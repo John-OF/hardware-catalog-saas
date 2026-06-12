@@ -5,11 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Multitenancy\Contracts\IsTenant;
+use Spatie\Multitenancy\Concerns\UsesMultitenancyConfig;
 use Spatie\Multitenancy\Models\Concerns\ImplementsTenant;
 
-class Tenant extends Model
+class Tenant extends Model implements IsTenant
 {
-    use HasUuids, ImplementsTenant;
+    use HasUuids, ImplementsTenant, UsesMultitenancyConfig;
 
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
