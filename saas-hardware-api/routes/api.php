@@ -21,6 +21,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])
 // Catálogo público (consultado por el frontend sin login)
 Route::prefix('public/{slug}')->group(function () {
     Route::get('/',          [PublicCatalogController::class, 'tenant']);
+    Route::get('/categories', [PublicCatalogController::class, 'categories']);
     Route::get('/products',  [PublicCatalogController::class, 'products']);
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
 });

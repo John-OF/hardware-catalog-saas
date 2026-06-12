@@ -61,4 +61,18 @@ class PublicCatalogController extends Controller
 
         return response()->json($product);
     }
+
+    public function categories(string $slug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $categories = Cache::remember("tenant:{$slug}:public_categories", 300, function () use ($tenant) {
+            return \App\Models\Category::where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get();
+        });
+
+        return response()->json($categories);
+    }
 }
