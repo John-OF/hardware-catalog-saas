@@ -1,0 +1,28 @@
+import { createBrowserRouter } from 'react-router-dom';
+import PrivateRoute from './PrivateRoute';
+import LoginPage from '../pages/auth/LoginPage';
+import DashboardPage from '../pages/dashboard/DashboardPage';
+import ProductsPage from '../pages/dashboard/ProductsPage';
+import CategoriesPage from '../pages/dashboard/CategoriesPage';
+import CatalogPage from '../pages/public/CatalogPage';
+import ProductDetailPage from '../pages/public/ProductDetailPage';
+
+export const router = createBrowserRouter([
+  // Rutas públicas
+  { path: '/login', element: <LoginPage /> },
+  { path: '/:slug', element: <CatalogPage /> },
+  { path: '/:slug/product/:id', element: <ProductDetailPage /> },
+
+  // Rutas privadas (dashboard)
+  {
+    path: '/dashboard',
+    element: <PrivateRoute><DashboardPage /></PrivateRoute>,
+    children: [
+      { path: 'products',   element: <ProductsPage /> },
+      { path: 'categories', element: <CategoriesPage /> },
+    ],
+  },
+
+  // Redirigir raíz al login
+  { path: '/', element: <LoginPage /> },
+]);
