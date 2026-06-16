@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Search, 
-  Store, 
+import {
+  Search,
+  Store,
   ChevronLeft,
-  ChevronRight, 
-  ShoppingBag, 
+  ChevronRight,
+  ShoppingBag,
   Loader2,
-  FolderOpen
+  FolderOpen,
+  MessageCircle,
+  LayoutGrid
 } from 'lucide-react';
 import api from '../../api/axios';
 import { getPublicTenant, getPublicProducts } from '../../api/public';
+import CategoryIcon from '../../components/ui/CategoryIcon';
+import { useTenantBranding } from '../../hooks/useTenantBranding';
 import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
 
 export default function CatalogPage() {
@@ -30,6 +34,9 @@ export default function CatalogPage() {
     enabled: !!slug,
   });
 
+  // Título y favicon de la pestaña según el tenant
+  useTenantBranding(tenant);
+
   // Apply tenant's primary color dynamically
   useEffect(() => {
     if (tenant?.primary_color) {
@@ -41,6 +48,14 @@ export default function CatalogPage() {
       const b = parseInt(hex.substring(4, 6), 16);
       document.documentElement.style.setProperty('--primary-glow', `rgba(${r}, ${g}, ${b}, 0.15)`);
     }
+    if (tenant?.theme?.accent_color) {
+      document.documentElement.style.setProperty('--accent', tenant.theme.accent_color);
+    }
+
+    // Modo claro/oscuro: se aplica al body para abarcar todo el viewport
+    const isLight = tenant?.theme?.color_mode === 'light';
+    document.body.classList.toggle('light-mode', isLight);
+    return () => document.body.classList.remove('light-mode');
   }, [tenant]);
 
   // Fetch active categories (since it's a shared db, we can fetch all, but the API filters by active tenant context based on headers? 
@@ -154,29 +169,41 @@ export default function CatalogPage() {
             {tenant.logo_url ? (
               <img src={tenant.logo_url} alt={tenant.name} />
             ) : (
-              <span>🏪</span>
+              <Store size={28} />
             )}
           </div>
           <h2>{tenant.name}</h2>
         </div>
         <div className="header-contact">
           <a 
-            href={`https://wa.me/${tenant.whatsapp_number.replace('+', '')}`} 
+            href={`https://wa.me/${tenant.whatsapp_number?.replace('+', '') ?? ''}`}
             target="_blank" 
             rel="noopener noreferrer" 
             className="btn-primary whatsapp-header-btn"
           >
-            💬 Contactar
+            <MessageCircle size={18} /> Contactar
           </a>
         </div>
       </header>
 
       {/* Hero Catalog */}
-      <section className="catalog-hero glass-card">
+      <section
+        className="catalog-hero glass-card"
+        style={tenant.theme?.banner_url ? {
+          backgroundImage: `linear-gradient(to right, rgba(11,15,25,0.92), rgba(11,15,25,0.55)), url(${tenant.theme.banner_url})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : undefined}
+      >
         <div className="hero-content">
-          <span className="hero-badge">CATÁLOGO VIRTUAL</span>
-          <h1>Encuentra las mejores piezas de hardware</h1>
-          <p>Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.</p>
+          <span
+            className="hero-badge"
+            style={tenant.theme?.accent_color ? { color: tenant.theme.accent_color, borderColor: tenant.theme.accent_color } : undefined}
+          >
+            CATÁLOGO VIRTUAL
+          </span>
+          <h1>{tenant.theme?.hero_title || 'Encuentra las mejores piezas de hardware'}</h1>
+          <p>{tenant.theme?.hero_subtitle || 'Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.'}</p>
         </div>
         <div className="hero-glow"></div>
       </section>
@@ -192,7 +219,7 @@ export default function CatalogPage() {
                 onClick={() => { setSelectedCategory(''); setPage(1); }} 
                 className={`category-filter-btn ${selectedCategory === '' ? 'active' : ''}`}
               >
-                <span>📁 Todos</span>
+                <span className="category-filter-label"><LayoutGrid size={16} /> Todos</span>
               </button>
               {publicCategories.map((cat) => (
                 <button 
@@ -200,7 +227,7 @@ export default function CatalogPage() {
                   onClick={() => { setSelectedCategory(cat.id); setPage(1); }} 
                   className={`category-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
                 >
-                  <span>{getEmojiIcon(cat.icon)} {cat.name}</span>
+                  <span className="category-filter-label"><CategoryIcon slug={cat.icon} size={16} /> {cat.name}</span>
                 </button>
               ))}
             </div>
@@ -481,6 +508,12 @@ export default function CatalogPage() {
           transition: var(--transition);
         }
 
+        .category-filter-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.55rem;
+        }
+
         .category-filter-btn:hover {
           background: rgba(255, 255, 255, 0.02);
           color: var(--text-primary);
@@ -676,7 +709,7 @@ export default function CatalogPage() {
         .card-price {
           font-size: 1.15rem;
           font-weight: 700;
-          color: white;
+          color: var(--text-primary);
         }
 
         .view-detail-link {
@@ -730,19 +763,3 @@ export default function CatalogPage() {
   );
 }
 
-// Mapeo útil de slugs de iconos a emojis
-function getEmojiIcon(iconSlug: string | null): string {
-  switch (iconSlug) {
-    case 'cpu': return '💻';
-    case 'gpu': return '🎮';
-    case 'ram': return '⚡';
-    case 'motherboard': return '🔌';
-    case 'ssd': return '💾';
-    case 'power': return '🔋';
-    case 'case': return '🖥️';
-    case 'cooling': return '❄️';
-    case 'monitor': return '📺';
-    case 'peripheral': return '🖱️';
-    default: return '📁';
-  }
-}

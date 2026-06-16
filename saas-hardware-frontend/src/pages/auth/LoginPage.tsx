@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
 import { loginUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
@@ -61,7 +61,7 @@ export default function LoginPage() {
       <div className="login-card glass-card animate-scale-in">
         <div className="login-header">
           <div className="logo-badge">
-            <span>⚙️</span>
+            <Cpu size={32} />
           </div>
           <h1>SaaS Hardware</h1>
           <p>Panel de Administración</p>

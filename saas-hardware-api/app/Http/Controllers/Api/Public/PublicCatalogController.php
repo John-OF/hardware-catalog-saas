@@ -16,8 +16,9 @@ class PublicCatalogController extends Controller
         $tenant = Cache::remember("tenant:{$slug}", 300, function () use ($slug) {
             return Tenant::where('slug', $slug)
                 ->where('is_active', true)
-                ->select(['id', 'slug', 'name', 'logo_url', 'primary_color', 'whatsapp_number'])
-                ->firstOrFail();
+                ->select(['id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number'])
+                ->firstOrFail()
+                ->toArray();
         });
 
         return response()->json($tenant);
@@ -43,7 +44,8 @@ class PublicCatalogController extends Controller
                 ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
                 ->orderByDesc('created_at')
-                ->paginate(24);
+                ->paginate(24)
+                ->toArray();
         });
 
         return response()->json($products);
@@ -70,7 +72,8 @@ class PublicCatalogController extends Controller
             return \App\Models\Category::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->orderBy('sort_order')
-                ->get();
+                ->get()
+                ->toArray();
         });
 
         return response()->json($categories);

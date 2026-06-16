@@ -10,6 +10,7 @@ import {
   Phone
 } from 'lucide-react';
 import { getPublicTenant, getPublicProduct } from '../../api/public';
+import { useTenantBranding } from '../../hooks/useTenantBranding';
 import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
@@ -32,6 +33,15 @@ export default function ProductDetailPage() {
       const b = parseInt(hex.substring(4, 6), 16);
       document.documentElement.style.setProperty('--primary-glow', `rgba(${r}, ${g}, ${b}, 0.15)`);
     }
+    if (tenant?.theme?.accent_color) {
+      document.documentElement.style.setProperty('--accent', tenant.theme.accent_color);
+    }
+
+    // Modo claro/oscuro: replicar el comportamiento del catálogo para que el
+    // detalle no vuelva a oscuro cuando el tenant está en modo claro.
+    const isLight = tenant?.theme?.color_mode === 'light';
+    document.body.classList.toggle('light-mode', isLight);
+    return () => document.body.classList.remove('light-mode');
   }, [tenant]);
 
   // Fetch Product Info
@@ -40,6 +50,9 @@ export default function ProductDetailPage() {
     queryFn: () => getPublicProduct(slug!, id!),
     enabled: !!slug && !!id,
   });
+
+  // Título y favicon de la pestaña: "Producto · Mi Tienda"
+  useTenantBranding(tenant, product?.name);
 
   // Whatsapp redirect handler
   const handleWhatsappQuery = () => {
@@ -331,7 +344,7 @@ export default function ProductDetailPage() {
         .detail-price {
           font-size: 2.25rem;
           font-weight: 800;
-          color: white;
+          color: var(--text-primary);
           line-height: 1.1;
         }
 
@@ -441,7 +454,7 @@ export default function ProductDetailPage() {
         }
 
         .spec-value {
-          color: white;
+          color: var(--text-primary);
           width: 60%;
         }
 

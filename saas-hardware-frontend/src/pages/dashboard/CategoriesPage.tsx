@@ -12,12 +12,13 @@ import {
   EyeOff, 
   Loader2 
 } from 'lucide-react';
-import { 
-  getCategories, 
-  createCategory, 
-  updateCategory, 
-  deleteCategory 
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory
 } from '../../api/categories';
+import CategoryIcon from '../../components/ui/CategoryIcon';
 import type { Category } from '../../types';
 
 export default function CategoriesPage() {
@@ -162,9 +163,7 @@ export default function CategoriesPage() {
             <div key={category.id} className="category-card glass-card">
               <div className="category-card-header">
                 <div className="category-icon-sphere">
-                  <span className="category-emoji">
-                    {getEmojiIcon(category.icon)}
-                  </span>
+                  <CategoryIcon slug={category.icon} size={28} />
                 </div>
                 <div className="category-status">
                   {category.is_active ? (
@@ -224,25 +223,43 @@ export default function CategoriesPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="cat-icon">Icono / Emoji Relacionado</label>
-                <select
-                  id="cat-icon"
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  className="premium-input select-input"
-                >
-                  <option value="cpu">💻 Procesadores (CPU)</option>
-                  <option value="gpu">🎮 Tarjetas de Video (GPU)</option>
-                  <option value="ram">⚡ Memorias RAM</option>
-                  <option value="motherboard">🔌 Placas Madre (Motherboard)</option>
-                  <option value="ssd">💾 Almacenamiento (SSD/HDD)</option>
-                  <option value="power">🔌 Fuentes de Poder</option>
-                  <option value="case">🖥️ Gabinetes / Chasis</option>
-                  <option value="cooling">❄️ Enfriamiento / Disipadores</option>
-                  <option value="monitor">📺 Monitores</option>
-                  <option value="peripheral">🖱️ Periféricos (Teclado/Mouse)</option>
-                  <option value="folder">📁 Genérico / Otros</option>
-                </select>
+                <label htmlFor="cat-icon">Icono Relacionado</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '42px',
+                      height: '42px',
+                      flexShrink: 0,
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+                      color: 'var(--primary)',
+                    }}
+                  >
+                    <CategoryIcon slug={icon} size={20} />
+                  </span>
+                  <select
+                    id="cat-icon"
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                    className="premium-input select-input"
+                    style={{ flex: 1 }}
+                  >
+                    <option value="cpu">Procesadores (CPU)</option>
+                    <option value="gpu">Tarjetas de Video (GPU)</option>
+                    <option value="ram">Memorias RAM</option>
+                    <option value="motherboard">Placas Madre (Motherboard)</option>
+                    <option value="ssd">Almacenamiento (SSD/HDD)</option>
+                    <option value="power">Fuentes de Poder</option>
+                    <option value="case">Gabinetes / Chasis</option>
+                    <option value="cooling">Enfriamiento / Disipadores</option>
+                    <option value="monitor">Monitores</option>
+                    <option value="peripheral">Periféricos (Teclado/Mouse)</option>
+                    <option value="folder">Genérico / Otros</option>
+                  </select>
+                </div>
               </div>
 
               <div className="form-row">
@@ -375,10 +392,7 @@ export default function CategoriesPage() {
           align-items: center;
           justify-content: center;
           box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05);
-        }
-
-        .category-emoji {
-          font-size: 1.25rem;
+          color: var(--primary);
         }
 
         .category-card-body h3 {
@@ -585,21 +599,4 @@ export default function CategoriesPage() {
       `}</style>
     </div>
   );
-}
-
-// Mapeo útil de slugs de iconos a emojis
-function getEmojiIcon(iconSlug: string | null): string {
-  switch (iconSlug) {
-    case 'cpu': return '💻';
-    case 'gpu': return '🎮';
-    case 'ram': return '⚡';
-    case 'motherboard': return '🔌';
-    case 'ssd': return '💾';
-    case 'power': return '🔋';
-    case 'case': return '🖥️';
-    case 'cooling': return '❄️';
-    case 'monitor': return '📺';
-    case 'peripheral': return '🖱️';
-    default: return '📁';
-  }
 }

@@ -20,12 +20,13 @@ class Tenant extends Model implements IsTenant
     }
 
     protected $fillable = [
-        'slug', 'name', 'logo_url', 'primary_color',
+        'slug', 'name', 'logo_url', 'primary_color', 'theme',
         'whatsapp_number', 'plan', 'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'theme'     => 'array',
     ];
 
     public function users(): HasMany

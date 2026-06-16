@@ -1,9 +1,20 @@
+export interface TenantTheme {
+  hero_title?: string | null;
+  hero_subtitle?: string | null;
+  banner_url?: string | null;
+  accent_color?: string | null;
+  color_mode?: 'dark' | 'light' | null;
+  page_title?: string | null;
+  favicon_url?: string | null;
+}
+
 export interface Tenant {
   id: string;
   slug: string;
   name: string;
   logo_url: string | null;
   primary_color: string;
+  theme: TenantTheme | null;
   whatsapp_number: string;
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;

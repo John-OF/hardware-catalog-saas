@@ -6,11 +6,12 @@ import {
   FolderTree, 
   LogOut, 
   ExternalLink, 
-  Store, 
-  User as UserIcon, 
-  Menu, 
+  Store,
+  User as UserIcon,
+  Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -86,6 +87,7 @@ export default function DashboardPage() {
   const getSectionTitle = () => {
     if (location.pathname.includes('/dashboard/products')) return 'Productos';
     if (location.pathname.includes('/dashboard/categories')) return 'Categorías';
+    if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
     return 'Dashboard';
   };
 
@@ -165,6 +167,16 @@ export default function DashboardPage() {
           >
             <FolderTree size={20} />
             <span>Categorías</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink
+            to="/dashboard/settings"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <Settings size={20} />
+            <span>Configuración</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
         </nav>

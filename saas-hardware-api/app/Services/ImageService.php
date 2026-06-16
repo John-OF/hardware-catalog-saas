@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\Laravel\Facades\Image;
 
 class ImageService
@@ -19,9 +20,9 @@ class ImageService
         $folder   = "products/{$tenantSlug}";
 
         // Imagen principal: máx 1200×1200 px, WebP calidad 85
-        $mainImage = Image::read($file)
+        $mainImage = Image::decodePath($file->getRealPath())
             ->scaleDown(width: 1200, height: 1200)
-            ->toWebp(quality: 85);
+            ->encode(new WebpEncoder(quality: 85));
 
         $mainPath = "{$folder}/{$filename}.webp";
         // En desarrollo, si no está configurado R2, guardar local
@@ -29,9 +30,9 @@ class ImageService
         Storage::disk($disk)->put($mainPath, $mainImage->toString());
 
         // Thumbnail: 400×400 px, recortado centrado
-        $thumb = Image::read($file)
+        $thumb = Image::decodePath($file->getRealPath())
             ->cover(width: 400, height: 400)
-            ->toWebp(quality: 80);
+            ->encode(new WebpEncoder(quality: 80));
 
         $thumbPath = "{$folder}/{$filename}_thumb.webp";
         Storage::disk($disk)->put($thumbPath, $thumb->toString());
@@ -40,6 +41,22 @@ class ImageService
             'image_url'     => Storage::disk($disk)->url($mainPath),
             'thumbnail_url' => Storage::disk($disk)->url($thumbPath),
         ];
+    }
+
+    /**
+     * Sube un favicon SIN pasar por el pipeline de WebP/escalado: un favicon
+     * debe conservar su formato original (.ico/.png/.svg) y ser pequeño.
+     * Devuelve la URL pública del archivo.
+     */
+    public function uploadFavicon(UploadedFile $file, string $tenantSlug): string
+    {
+        $ext  = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $path = "branding/{$tenantSlug}/favicon-" . Str::uuid()->toString() . ".{$ext}";
+
+        $disk = config('filesystems.default') === 'r2' ? 'r2' : 'public';
+        Storage::disk($disk)->put($path, file_get_contents($file->getRealPath()));
+
+        return Storage::disk($disk)->url($path);
     }
 
     /**
