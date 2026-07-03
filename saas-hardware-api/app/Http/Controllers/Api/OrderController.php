@@ -15,7 +15,8 @@ class OrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Order::withCount('items')
+        $query = Order::with('items')
+            ->withCount('items')
             ->orderBy('created_at', 'desc');
 
         // Filtro por estado
