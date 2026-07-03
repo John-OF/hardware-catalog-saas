@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  Settings
+  Settings,
+  ShoppingCart
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -88,6 +89,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/products')) return 'Productos';
     if (location.pathname.includes('/dashboard/categories')) return 'Categorías';
     if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
+    if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
     return 'Dashboard';
   };
 
@@ -167,6 +169,16 @@ export default function DashboardPage() {
           >
             <FolderTree size={20} />
             <span>Categorías</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink 
+            to="/dashboard/orders" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <ShoppingCart size={20} />
+            <span>Pedidos</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

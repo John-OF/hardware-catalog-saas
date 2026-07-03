@@ -5,6 +5,7 @@ import DashboardPage from '../pages/dashboard/DashboardPage';
 import ProductsPage from '../pages/dashboard/ProductsPage';
 import CategoriesPage from '../pages/dashboard/CategoriesPage';
 import SettingsPage from '../pages/dashboard/SettingsPage';
+import OrdersPage from '../pages/dashboard/OrdersPage';
 import CatalogPage from '../pages/public/CatalogPage';
 import ProductDetailPage from '../pages/public/ProductDetailPage';
 
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: 'products',   element: <ProductsPage /> },
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'settings',   element: <SettingsPage /> },
+      { path: 'orders',     element: <OrdersPage /> },
     ],
   },
 

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Public\PublicCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,4 +50,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     // Categorías
     Route::apiResource('categories', CategoryController::class);
+
+    // Pedidos
+    Route::apiResource('orders', OrderController::class);
 });

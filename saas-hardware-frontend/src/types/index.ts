@@ -78,6 +78,7 @@ export interface Order {
   status: 'pending' | 'attended' | 'cancelled';
   total: number;
   items: OrderItem[];
+  items_count?: number;
   created_at: string;
 }
 

@@ -11,6 +11,7 @@
   --bg-card: rgba(17, 24, 39, 0.7);
   --bg-card-hover: rgba(26, 36, 56, 0.85);
   --bg-sidebar: #0f172a;
+  --bg-select-option: #111827;
   
   --border: rgba(255, 255, 255, 0.08);
   --border-focus: rgba(37, 99, 235, 0.5);
@@ -53,6 +54,7 @@
   --bg-card: rgba(255, 255, 255, 0.85);
   --bg-card-hover: rgba(255, 255, 255, 0.95);
   --bg-sidebar: #0f172a; /* Mantiene barra oscura */
+  --bg-select-option: #ffffff;
   
   --border: rgba(15, 23, 42, 0.08);
   --border-focus: rgba(37, 99, 235, 0.6);
@@ -188,6 +190,16 @@ h1, h2, h3, h4, h5, h6 {
 
 .premium-input::placeholder {
   color: var(--text-muted);
+}
+
+/* Interactive Select Custom styling to fix white background / white text browser bug */
+select.premium-input {
+  background-color: var(--bg-select-option);
+}
+
+select.premium-input option {
+  background-color: var(--bg-select-option);
+  color: var(--text-primary);
 }
 
 /* Premium Buttons */
