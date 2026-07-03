@@ -10,22 +10,39 @@ import {
   Loader2,
   FolderOpen,
   MessageCircle,
-  LayoutGrid
+  LayoutGrid,
+  ShoppingCart,
+  Plus
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import { getPublicTenant, getPublicProducts } from '../../api/public';
 import CategoryIcon from '../../components/ui/CategoryIcon';
+import CartDrawer from '../../components/public/CartDrawer';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
+import { useCartStore } from '../../stores/cartStore';
 import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
-  
+
   // States
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [inStock, setInStock] = useState(false);
   const [page, setPage] = useState(1);
+  const [cartOpen, setCartOpen] = useState(false);
+
+  // Carrito
+  const addItem = useCartStore((s) => s.addItem);
+  const cartCount = useCartStore((s) => s.totalItems());
+
+  const handleAddToCart = (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem(slug!, product);
+    toast.success(`${product.name} agregado al pedido`);
+  };
 
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant, isError: isErrorTenant } = useQuery<Tenant>({
@@ -175,10 +192,19 @@ export default function CatalogPage() {
           <h2>{tenant.name}</h2>
         </div>
         <div className="header-contact">
-          <a 
+          <button
+            type="button"
+            className="cart-trigger"
+            onClick={() => setCartOpen(true)}
+            aria-label="Ver pedido"
+          >
+            <ShoppingCart size={20} />
+            {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+          </button>
+          <a
             href={`https://wa.me/${tenant.whatsapp_number?.replace('+', '') ?? ''}`}
-            target="_blank" 
-            rel="noopener noreferrer" 
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn-primary whatsapp-header-btn"
           >
             <MessageCircle size={18} /> Contactar
@@ -309,6 +335,14 @@ export default function CatalogPage() {
                           Ver más <ChevronRight size={14} />
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        className="card-add-btn"
+                        onClick={(e) => handleAddToCart(e, product)}
+                        disabled={product.stock === 0}
+                      >
+                        <Plus size={15} /> {product.stock === 0 ? 'Agotado' : 'Agregar'}
+                      </button>
                     </div>
                   </Link>
                 ))}
@@ -337,6 +371,8 @@ export default function CatalogPage() {
             </>
           )}
         </div>
+
+        <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={slug!} tenant={tenant} />
       </div>
 
       <style>{`
@@ -710,6 +746,65 @@ export default function CatalogPage() {
           font-size: 1.15rem;
           font-weight: 700;
           color: var(--text-primary);
+        }
+
+        .card-add-btn {
+          margin-top: 0.85rem;
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+          padding: 0.55rem;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--primary);
+          background: var(--primary-glow);
+          color: var(--primary);
+          font-family: var(--font-sans);
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: var(--transition);
+        }
+        .card-add-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
+        .card-add-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--border); color: var(--text-muted); background: transparent; }
+
+        .header-contact {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+
+        .cart-trigger {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: var(--transition);
+        }
+        .cart-trigger:hover { border-color: var(--primary); color: var(--primary); }
+        .cart-badge {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          min-width: 20px;
+          height: 20px;
+          padding: 0 5px;
+          border-radius: 10px;
+          background: var(--primary);
+          color: #fff;
+          font-size: 0.7rem;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .view-detail-link {

@@ -2,15 +2,18 @@ import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
-  ArrowLeft, 
-  ShoppingBag, 
-  CheckCircle, 
+  ArrowLeft,
+  ShoppingBag,
+  CheckCircle,
   XCircle,
   Loader2,
-  Phone
+  Phone,
+  Plus
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { getPublicTenant, getPublicProduct } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
+import { useCartStore } from '../../stores/cartStore';
 import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
@@ -53,6 +56,14 @@ export default function ProductDetailPage() {
 
   // Título y favicon de la pestaña: "Producto · Mi Tienda"
   useTenantBranding(tenant, product?.name);
+
+  const addItem = useCartStore((s) => s.addItem);
+
+  const handleAddToCart = () => {
+    if (!product || !slug) return;
+    addItem(slug, product);
+    toast.success(`${product.name} agregado al pedido`);
+  };
 
   // Whatsapp redirect handler
   const handleWhatsappQuery = () => {
@@ -181,14 +192,24 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Call to action */}
-          <button 
-            onClick={handleWhatsappQuery} 
-            className="btn-primary whatsapp-buy-btn"
-            disabled={product.stock === 0}
-          >
-            <Phone size={18} />
-            <span>Consultar por WhatsApp</span>
-          </button>
+          <div className="detail-cta-row">
+            <button
+              onClick={handleAddToCart}
+              className="btn-secondary add-cart-btn"
+              disabled={product.stock === 0}
+            >
+              <Plus size={18} />
+              <span>{product.stock === 0 ? 'Agotado' : 'Agregar al pedido'}</span>
+            </button>
+            <button
+              onClick={handleWhatsappQuery}
+              className="btn-primary whatsapp-buy-btn"
+              disabled={product.stock === 0}
+            >
+              <Phone size={18} />
+              <span>Consultar</span>
+            </button>
+          </div>
 
           {/* Description */}
           {product.description && (
@@ -375,8 +396,25 @@ export default function ProductDetailPage() {
         }
 
         /* Buy button */
+        .detail-cta-row {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .add-cart-btn {
+          flex: 1;
+          padding: 1rem;
+          font-size: 1rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+        .add-cart-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .whatsapp-buy-btn {
-          width: 100%;
+          flex: 1;
           padding: 1rem;
           font-size: 1.05rem;
           font-weight: 600;

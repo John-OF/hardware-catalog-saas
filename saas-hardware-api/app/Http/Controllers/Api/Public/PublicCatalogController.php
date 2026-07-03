@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\Public;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class PublicCatalogController extends Controller
 {
@@ -77,5 +80,72 @@ class PublicCatalogController extends Controller
         });
 
         return response()->json($categories);
+    }
+
+    /**
+     * Crea una solicitud de pedido desde el catálogo público.
+     * El cierre real se hace por WhatsApp; aquí solo se registra el pedido.
+     */
+    public function storeOrder(Request $request, string $slug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $data = $request->validate([
+            'customer_name'      => 'required|string|max:200',
+            'customer_phone'     => 'required|string|max:30',
+            'customer_note'      => 'nullable|string|max:1000',
+            'items'              => 'required|array|min:1|max:100',
+            'items.*.product_id' => 'required|uuid',
+            'items.*.quantity'   => 'required|integer|min:1|max:999',
+        ]);
+
+        // Cargar todos los productos solicitados de una vez, scopeados al tenant
+        // y solo activos. NO confiamos en el precio que envía el cliente.
+        $productIds = collect($data['items'])->pluck('product_id')->unique();
+        $products = Product::where('tenant_id', $tenant->id)
+            ->where('is_active', true)
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $lineItems = [];
+        $total = 0;
+        foreach ($data['items'] as $item) {
+            $product = $products->get($item['product_id']);
+            if (!$product) {
+                // Algún producto ya no existe o fue desactivado.
+                return response()->json([
+                    'message' => 'Uno de los productos ya no está disponible. Actualiza tu carrito.',
+                ], 422);
+            }
+
+            $subtotal = round((float) $product->price * $item['quantity'], 2);
+            $total += $subtotal;
+
+            $lineItems[] = [
+                'product_id'   => $product->id,
+                'product_name' => $product->name,
+                'unit_price'   => $product->price,
+                'quantity'     => $item['quantity'],
+                'subtotal'     => $subtotal,
+            ];
+        }
+
+        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total) {
+            $order = Order::create([
+                'tenant_id'      => $tenant->id,
+                'customer_name'  => $data['customer_name'],
+                'customer_phone' => $data['customer_phone'],
+                'customer_note'  => $data['customer_note'] ?? null,
+                'status'         => 'pending',
+                'total'          => $total,
+            ]);
+
+            $order->items()->createMany($lineItems);
+
+            return $order;
+        });
+
+        return response()->json($order->load('items'), 201);
     }
 }

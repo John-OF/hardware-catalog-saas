@@ -24,6 +24,10 @@ Route::prefix('public/{slug}')->group(function () {
     Route::get('/categories', [PublicCatalogController::class, 'categories']);
     Route::get('/products',  [PublicCatalogController::class, 'products']);
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
+
+    // Crear solicitud de pedido (público, limitado para evitar spam)
+    Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
+        ->middleware('throttle:10,1');
 });
 
 /*

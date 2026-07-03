@@ -56,6 +56,31 @@ export interface Product {
   created_at: string;
 }
 
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+export interface OrderItem {
+  id: string;
+  product_id: string | null;
+  product_name: string;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_note: string | null;
+  status: 'pending' | 'attended' | 'cancelled';
+  total: number;
+  items: OrderItem[];
+  created_at: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;
