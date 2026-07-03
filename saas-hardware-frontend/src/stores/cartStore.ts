@@ -49,7 +49,12 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       totalAmount: () =>
-        get().items.reduce((acc, i) => acc + Number(i.product.price) * i.quantity, 0),
+        get().items.reduce((acc, i) => {
+          const price = i.product.sale_price !== null && i.product.sale_price !== undefined
+            ? Number(i.product.sale_price)
+            : Number(i.product.price);
+          return acc + price * i.quantity;
+        }, 0),
     }),
     { name: 'catalog-cart' }
   )

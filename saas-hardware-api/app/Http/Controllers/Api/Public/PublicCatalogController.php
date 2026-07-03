@@ -119,13 +119,14 @@ class PublicCatalogController extends Controller
                 ], 422);
             }
 
-            $subtotal = round((float) $product->price * $item['quantity'], 2);
+            $actualPrice = $product->sale_price !== null ? (float) $product->sale_price : (float) $product->price;
+            $subtotal = round($actualPrice * $item['quantity'], 2);
             $total += $subtotal;
 
             $lineItems[] = [
                 'product_id'   => $product->id,
                 'product_name' => $product->name,
-                'unit_price'   => $product->price,
+                'unit_price'   => $actualPrice,
                 'quantity'     => $item['quantity'],
                 'subtotal'     => $subtotal,
             ];

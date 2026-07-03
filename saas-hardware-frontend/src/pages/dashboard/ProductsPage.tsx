@@ -14,9 +14,11 @@ import {
   Eye, 
   EyeOff, 
   ChevronLeft, 
-  ChevronRight
+  ChevronRight,
+  Upload,
+  AlertCircle
 } from 'lucide-react';
-import { getProducts, createProduct, updateProduct, deleteProduct } from '../../api/products';
+import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import type { Product, Category, PaginatedResponse } from '../../types';
 
@@ -32,10 +34,17 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // Import states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importReport, setImportReport] = useState<{ message: string; success_count: number; errors: string[] } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
   // Form inputs
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
@@ -112,6 +121,7 @@ export default function ProductsPage() {
     setName('');
     setBrand('');
     setPrice('');
+    setSalePrice('');
     setStock('');
     setCategoryId('');
     setDescription('');
@@ -127,6 +137,7 @@ export default function ProductsPage() {
     setName(product.name);
     setBrand(product.brand || '');
     setPrice(product.price.toString());
+    setSalePrice(product.sale_price ? product.sale_price.toString() : '');
     setStock(product.stock.toString());
     setCategoryId(product.category_id || '');
     setDescription(product.description || '');
@@ -184,10 +195,16 @@ export default function ProductsPage() {
       return;
     }
 
+    if (salePrice && Number(salePrice) >= Number(price)) {
+      toast.error('El precio de oferta debe ser menor que el precio regular.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('name', name);
     formData.append('brand', brand);
     formData.append('price', price);
+    formData.append('sale_price', salePrice || '');
     formData.append('stock', stock);
     formData.append('category_id', categoryId);
     formData.append('description', description);
@@ -213,6 +230,51 @@ export default function ProductsPage() {
     } else {
       createMutation.mutate(formData);
     }
+  };
+
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) {
+      toast.error('Por favor, selecciona un archivo CSV.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportReport(null);
+
+    try {
+      const report = await importProductsCsv(importFile);
+      setImportReport(report);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      
+      if (report.errors.length === 0) {
+        toast.success(report.message);
+        setIsImportModalOpen(false);
+        setImportFile(null);
+      } else {
+        toast.error(`Importación parcial: ${report.success_count} productos cargados con éxito.`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.message || 'Error al importar los productos.';
+      toast.error(msg);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = "nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
+    const row = "Intel Core i7-14700K;Intel;409.99;389.99;15;Procesadores;Procesador de alto rendimiento para socket LGA1700;Frecuencia:3.4 GHz;Núcleos:20\n";
+    const blob = new Blob([headers + row], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "plantilla_productos.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -257,10 +319,17 @@ export default function ProductsPage() {
           ))}
         </select>
 
-        <button onClick={openCreateModal} className="btn-primary add-product-btn">
-          <Plus size={18} />
-          <span>Nuevo Producto</span>
-        </button>
+        <div className="action-buttons-group" style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
+            <Upload size={18} />
+            <span>Importar CSV</span>
+          </button>
+
+          <button onClick={openCreateModal} className="btn-primary add-product-btn">
+            <Plus size={18} />
+            <span>Nuevo Producto</span>
+          </button>
+        </div>
       </div>
 
       {/* Products list */}
@@ -317,7 +386,20 @@ export default function ProductsPage() {
                         {product.category?.name || 'Sin Categoría'}
                       </span>
                     </td>
-                    <td className="price-cell">${parseFloat(product.price.toString()).toFixed(2)}</td>
+                    <td className="price-cell">
+                      {product.sale_price !== null && product.sale_price !== undefined ? (
+                        <div className="admin-price-box">
+                          <span className="strike-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.85em', marginRight: '0.4rem', fontWeight: 'normal' }}>
+                            ${parseFloat(product.price.toString()).toFixed(2)}
+                          </span>
+                          <span className="sale-price-active" style={{ color: 'var(--success)', fontWeight: 700 }}>
+                            ${parseFloat(product.sale_price.toString()).toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        `$${parseFloat(product.price.toString()).toFixed(2)}`
+                      )}
+                    </td>
                     <td>
                       <div className="stock-cell">
                         <span className={`stock-number ${product.stock === 0 ? 'out' : product.stock < 5 ? 'low' : ''}`}>
@@ -453,7 +535,7 @@ export default function ProductsPage() {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label htmlFor="prod-price">Precio ($ USD)</label>
+                  <label htmlFor="prod-price">Precio Regular ($ USD)</label>
                   <input
                     id="prod-price"
                     type="number"
@@ -468,6 +550,22 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="form-group half">
+                  <label htmlFor="prod-saleprice">Precio de Oferta ($ USD - Opcional)</label>
+                  <input
+                    id="prod-saleprice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(e.target.value)}
+                    className="premium-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group half">
                   <label htmlFor="prod-stock">Stock disponible</label>
                   <input
                     id="prod-stock"
@@ -479,6 +577,9 @@ export default function ProductsPage() {
                     className="premium-input"
                     required
                   />
+                </div>
+                <div className="form-group half">
+                  {/* Espacio vacío para grilla */}
                 </div>
               </div>
 
@@ -555,6 +656,111 @@ export default function ProductsPage() {
                 <button type="submit" disabled={isSubmitting} className="btn-primary">
                   {isSubmitting ? <Loader2 className="spinner" size={16} /> : null}
                   {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="modal-overlay" onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}>
+          <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+            <header className="modal-header">
+              <div>
+                <h3>Importación Masiva de Productos (CSV)</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                  Sube una plantilla CSV para crear o actualizar componentes rápidamente.
+                </p>
+              </div>
+              <button 
+                className="close-btn" 
+                onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }} 
+                aria-label="Cerrar modal"
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <form onSubmit={handleImportSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="customer-summary-card" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>Formato y Columnas Permitidas</h4>
+                <p>El archivo debe estar codificado en UTF-8 y tener como cabecera (primera fila):</p>
+                <code style={{ background: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.6rem', borderRadius: '4px', fontFamily: 'monospace', color: 'var(--primary)', display: 'block', wordBreak: 'break-all' }}>
+                  nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones
+                </code>
+                <ul style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                  <li><strong>nombre</strong>, <strong>precio</strong> y <strong>stock</strong> son obligatorios.</li>
+                  <li><strong>categoria</strong>: si no existe en la tienda, se creará automáticamente.</li>
+                  <li><strong>especificaciones</strong>: formato de clave:valor separados por punto y coma (ej: <code>Frecuencia:3.2 GHz;Núcleos:16</code>).</li>
+                </ul>
+                
+                <button 
+                  type="button" 
+                  onClick={handleDownloadTemplate} 
+                  className="btn-secondary" 
+                  style={{ alignSelf: 'flex-start', marginTop: '0.5rem', padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+                >
+                  <Upload size={14} style={{ transform: 'rotate(180deg)', marginRight: '4px' }} /> Descargar Plantilla Modelo CSV
+                </button>
+              </div>
+
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Selecciona el archivo (.csv)</label>
+                <input 
+                  type="file" 
+                  accept=".csv,text/csv" 
+                  className="premium-input" 
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      setImportFile(files[0]);
+                      setImportReport(null);
+                    }
+                  }}
+                  required
+                />
+              </div>
+
+              {/* Import Results Report */}
+              {importReport && (
+                <div className="customer-summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '200px', overflowY: 'auto' }}>
+                  <h4 style={{ color: importReport.errors.length > 0 ? 'var(--warning)' : 'var(--success)', margin: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <AlertCircle size={16} />
+                    {importReport.errors.length > 0 ? 'Importación Parcial / Errores Detectados' : 'Importación Exitosa'}
+                  </h4>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>{importReport.message}</p>
+                  
+                  {importReport.errors.length > 0 && (
+                    <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Errores por fila:</span>
+                      <ul style={{ paddingLeft: '1.2rem', color: 'var(--danger)', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {importReport.errors.map((err, idx) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="modal-actions-bar" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }} 
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isImporting} 
+                  className="btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
+                  <span>{isImporting ? 'Importando...' : 'Iniciar Importación'}</span>
                 </button>
               </div>
             </form>
@@ -1005,6 +1211,79 @@ export default function ProductsPage() {
         .toggle-text {
           font-size: 0.9rem;
           color: var(--text-secondary);
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 150;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+          width: 100%;
+          background: var(--glass-bg);
+          border: 1px solid var(--glass-border);
+          box-shadow: var(--shadow-xl);
+          border-radius: var(--radius-lg);
+          display: flex;
+          flex-direction: column;
+          max-height: 90vh;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1.25rem 1.5rem;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h3 {
+          font-size: 1.15rem;
+          color: var(--text-primary);
+          margin-bottom: 0.25rem;
+        }
+
+        .close-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          cursor: pointer;
+          display: flex;
+        }
+
+        .modal-body {
+          padding: 1.5rem;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .customer-summary-card {
+          background: rgba(255, 255, 255, 0.015);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 1.25rem;
+        }
+
+        .customer-summary-card h4 {
+          font-size: 0.95rem;
+          color: var(--text-primary);
+          margin-bottom: 1rem;
+          font-family: var(--font-heading);
+        }
+
+        .modal-actions-bar {
+          display: flex;
+          gap: 0.75rem;
+          margin-top: 0.5rem;
         }
 
         @media (max-width: 768px) {

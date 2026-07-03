@@ -46,6 +46,7 @@ export interface Product {
   name: string;
   brand: string | null;
   price: number;
+  sale_price: number | null;
   stock: number;
   is_available: boolean;
   description: string | null;

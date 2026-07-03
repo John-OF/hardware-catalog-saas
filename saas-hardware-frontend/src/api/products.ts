@@ -40,3 +40,20 @@ export const updateProduct = async (id: string, formData: FormData): Promise<Pro
 export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete(`/products/${id}`);
 };
+
+export interface ImportReport {
+  message: string;
+  success_count: number;
+  errors: string[];
+}
+
+export const importProductsCsv = async (file: File): Promise<ImportReport> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post<ImportReport>('/products/import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};

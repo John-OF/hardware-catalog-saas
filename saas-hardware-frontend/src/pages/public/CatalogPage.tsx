@@ -305,13 +305,27 @@ export default function CatalogPage() {
                       {product.stock > 0 && product.stock < 5 && (
                         <span className="card-badge low-stock">Pocas Unidades</span>
                       )}
+                      {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
+                        <span className="card-badge sale">Oferta</span>
+                      )}
                     </div>
 
                     <div className="card-details">
                       <span className="card-brand">{product.brand || 'Genérico'}</span>
                       <h3 className="card-title">{product.name}</h3>
                       <div className="card-footer">
-                        <span className="card-price">${parseFloat(product.price.toString()).toFixed(2)}</span>
+                        <span className="card-price">
+                          {product.sale_price !== null && product.sale_price !== undefined ? (
+                            <>
+                              <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
+                                ${parseFloat(product.price.toString()).toFixed(2)}
+                              </span>
+                              <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                            </>
+                          ) : (
+                            `$${parseFloat(product.price.toString()).toFixed(2)}`
+                          )}
+                        </span>
                         <span className="view-detail-link">
                           Ver más <ChevronRight size={14} />
                         </span>
@@ -684,6 +698,12 @@ export default function CatalogPage() {
 
         .card-badge.low-stock {
           background: rgba(245, 158, 11, 0.85);
+          color: white;
+          backdrop-filter: blur(4px);
+        }
+
+        .card-badge.sale {
+          background: var(--success);
           color: white;
           backdrop-filter: blur(4px);
         }

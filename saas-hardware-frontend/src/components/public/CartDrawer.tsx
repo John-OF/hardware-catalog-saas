@@ -27,9 +27,12 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   const [sending, setSending] = useState(false);
 
   const buildWhatsappMessage = (orderId: string) => {
-    const lines = items.map(
-      (i) => `• ${i.quantity} x ${i.product.name} — ${money(Number(i.product.price) * i.quantity)}`
-    );
+    const lines = items.map((i) => {
+      const price = i.product.sale_price !== null && i.product.sale_price !== undefined
+        ? Number(i.product.sale_price)
+        : Number(i.product.price);
+      return `• ${i.quantity} x ${i.product.name} — ${money(price * i.quantity)}`;
+    });
     return (
       `Hola ${tenant.name}, quiero hacer este pedido:\n\n` +
       `${lines.join('\n')}\n\n` +
@@ -98,7 +101,20 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                   </div>
                   <div className="cart-item-info">
                     <p className="cart-item-name">{i.product.name}</p>
-                    <span className="cart-item-price">{money(Number(i.product.price))}</span>
+                    <span className="cart-item-price">
+                      {i.product.sale_price !== null && i.product.sale_price !== undefined ? (
+                        <>
+                          <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.35rem', opacity: 0.6 }}>
+                            {money(Number(i.product.price))}
+                          </span>
+                          <span className="sale-price-active" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                            {money(Number(i.product.sale_price))}
+                          </span>
+                        </>
+                      ) : (
+                        money(Number(i.product.price))
+                      )}
+                    </span>
                   </div>
                   <div className="cart-item-actions">
                     <div className="qty-stepper">

@@ -30,6 +30,7 @@ class UpdateProductRequest extends FormRequest
             'name'        => 'sometimes|string|max:300',
             'brand'       => 'nullable|string|max:100',
             'price'       => 'sometimes|numeric|min:0',
+            'sale_price'  => 'nullable|numeric|min:0',
             'stock'       => 'sometimes|integer|min:0',
             'category_id' => 'nullable|uuid|exists:categories,id',
             'description' => 'nullable|string|max:5000',

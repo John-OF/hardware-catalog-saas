@@ -52,7 +52,8 @@ export default function ProductDetailPage() {
     if (!product || !tenant) return;
 
     const currentUrl = window.location.href;
-    const baseMessage = `Hola, estoy interesado en el producto *${product.name}* (Precio: $${parseFloat(product.price.toString()).toFixed(2)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
+    const finalPrice = product.sale_price !== null && product.sale_price !== undefined ? product.sale_price : product.price;
+    const baseMessage = `Hola, estoy interesado en el producto *${product.name}* (Precio: $${parseFloat(finalPrice.toString()).toFixed(2)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
     const encodedMessage = encodeURIComponent(baseMessage);
     
     // Quitar cualquier carácter que no sea numérico del teléfono
@@ -148,8 +149,21 @@ export default function ProductDetailPage() {
           {/* Pricing & Stock card */}
           <div className="pricing-stock-card">
             <div className="detail-price-box">
-              <span className="price-label">Precio Sugerido</span>
-              <span className="detail-price">${parseFloat(product.price.toString()).toFixed(2)}</span>
+              <span className="price-label">
+                {product.sale_price !== null && product.sale_price !== undefined ? 'Precio de Oferta' : 'Precio Sugerido'}
+              </span>
+              <span className="detail-price">
+                {product.sale_price !== null && product.sale_price !== undefined ? (
+                  <>
+                    <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.75rem', opacity: 0.5, fontSize: '0.7em', fontWeight: 'normal' }}>
+                      ${parseFloat(product.price.toString()).toFixed(2)}
+                    </span>
+                    <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                  </>
+                ) : (
+                  `$${parseFloat(product.price.toString()).toFixed(2)}`
+                )}
+              </span>
             </div>
 
             <div className="detail-stock-box">
