@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -33,6 +33,13 @@ export default function CatalogPage() {
   const [inStock, setInStock] = useState(false);
   const [page, setPage] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
+  const [selectedSpecs, setSelectedSpecs] = useState<Record<string, string>>({});
+  const [availableSpecs, setAvailableSpecs] = useState<Record<string, Set<string>>>({});
+
+  // Reset filter when changing category
+  useEffect(() => {
+    setSelectedSpecs({});
+  }, [selectedCategory]);
 
   // Carrito
   const addItem = useCartStore((s) => s.addItem);
@@ -96,11 +103,12 @@ export default function CatalogPage() {
 
   // Fetch Public Products
   const { data: paginatedData, isLoading: isLoadingProducts } = useQuery<PaginatedResponse<Product>>({
-    queryKey: ['publicProducts', slug, search, selectedCategory, inStock, page],
+    queryKey: ['publicProducts', slug, search, selectedCategory, inStock, selectedSpecs, page],
     queryFn: () => getPublicProducts(slug!, {
       category_id: selectedCategory || undefined,
       search: search || undefined,
       in_stock: inStock || undefined,
+      specs: Object.keys(selectedSpecs).length > 0 ? selectedSpecs : undefined,
       page,
     }),
     enabled: !!slug,
@@ -108,6 +116,29 @@ export default function CatalogPage() {
 
   const products = paginatedData?.data || [];
   const totalPages = paginatedData?.last_page || 1;
+
+  // Extract unique spec values from products list
+  useEffect(() => {
+    if (Object.keys(selectedSpecs).length === 0 && paginatedData?.data) {
+      const specsMap: Record<string, Set<string>> = {};
+      paginatedData.data.forEach((prod) => {
+        if (prod.specs) {
+          Object.entries(prod.specs).forEach(([key, val]) => {
+            if (key && val) {
+              const valStr = val.toString().trim();
+              if (valStr !== '') {
+                if (!specsMap[key]) {
+                  specsMap[key] = new Set<string>();
+                }
+                specsMap[key].add(valStr);
+              }
+            }
+          });
+        }
+      });
+      setAvailableSpecs(specsMap);
+    }
+  }, [paginatedData, selectedSpecs]);
 
   if (isLoadingTenant) {
     return (
@@ -252,6 +283,70 @@ export default function CatalogPage() {
               <span>Sólo en stock</span>
             </label>
           </div>
+
+          {/* Dynamic Technical Specs Filters */}
+          {Object.keys(availableSpecs).length > 0 && (
+            <div className="sidebar-section specs-filters-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0 }}>Especificaciones</h3>
+                {Object.keys(selectedSpecs).length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => { setSelectedSpecs({}); setPage(1); }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {Object.entries(availableSpecs).map(([specKey, specValues]) => (
+                  <div key={specKey} className="spec-filter-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <span className="spec-filter-title" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {specKey}
+                    </span>
+                    <div className="spec-filter-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                      {Array.from(specValues).map((val) => {
+                        const isSelected = selectedSpecs[specKey] === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSpecs((prev) => {
+                                const copy = { ...prev };
+                                if (isSelected) {
+                                  delete copy[specKey];
+                                } else {
+                                  copy[specKey] = val;
+                                }
+                                return copy;
+                              });
+                              setPage(1);
+                            }}
+                            className={`spec-pill-btn ${isSelected ? 'active' : ''}`}
+                            style={{
+                              fontSize: '0.75rem',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '20px',
+                              border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                              background: isSelected ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                              color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'var(--transition)',
+                              fontWeight: isSelected ? 600 : 'normal'
+                            }}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* Main Grid Area */}

@@ -17,7 +17,7 @@ class ProductController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $products = Product::with('category')
+        $products = Product::with(['category', 'images'])
             ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
             ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
             ->when($request->active_only, fn($q) => $q->where('is_active', true))
@@ -40,12 +40,26 @@ class ProductController extends Controller
         // No pasar 'id' — HasUuids genera UUID v7 automáticamente
         $product = Product::create($data);
 
-        return response()->json($product->load('category'), 201);
+        // Subir imágenes de la galería si existen
+        if ($request->hasFile('gallery')) {
+            $tenant = app('currentTenant');
+            $sortOrder = 0;
+            foreach ($request->file('gallery') as $galleryFile) {
+                $urls = $this->imageService->uploadProductImage($galleryFile, $tenant->slug);
+                $product->images()->create([
+                    'image_url'     => $urls['image_url'],
+                    'thumbnail_url' => $urls['thumbnail_url'],
+                    'sort_order'    => $sortOrder++,
+                ]);
+            }
+        }
+
+        return response()->json($product->load(['category', 'images']), 201);
     }
 
     public function show(Product $product): JsonResponse
     {
-        return response()->json($product->load('category'));
+        return response()->json($product->load(['category', 'images']));
     }
 
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
@@ -63,12 +77,50 @@ class ProductController extends Controller
 
         $product->update($data);
 
-        return response()->json($product->load('category'));
+        // Eliminar imágenes de galería seleccionadas
+        if ($request->has('deleted_image_ids')) {
+            $deletedIds = is_array($request->deleted_image_ids) 
+                ? $request->deleted_image_ids 
+                : json_decode($request->deleted_image_ids, true) ?? [];
+
+            foreach ($deletedIds as $imgId) {
+                $imgModel = $product->images()->find($imgId);
+                if ($imgModel) {
+                    $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
+                    $imgModel->delete();
+                }
+            }
+        }
+
+        // Subir nuevas imágenes a la galería
+        if ($request->hasFile('gallery')) {
+            $tenant = app('currentTenant');
+            $maxSort = $product->images()->max('sort_order') ?? -1;
+            $sortOrder = $maxSort + 1;
+
+            foreach ($request->file('gallery') as $galleryFile) {
+                $urls = $this->imageService->uploadProductImage($galleryFile, $tenant->slug);
+                $product->images()->create([
+                    'image_url'     => $urls['image_url'],
+                    'thumbnail_url' => $urls['thumbnail_url'],
+                    'sort_order'    => $sortOrder++,
+                ]);
+            }
+        }
+
+        return response()->json($product->load(['category', 'images']));
     }
 
     public function destroy(Product $product): JsonResponse
     {
+        // Eliminar imagen principal
         $this->imageService->deleteProductImages($product->image_url, $product->thumbnail_url);
+
+        // Eliminar imágenes de la galería
+        foreach ($product->images as $imgModel) {
+            $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
+        }
+
         $product->delete();
 
         return response()->json(null, 204);

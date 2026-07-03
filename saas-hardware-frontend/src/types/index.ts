@@ -38,6 +38,14 @@ export interface Category {
   is_active: boolean;
 }
 
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  thumbnail_url: string | null;
+  sort_order: number;
+}
+
 export interface Product {
   id: string;
   tenant_id: string;
@@ -53,6 +61,7 @@ export interface Product {
   specs: Record<string, string | number> | null;
   image_url: string | null;
   thumbnail_url: string | null;
+  images?: ProductImage[];
   is_active: boolean;
   created_at: string;
 }

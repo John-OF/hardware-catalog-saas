@@ -35,8 +35,11 @@ class UpdateProductRequest extends FormRequest
             'category_id' => 'nullable|uuid|exists:categories,id',
             'description' => 'nullable|string|max:5000',
             'specs'       => 'nullable|array',
-            'image'       => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
-            'is_active'   => 'nullable|boolean',
+            'image'             => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
+            'gallery'           => 'nullable|array',
+            'gallery.*'         => 'image|mimes:jpeg,jpg,png,webp|max:10240',
+            'deleted_image_ids' => 'nullable',
+            'is_active'         => 'nullable|boolean',
         ];
     }
 }

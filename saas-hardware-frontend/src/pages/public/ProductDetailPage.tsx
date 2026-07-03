@@ -1,5 +1,5 @@
-
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
   ArrowLeft,
@@ -8,7 +8,10 @@ import {
   XCircle,
   Loader2,
   Phone,
-  Plus
+  Plus,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { getPublicTenant, getPublicProduct } from '../../api/public';
@@ -19,6 +22,8 @@ import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
+  const navigate = useNavigate();
+  const [activeImage, setActiveImage] = useState<string | null>(null);
 
   // Fetch Tenant Info (to maintain active styling/colors)
   const { data: tenant } = useQuery<Tenant>({
@@ -39,6 +44,12 @@ export default function ProductDetailPage() {
   // Título y favicon de la pestaña: "Producto · Mi Tienda"
   useTenantBranding(tenant, product?.name);
 
+  useEffect(() => {
+    if (product) {
+      setActiveImage(product.image_url);
+    }
+  }, [product]);
+
   const addItem = useCartStore((s) => s.addItem);
 
   const handleAddToCart = () => {
@@ -46,6 +57,49 @@ export default function ProductDetailPage() {
     addItem(slug, product);
     toast.success(`${product.name} agregado al pedido`);
   };
+
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  // Collect all images including main and gallery
+  const allImages = product
+    ? [product.image_url, ...(product.images || []).map((img) => img.image_url)].filter(Boolean) as string[]
+    : [];
+
+  const currentImageIndex = allImages.indexOf(activeImage || '');
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentImageIndex > 0) {
+      setActiveImage(allImages[currentImageIndex - 1]);
+    } else {
+      setActiveImage(allImages[allImages.length - 1]);
+    }
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentImageIndex < allImages.length - 1) {
+      setActiveImage(allImages[currentImageIndex + 1]);
+    } else {
+      setActiveImage(allImages[0]);
+    }
+  };
+
+  // Escuchar tecla Escape para cerrar lightbox o regresar al catálogo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isLightboxOpen) {
+          setIsLightboxOpen(false);
+        } else if (slug) {
+          navigate(`/${slug}`);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLightboxOpen, slug, navigate]);
 
   // Whatsapp redirect handler
   const handleWhatsappQuery = () => {
@@ -126,11 +180,83 @@ export default function ProductDetailPage() {
         
         {/* Product image block */}
         <div className="product-image-block">
-          {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="product-main-img" />
-          ) : (
-            <div className="product-placeholder-img">
-              <ShoppingBag size={64} />
+          <div 
+            className="product-main-image-container" 
+            onClick={() => setIsLightboxOpen(true)}
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              width: '100%', 
+              height: '350px', 
+              background: 'rgba(255,255,255,0.01)', 
+              borderRadius: 'var(--radius-lg)', 
+              border: '1px solid var(--border)', 
+              overflow: 'hidden',
+              cursor: 'zoom-in'
+            }}
+          >
+            {activeImage ? (
+              <img src={activeImage} alt={product.name} className="product-main-img" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            ) : (
+              <div className="product-placeholder-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                <ShoppingBag size={64} />
+              </div>
+            )}
+          </div>
+
+          {/* Gallery thumbnails */}
+          {product.images && product.images.length > 0 && (
+            <div className="product-gallery-thumbnails" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+              {/* Main image thumbnail */}
+              {product.image_url && (
+                <button
+                  type="button"
+                  className={`gallery-thumb-btn ${activeImage === product.image_url ? 'active' : ''}`}
+                  onClick={() => setActiveImage(product.image_url)}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: activeImage === product.image_url ? '2px solid var(--primary)' : '1px solid var(--border)',
+                    background: 'rgba(255,255,255,0.02)',
+                    padding: '2px',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'var(--transition)',
+                  }}
+                >
+                  <img src={product.thumbnail_url || product.image_url} alt="Main thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                </button>
+              )}
+              {/* Gallery images thumbnails */}
+              {product.images.map((img) => (
+                <button
+                  key={img.id}
+                  type="button"
+                  className={`gallery-thumb-btn ${activeImage === img.image_url ? 'active' : ''}`}
+                  onClick={() => setActiveImage(img.image_url)}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: activeImage === img.image_url ? '2px solid var(--primary)' : '1px solid var(--border)',
+                    background: 'rgba(255,255,255,0.02)',
+                    padding: '2px',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'var(--transition)',
+                  }}
+                >
+                  <img src={img.thumbnail_url || img.image_url} alt="Gallery thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -236,6 +362,109 @@ export default function ProductDetailPage() {
 
         </div>
       </div>
+
+      {isLightboxOpen && activeImage && (
+        <div 
+          className="lightbox-overlay" 
+          onClick={() => setIsLightboxOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(10px)',
+            padding: '2rem',
+            cursor: 'zoom-out'
+          }}
+        >
+          <button 
+            type="button" 
+            className="lightbox-close" 
+            onClick={() => setIsLightboxOpen(false)}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: 'none',
+              borderRadius: '50%',
+              color: 'white',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'var(--transition)'
+            }}
+          >
+            <X size={20} />
+          </button>
+          
+          {allImages.length > 1 && (
+            <>
+              <button 
+                type="button" 
+                onClick={handlePrevImage}
+                style={{
+                  position: 'absolute',
+                  left: '1.5rem',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  color: 'white',
+                  width: '44px',
+                  height: '44px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button 
+                type="button" 
+                onClick={handleNextImage}
+                style={{
+                  position: 'absolute',
+                  right: '1.5rem',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  color: 'white',
+                  width: '44px',
+                  height: '44px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
+              >
+                <ChevronRight size={24} />
+              </button>
+            </>
+          )}
+
+          <img 
+            src={activeImage} 
+            alt={product.name} 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }} 
+          />
+        </div>
+      )}
 
       <style>{`
         .product-detail-container {

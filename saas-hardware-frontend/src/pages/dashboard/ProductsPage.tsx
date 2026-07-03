@@ -51,6 +51,12 @@ export default function ProductsPage() {
   const [isActive, setIsActive] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Gallery states
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  const [existingGallery, setExistingGallery] = useState<any[]>([]);
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   
   // Specs list state (list of { key, value })
   const [specsList, setSpecsList] = useState<{ key: string; value: string }[]>([]);
@@ -128,6 +134,10 @@ export default function ProductsPage() {
     setIsActive(true);
     setImageFile(null);
     setImagePreview(null);
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+    setExistingGallery([]);
+    setDeletedImageIds([]);
     setSpecsList([]);
     setIsModalOpen(true);
   };
@@ -144,6 +154,10 @@ export default function ProductsPage() {
     setIsActive(product.is_active);
     setImageFile(null);
     setImagePreview(product.thumbnail_url);
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+    setExistingGallery(product.images || []);
+    setDeletedImageIds([]);
     
     // Map specs record to array [{key, value}]
     if (product.specs) {
@@ -212,6 +226,15 @@ export default function ProductsPage() {
 
     if (imageFile) {
       formData.append('image', imageFile);
+    }
+
+    // Gallery uploads
+    galleryFiles.forEach((file) => {
+      formData.append('gallery[]', file);
+    });
+
+    if (deletedImageIds.length > 0) {
+      formData.append('deleted_image_ids', JSON.stringify(deletedImageIds));
     }
 
     // Convert specs array back to JSON object
@@ -486,6 +509,68 @@ export default function ProductsPage() {
                       <input type="file" accept="image/*" onChange={handleImageChange} style={{display: 'none'}} />
                     </label>
                   )}
+                </div>
+              </div>
+
+              {/* Gallery Images */}
+              <div className="form-group image-upload-group">
+                <label>Galería de Imágenes (Opcional)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  {/* Existing gallery images */}
+                  {existingGallery.map((img) => (
+                    <div key={img.id} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                      <img src={img.thumbnail_url || img.image_url} alt="Gallery item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button 
+                        type="button" 
+                        className="remove-preview" 
+                        onClick={() => {
+                          setDeletedImageIds((prev) => [...prev, img.id]);
+                          setExistingGallery((prev) => prev.filter((item) => item.id !== img.id));
+                        }}
+                        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: '50%', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* New gallery previews */}
+                  {galleryPreviews.map((url, idx) => (
+                    <div key={idx} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                      <img src={url} alt="New preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button 
+                        type="button" 
+                        className="remove-preview" 
+                        onClick={() => {
+                          setGalleryFiles((prev) => prev.filter((_, i) => i !== idx));
+                          setGalleryPreviews((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: '50%', color: 'white', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Upload button */}
+                  <label className="dropzone-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'var(--transition)', background: 'rgba(255,255,255,0.005)', margin: 0 }}>
+                    <Plus size={18} style={{ color: 'var(--text-muted)' }} />
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Agregar</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        if (files.length > 0) {
+                          setGalleryFiles((prev) => [...prev, ...files]);
+                          const newUrls = files.map((file) => URL.createObjectURL(file));
+                          setGalleryPreviews((prev) => [...prev, ...newUrls]);
+                        }
+                      }} 
+                      style={{ display: 'none' }} 
+                    />
+                  </label>
                 </div>
               </div>
 

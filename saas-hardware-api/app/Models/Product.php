@@ -53,6 +53,11 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function images(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
     // Accessor útil para el frontend
     public function getIsAvailableAttribute(): bool
     {

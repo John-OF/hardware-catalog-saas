@@ -19,6 +19,7 @@ export const getPublicProducts = async (
     category_id?: string;
     search?: string;
     in_stock?: boolean;
+    specs?: Record<string, string>;
     page?: number;
   }
 ): Promise<PaginatedResponse<Product>> => {

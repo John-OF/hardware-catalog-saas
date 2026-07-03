@@ -36,16 +36,23 @@ class PublicCatalogController extends Controller
 
         // IMPORTANTE: usar only() para prevenir cache flooding con parámetros arbitrarios
         $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($request->only([
-            'category_id', 'search', 'in_stock', 'page'
+            'category_id', 'search', 'in_stock', 'specs', 'page'
         ])));
 
         $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request) {
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
-                ->with('category:id,name,icon')
+                ->with(['category:id,name,icon', 'images'])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
                 ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
+                ->when($request->specs, function ($q) use ($request) {
+                    foreach ($request->specs as $key => $value) {
+                        if ($value !== null && $value !== '') {
+                            $q->where('specs->' . $key, $value);
+                        }
+                    }
+                })
                 ->orderByDesc('created_at')
                 ->paginate(24)
                 ->toArray();
@@ -61,7 +68,7 @@ class PublicCatalogController extends Controller
         $product = Product::where('tenant_id', $tenant->id)
             ->where('id', $productId)
             ->where('is_active', true)
-            ->with('category')
+            ->with(['category', 'images'])
             ->firstOrFail();
 
         return response()->json($product);
