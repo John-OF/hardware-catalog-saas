@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -13,6 +13,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { getPublicTenant, getPublicProduct } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
+import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
 import type { Tenant, Product } from '../../types';
 
@@ -26,26 +27,7 @@ export default function ProductDetailPage() {
     enabled: !!slug,
   });
 
-  // Apply tenant's primary color dynamically
-  useEffect(() => {
-    if (tenant?.primary_color) {
-      document.documentElement.style.setProperty('--primary', tenant.primary_color);
-      const hex = tenant.primary_color.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      document.documentElement.style.setProperty('--primary-glow', `rgba(${r}, ${g}, ${b}, 0.15)`);
-    }
-    if (tenant?.theme?.accent_color) {
-      document.documentElement.style.setProperty('--accent', tenant.theme.accent_color);
-    }
-
-    // Modo claro/oscuro: replicar el comportamiento del catálogo para que el
-    // detalle no vuelva a oscuro cuando el tenant está en modo claro.
-    const isLight = tenant?.theme?.color_mode === 'light';
-    document.body.classList.toggle('light-mode', isLight);
-    return () => document.body.classList.remove('light-mode');
-  }, [tenant]);
+  useTenantTheme(tenant);
 
   // Fetch Product Info
   const { data: product, isLoading, isError } = useQuery<Product>({
@@ -336,6 +318,12 @@ export default function ProductDetailPage() {
           background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+        }
+
+        .light-mode .detail-title {
+          background: none;
+          -webkit-text-fill-color: initial;
+          color: var(--text-primary);
         }
 
         /* Pricing Card */
