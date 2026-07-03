@@ -19,7 +19,10 @@ class ProductController extends Controller
     {
         $products = Product::with(['category', 'images'])
             ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
-            ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
+            ->when($request->search, fn($q) => $q->where(function ($query) use ($request) {
+                $query->where('name', 'like', "%{$request->search}%")
+                      ->orWhere('sku', 'like', "%{$request->search}%");
+            }))
             ->when($request->active_only, fn($q) => $q->where('is_active', true))
             ->orderByDesc('created_at')
             ->paginate(20);
@@ -290,5 +293,96 @@ class ProductController extends Controller
             'success_count' => $successCount,
             'errors'        => $errors,
         ]);
+    }
+
+    /**
+     * Aplica acciones masivas (activar, desactivar, borrar, ajustar precios) en lote.
+     */
+    public function bulkAction(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'product_ids'      => 'nullable|array',
+            'product_ids.*'    => 'uuid|exists:products,id',
+            'category_id'      => 'nullable|uuid|exists:categories,id',
+            'bulk_action'      => 'required|string|in:activate,deactivate,delete,adjust_price',
+            'price_adjustment' => 'nullable|numeric',
+        ]);
+
+        $action = $data['bulk_action'];
+        $query = Product::query();
+
+        if (!empty($data['product_ids'])) {
+            $query->whereIn('id', $data['product_ids']);
+        } elseif (!empty($data['category_id'])) {
+            $query->where('category_id', $data['category_id']);
+        } else {
+            return response()->json([
+                'message' => 'Debes seleccionar productos o una categoría para aplicar la acción.',
+            ], 422);
+        }
+
+        if ($action === 'delete') {
+            $products = $query->get();
+            foreach ($products as $prod) {
+                $this->imageService->deleteProductImages($prod->image_url, $prod->thumbnail_url);
+                foreach ($prod->images as $img) {
+                    $this->imageService->deleteProductImages($img->image_url, $img->thumbnail_url);
+                }
+                $prod->delete();
+            }
+            return response()->json(['message' => 'Productos eliminados en lote con éxito.']);
+        }
+
+        if ($action === 'activate') {
+            $query->update(['is_active' => true]);
+            return response()->json(['message' => 'Productos publicados en lote con éxito.']);
+        }
+
+        if ($action === 'deactivate') {
+            $query->update(['is_active' => false]);
+            return response()->json(['message' => 'Productos ocultados en lote con éxito.']);
+        }
+
+        if ($action === 'adjust_price') {
+            $percentage = (float) ($data['price_adjustment'] ?? 0);
+            if ($percentage === 0.0) {
+                return response()->json(['message' => 'El porcentaje de ajuste de precio debe ser distinto de cero.'], 422);
+            }
+
+            $products = $query->get();
+            foreach ($products as $prod) {
+                $multiplier = 1 + ($percentage / 100);
+                $prod->price = round($prod->price * $multiplier, 2);
+                if ($prod->sale_price !== null) {
+                    $prod->sale_price = round($prod->sale_price * $multiplier, 2);
+                }
+                $prod->save();
+            }
+
+            return response()->json(['message' => "Precios ajustados un {$percentage}% con éxito en lote."]);
+        }
+
+        return response()->json(['message' => 'Acción no válida.'], 400);
+    }
+
+    /**
+     * Replica un producto existente junto con su galería.
+     */
+    public function duplicate(Product $product): JsonResponse
+    {
+        $newProduct = $product->replicate();
+        $newProduct->name = $product->name . ' (Copia)';
+        $newProduct->is_active = false;
+        $newProduct->save();
+
+        foreach ($product->images as $img) {
+            $newProduct->images()->create([
+                'image_url'     => $img->image_url,
+                'thumbnail_url' => $img->thumbnail_url,
+                'sort_order'    => $img->sort_order,
+            ]);
+        }
+
+        return response()->json($newProduct->load(['category', 'images']), 201);
     }
 }

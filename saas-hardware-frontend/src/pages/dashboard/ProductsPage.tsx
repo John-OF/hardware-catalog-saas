@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { 
@@ -16,9 +16,11 @@ import {
   ChevronLeft, 
   ChevronRight,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  CheckSquare
 } from 'lucide-react';
-import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv } from '../../api/products';
+import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import type { Product, Category, PaginatedResponse } from '../../types';
 
@@ -40,12 +42,19 @@ export default function ProductsPage() {
   const [importReport, setImportReport] = useState<{ message: string; success_count: number; errors: string[] } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
+  // Bulk selection states
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
+  const [bulkPriceAdjustment, setBulkPriceAdjustment] = useState('');
+
   // Form inputs
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
+  const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [stock, setStock] = useState('');
+  const [lowStockThreshold, setLowStockThreshold] = useState('5');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -79,6 +88,11 @@ export default function ProductsPage() {
 
   const products = paginatedData?.data || [];
   const totalPages = paginatedData?.last_page || 1;
+
+  // Reset bulk selection on page/filters change
+  useEffect(() => {
+    setSelectedProductIds([]);
+  }, [search, selectedCategory, page]);
 
   // Mutation: Create Product
   const createMutation = useMutation({
@@ -122,13 +136,42 @@ export default function ProductsPage() {
     }
   });
 
+  // Mutation: Duplicate Product
+  const duplicateMutation = useMutation({
+    mutationFn: duplicateProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Producto clonado con éxito');
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || 'Error al duplicar el producto';
+      toast.error(msg);
+    }
+  });
+
+  // Mutation: Bulk Actions
+  const bulkActionMutation = useMutation({
+    mutationFn: bulkActionProducts,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setSelectedProductIds([]); // Limpiar selección
+      toast.success(data.message || 'Acción masiva aplicada con éxito');
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || 'Error al ejecutar la acción masiva';
+      toast.error(msg);
+    }
+  });
+
   const openCreateModal = () => {
     setEditingProduct(null);
     setName('');
     setBrand('');
+    setSku('');
     setPrice('');
     setSalePrice('');
     setStock('');
+    setLowStockThreshold('5');
     setCategoryId('');
     setDescription('');
     setIsActive(true);
@@ -146,9 +189,11 @@ export default function ProductsPage() {
     setEditingProduct(product);
     setName(product.name);
     setBrand(product.brand || '');
+    setSku(product.sku || '');
     setPrice(product.price.toString());
     setSalePrice(product.sale_price ? product.sale_price.toString() : '');
     setStock(product.stock.toString());
+    setLowStockThreshold(product.low_stock_threshold ? product.low_stock_threshold.toString() : '5');
     setCategoryId(product.category_id || '');
     setDescription(product.description || '');
     setIsActive(product.is_active);
@@ -217,9 +262,11 @@ export default function ProductsPage() {
     const formData = new FormData();
     formData.append('name', name);
     formData.append('brand', brand);
+    formData.append('sku', sku || '');
     formData.append('price', price);
     formData.append('sale_price', salePrice || '');
     formData.append('stock', stock);
+    formData.append('low_stock_threshold', lowStockThreshold || '5');
     formData.append('category_id', categoryId);
     formData.append('description', description);
     formData.append('is_active', isActive ? '1' : '0');
@@ -306,7 +353,63 @@ export default function ProductsPage() {
     }
   };
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const toggleSelectProduct = (id: string) => {
+    setSelectedProductIds((prev) => 
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedProductIds.length === products.length) {
+      setSelectedProductIds([]);
+    } else {
+      setSelectedProductIds(products.map((p) => p.id));
+    }
+  };
+
+  const handleBulkAction = (action: 'activate' | 'deactivate' | 'delete') => {
+    if (selectedProductIds.length === 0) return;
+    
+    let confirmMsg = '';
+    if (action === 'delete') {
+      confirmMsg = `¿Seguro que deseas eliminar los ${selectedProductIds.length} productos seleccionados? Esta acción no se puede deshacer.`;
+    } else if (action === 'activate') {
+      confirmMsg = `¿Seguro que deseas publicar/activar los ${selectedProductIds.length} productos seleccionados?`;
+    } else if (action === 'deactivate') {
+      confirmMsg = `¿Seguro que deseas ocultar/desactivar los ${selectedProductIds.length} productos seleccionados?`;
+    }
+
+    if (window.confirm(confirmMsg)) {
+      bulkActionMutation.mutate({
+        product_ids: selectedProductIds,
+        bulk_action: action
+      });
+    }
+  };
+
+  const handleBulkPriceAdjustSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const percent = parseFloat(bulkPriceAdjustment);
+    if (isNaN(percent) || percent === 0) {
+      toast.error('Ingresa un porcentaje de ajuste válido y distinto de cero.');
+      return;
+    }
+
+    bulkActionMutation.mutate({
+      product_ids: selectedProductIds,
+      bulk_action: 'adjust_price',
+      price_adjustment: percent
+    });
+
+    setIsPriceAdjustModalOpen(false);
+    setBulkPriceAdjustment('');
+  };
+
+  const handleDuplicateProduct = (id: string) => {
+    duplicateMutation.mutate(id);
+  };
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending || duplicateMutation.isPending || bulkActionMutation.isPending;
 
   return (
     <div className="products-page animate-fade-in">
@@ -355,6 +458,51 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Bulk actions bar */}
+      {selectedProductIds.length > 0 && (
+        <div className="bulk-actions-bar glass-card animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.5rem', background: 'rgba(var(--primary-rgb), 0.08)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+            <CheckSquare size={18} style={{ color: 'var(--primary)' }} />
+            <span><strong>{selectedProductIds.length}</strong> seleccionados</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              type="button" 
+              onClick={() => handleBulkAction('activate')} 
+              className="btn-secondary" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+            >
+              Publicar
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleBulkAction('deactivate')} 
+              className="btn-secondary" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+            >
+              Ocultar
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setIsPriceAdjustModalOpen(true)} 
+              className="btn-secondary" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+            >
+              Ajustar Precio
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleBulkAction('delete')} 
+              className="btn-primary" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none' }}
+            >
+              <Trash2 size={14} style={{ marginRight: '4px', display: 'inline' }} /> Eliminar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Products list */}
       {isLoading ? (
         <div className="inner-loader">
@@ -377,6 +525,14 @@ export default function ProductsPage() {
             <table className="premium-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={products.length > 0 && selectedProductIds.length === products.length}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   <th>Imagen</th>
                   <th>Producto</th>
                   <th>Categoría</th>
@@ -387,69 +543,99 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <div className="table-img-wrapper">
-                        {product.thumbnail_url ? (
-                          <img src={product.thumbnail_url} alt={product.name} />
+                {products.map((product) => {
+                  const isSelected = selectedProductIds.includes(product.id);
+                  const isLowStock = product.stock <= (product.low_stock_threshold ?? 5);
+                  return (
+                    <tr key={product.id} className={isSelected ? 'row-selected' : ''} style={{ background: isSelected ? 'rgba(var(--primary-rgb), 0.03)' : undefined }}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => toggleSelectProduct(product.id)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td>
+                        <div className="table-img-wrapper">
+                          {product.thumbnail_url ? (
+                            <img src={product.thumbnail_url} alt={product.name} />
+                          ) : (
+                            <ImageIcon size={18} className="placeholder-icon" />
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="product-info-cell">
+                          <span className="product-name">{product.name}</span>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {product.brand && <span className="product-brand">{product.brand}</span>}
+                            {product.sku && (
+                              <span className="sku-tag" style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.04)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                                SKU: {product.sku}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="category-tag">
+                          {product.category?.name || 'Sin Categoría'}
+                        </span>
+                      </td>
+                      <td className="price-cell">
+                        {product.sale_price !== null && product.sale_price !== undefined ? (
+                          <div className="admin-price-box">
+                            <span className="strike-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.85em', marginRight: '0.4rem', fontWeight: 'normal' }}>
+                              ${parseFloat(product.price.toString()).toFixed(2)}
+                            </span>
+                            <span className="sale-price-active" style={{ color: 'var(--success)', fontWeight: 700 }}>
+                              ${parseFloat(product.sale_price.toString()).toFixed(2)}
+                            </span>
+                          </div>
                         ) : (
-                          <ImageIcon size={18} className="placeholder-icon" />
+                          `$${parseFloat(product.price.toString()).toFixed(2)}`
                         )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="product-info-cell">
-                        <span className="product-name">{product.name}</span>
-                        {product.brand && <span className="product-brand">{product.brand}</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="category-tag">
-                        {product.category?.name || 'Sin Categoría'}
-                      </span>
-                    </td>
-                    <td className="price-cell">
-                      {product.sale_price !== null && product.sale_price !== undefined ? (
-                        <div className="admin-price-box">
-                          <span className="strike-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.85em', marginRight: '0.4rem', fontWeight: 'normal' }}>
-                            ${parseFloat(product.price.toString()).toFixed(2)}
+                      </td>
+                      <td>
+                        <div className="stock-cell">
+                          <span className={`stock-number ${product.stock === 0 ? 'out' : isLowStock ? 'low' : ''}`}>
+                            {product.stock}
                           </span>
-                          <span className="sale-price-active" style={{ color: 'var(--success)', fontWeight: 700 }}>
-                            ${parseFloat(product.sale_price.toString()).toFixed(2)}
+                          <span className="stock-label">
+                            {product.stock === 0 ? (
+                              'Sin Stock'
+                            ) : isLowStock ? (
+                              <span style={{ color: '#f87171', fontWeight: 600 }}>Stock Bajo (≤{product.low_stock_threshold ?? 5})</span>
+                            ) : (
+                              'Disponible'
+                            )}
                           </span>
                         </div>
-                      ) : (
-                        `$${parseFloat(product.price.toString()).toFixed(2)}`
-                      )}
-                    </td>
-                    <td>
-                      <div className="stock-cell">
-                        <span className={`stock-number ${product.stock === 0 ? 'out' : product.stock < 5 ? 'low' : ''}`}>
-                          {product.stock}
-                        </span>
-                        <span className="stock-label">{product.stock === 0 ? 'Sin Stock' : product.stock < 5 ? 'Poco Stock' : 'Disponible'}</span>
-                      </div>
-                    </td>
-                    <td>
-                      {product.is_active ? (
-                        <span className="badge badge-success"><Eye size={12} style={{marginRight: '3.5px'}} /> Visible</span>
-                      ) : (
-                        <span className="badge badge-danger"><EyeOff size={12} style={{marginRight: '3.5px'}} /> Oculto</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        <button onClick={() => openEditModal(product)} className="table-action-btn edit" title="Editar">
-                          <Edit2 size={15} />
-                        </button>
-                        <button onClick={() => handleDelete(product.id, product.name)} className="table-action-btn delete" title="Eliminar">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>
+                        {product.is_active ? (
+                          <span className="badge badge-success"><Eye size={12} style={{marginRight: '3.5px'}} /> Visible</span>
+                        ) : (
+                          <span className="badge badge-danger"><EyeOff size={12} style={{marginRight: '3.5px'}} /> Oculto</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button onClick={() => openEditModal(product)} className="table-action-btn edit" title="Editar">
+                            <Edit2 size={15} />
+                          </button>
+                          <button onClick={() => handleDuplicateProduct(product.id)} className="table-action-btn edit" title="Clonar / Duplicar" style={{ color: 'var(--primary)' }}>
+                            <Copy size={15} />
+                          </button>
+                          <button onClick={() => handleDelete(product.id, product.name)} className="table-action-btn delete" title="Eliminar">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -480,7 +666,7 @@ export default function ProductsPage() {
       {/* Modal Drawer */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-drawer glass-card animate-slide-up wide-drawer" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-drawer glass-card animate-scale-in wide-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
               <h3>{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
               <button onClick={closeModal} className="drawer-close">
@@ -601,21 +787,33 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="form-group half">
-                  <label htmlFor="prod-cat">Categoría</label>
-                  <select
-                    id="prod-cat"
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="premium-input select-input"
-                  >
-                    <option value="">Sin Categoría</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                  <label htmlFor="prod-sku">SKU / Código</label>
+                  <input
+                    id="prod-sku"
+                    type="text"
+                    placeholder="ej. KNG-16GB-DDR5"
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    className="premium-input"
+                  />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="prod-cat">Categoría</label>
+                <select
+                  id="prod-cat"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="premium-input select-input"
+                >
+                  <option value="">Sin Categoría</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-row">
@@ -664,7 +862,16 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="form-group half">
-                  {/* Espacio vacío para grilla */}
+                  <label htmlFor="prod-threshold">Umbral de Stock Bajo (Alerta)</label>
+                  <input
+                    id="prod-threshold"
+                    type="number"
+                    min="0"
+                    placeholder="5"
+                    value={lowStockThreshold}
+                    onChange={(e) => setLowStockThreshold(e.target.value)}
+                    className="premium-input"
+                  />
                 </div>
               </div>
 
@@ -846,6 +1053,61 @@ export default function ProductsPage() {
                 >
                   {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
                   <span>{isImporting ? 'Importando...' : 'Iniciar Importación'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isPriceAdjustModalOpen && (
+        <div className="modal-overlay" onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}>
+          <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <header className="modal-header">
+              <h3>Ajustar Precios en Lote</h3>
+              <button 
+                className="close-btn" 
+                onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <form onSubmit={handleBulkPriceAdjustSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Ajusta el precio de los <strong>{selectedProductIds.length}</strong> productos seleccionados por un porcentaje.
+              </p>
+              
+              <div className="form-group">
+                <label htmlFor="price-adjustment-input">Porcentaje de Ajuste (%)</label>
+                <input
+                  id="price-adjustment-input"
+                  type="number"
+                  step="0.01"
+                  placeholder="ej. 5 para +5%, -3.5 para -3.5%"
+                  value={bulkPriceAdjustment}
+                  onChange={(e) => setBulkPriceAdjustment(e.target.value)}
+                  className="premium-input"
+                  required
+                />
+              </div>
+
+              <div className="modal-actions-bar" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }} 
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={bulkActionMutation.isPending} 
+                  className="btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  {bulkActionMutation.isPending ? <Loader2 className="spinner" size={16} /> : 'Aplicar'}
                 </button>
               </div>
             </form>
@@ -1070,21 +1332,112 @@ export default function ProductsPage() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(3, 7, 18, 0.6);
-          backdrop-filter: blur(4px);
-          z-index: 100;
+          background: rgba(3, 7, 18, 0.65);
+          backdrop-filter: blur(8px);
+          z-index: 200; /* Ensure overlay is on top of everything */
           display: flex;
-          justify-content: flex-end;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+        }
+
+        .modal-drawer {
+          width: 100%;
+          max-width: 480px;
+          max-height: calc(85vh - 45px); /* Keep the card height bounded within viewport */
+          border-radius: var(--radius-lg);
+          border: 1px solid var(--border);
+          padding: 2rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+          background: rgba(11, 15, 25, 0.98);
+          backdrop-filter: blur(25px);
+          box-shadow: var(--shadow-2xl);
+          overflow: hidden; /* Hide overflow so that internal form scrolls */
         }
 
         .modal-drawer.wide-drawer {
-          max-width: 560px;
+          max-width: 580px;
+        }
+
+        .drawer-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid var(--border);
+          padding-bottom: 1rem;
+        }
+
+        .drawer-header h3 {
+          font-size: 1.25rem;
+          color: var(--text-primary);
+          font-family: var(--font-heading);
+          margin: 0;
+        }
+
+        .drawer-close {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: var(--transition);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.25rem;
+          border-radius: 50%;
+        }
+
+        .drawer-close:hover {
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .drawer-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
         }
 
         .scrollable-form {
           flex: 1;
           overflow-y: auto;
-          padding-right: 0.25rem;
+          padding-right: 0.5rem;
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .form-group label {
+          font-size: 0.85rem;
+          font-weight: 500;
+          color: var(--text-secondary);
+        }
+
+        .form-row {
+          display: flex;
+          gap: 1rem;
+          width: 100%;
+        }
+
+        .form-row .half {
+          flex: 1;
+        }
+
+        .drawer-actions {
+          display: flex;
+          gap: 0.75rem;
+          margin-top: 0.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid var(--border);
+        }
+
+        .drawer-actions button {
+          flex: 1;
         }
 
         /* Image Dropzone styles */
@@ -1299,17 +1652,6 @@ export default function ProductsPage() {
         }
 
         /* Modal styling */
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 150;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          backdrop-filter: blur(4px);
-        }
 
         .modal-content {
           width: 100%;

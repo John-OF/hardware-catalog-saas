@@ -18,16 +18,17 @@ class Product extends Model
     }
 
     protected $fillable = [
-        'category_id', 'name', 'brand', 'price', 'sale_price',
-        'stock', 'description', 'specs',
+        'category_id', 'sku', 'name', 'brand', 'price', 'sale_price',
+        'stock', 'low_stock_threshold', 'description', 'specs',
         'image_url', 'thumbnail_url', 'is_active',
     ];
 
     protected $casts = [
-        'specs'      => 'array',
-        'price'      => 'decimal:2',
-        'sale_price' => 'decimal:2',
-        'is_active'  => 'boolean',
+        'specs'                => 'array',
+        'price'                => 'decimal:2',
+        'sale_price'           => 'decimal:2',
+        'low_stock_threshold'  => 'integer',
+        'is_active'            => 'boolean',
     ];
 
     protected static function booted()

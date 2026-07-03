@@ -56,6 +56,8 @@ export interface Product {
   price: number;
   sale_price: number | null;
   stock: number;
+  low_stock_threshold: number;
+  sku: string | null;
   is_available: boolean;
   description: string | null;
   specs: Record<string, string | number> | null;

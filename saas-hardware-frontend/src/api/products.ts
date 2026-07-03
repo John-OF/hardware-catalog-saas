@@ -57,3 +57,20 @@ export const importProductsCsv = async (file: File): Promise<ImportReport> => {
   });
   return response.data;
 };
+
+export const duplicateProduct = async (id: string): Promise<Product> => {
+  const response = await api.post<Product>(`/products/${id}/duplicate`);
+  return response.data;
+};
+
+export interface BulkActionPayload {
+  product_ids?: string[];
+  category_id?: string;
+  bulk_action: 'activate' | 'deactivate' | 'delete' | 'adjust_price';
+  price_adjustment?: number;
+}
+
+export const bulkActionProducts = async (payload: BulkActionPayload): Promise<{ message: string }> => {
+  const response = await api.post<{ message: string }>('/products/bulk', payload);
+  return response.data;
+};

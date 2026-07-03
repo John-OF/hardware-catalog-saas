@@ -47,6 +47,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     // Productos
     Route::post('products/import', [ProductController::class, 'import']);
+    Route::post('products/bulk', [ProductController::class, 'bulkAction']);
+    Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate']);
     Route::apiResource('products', ProductController::class);
 
     // Categorías
