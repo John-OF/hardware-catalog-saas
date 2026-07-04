@@ -18,7 +18,7 @@ export const getOrder = async (id: string): Promise<Order> => {
   return response.data;
 };
 
-export const updateOrderStatus = async (id: string, status: 'pending' | 'attended' | 'cancelled'): Promise<Order> => {
+export const updateOrderStatus = async (id: string, status: 'pending' | 'processing' | 'attended' | 'cancelled'): Promise<Order> => {
   const response = await api.put<Order>(`/orders/${id}`, { status });
   return response.data;
 };

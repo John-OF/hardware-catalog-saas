@@ -17,11 +17,13 @@ import {
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
 import type { Order, PaginatedResponse } from '../../types';
+import { useTenantStore } from '../../stores/tenantStore';
 
 const money = (n: number) => `$${Number(n).toFixed(2)}`;
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
+  const tenant = useTenantStore((s) => s.tenant);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -43,7 +45,7 @@ export default function OrdersPage() {
 
   // Mutation to update status
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: 'attended' | 'cancelled' | 'pending' }) =>
+    mutationFn: ({ id, status }: { id: string; status: 'attended' | 'cancelled' | 'pending' | 'processing' }) =>
       updateOrderStatus(id, status),
     onSuccess: (updatedOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -72,7 +74,7 @@ export default function OrdersPage() {
     }
   });
 
-  const handleUpdateStatus = (id: string, newStatus: 'attended' | 'cancelled' | 'pending') => {
+  const handleUpdateStatus = (id: string, newStatus: 'attended' | 'cancelled' | 'pending' | 'processing') => {
     updateStatusMutation.mutate({ id, status: newStatus });
   };
 
@@ -84,19 +86,45 @@ export default function OrdersPage() {
 
   const getStatusBadgeClass = (statusVal: string) => {
     if (statusVal === 'attended') return 'badge-success';
+    if (statusVal === 'processing') return 'badge-info';
     if (statusVal === 'cancelled') return 'badge-danger';
     return 'badge-warning';
   };
 
   const getStatusText = (statusVal: string) => {
-    if (statusVal === 'attended') return 'Atendido';
+    if (statusVal === 'attended') return 'Atendido / Listo';
+    if (statusVal === 'processing') return 'En Proceso';
     if (statusVal === 'cancelled') return 'Cancelado';
     return 'Pendiente';
   };
 
-  const handleWhatsappContact = (order: Order) => {
+  const getWhatsappMessageForStatus = (order: Order, type: 'status' | 'general' = 'status') => {
+    const totalFormatted = money(order.total);
+    const tenantName = tenant?.name || 'nuestra tienda';
+    const itemsDescription = order.items && order.items.length > 0
+      ? order.items.map(item => `${item.quantity}x ${item.product_name}`).join(', ')
+      : 'productos';
+    
+    if (type === 'general') {
+      return `Hola ${order.customer_name}, te contacto de la tienda ${tenantName} por tu pedido de: ${itemsDescription}.`;
+    }
+
+    switch (order.status) {
+      case 'processing':
+        return `Hola ${order.customer_name}, tu pedido de: ${itemsDescription} ya se encuentra en preparación en ${tenantName}. Te avisaremos apenas esté listo.`;
+      case 'attended':
+        return `¡Hola ${order.customer_name}! Tu pedido de: ${itemsDescription} por un total de ${totalFormatted} ya está listo en ${tenantName} para ser retirado o entregado. ¡Muchas gracias por tu compra!`;
+      case 'cancelled':
+        return `Hola ${order.customer_name}, tu pedido de: ${itemsDescription} ha sido cancelado en ${tenantName}. Si tienes alguna duda o consulta, por favor escríbenos por aquí.`;
+      default:
+        return `Hola ${order.customer_name}, hemos recibido tu pedido de: ${itemsDescription} en ${tenantName} por un total de ${totalFormatted}. Pronto iniciaremos su preparación.`;
+    }
+  };
+
+  const handleWhatsappContact = (order: Order, type: 'status' | 'general' = 'status') => {
     const cleanPhone = order.customer_phone.replace(/[^0-9]/g, '');
-    const msg = encodeURIComponent(`Hola ${order.customer_name}, te contacto desde la tienda por tu pedido #${order.id.slice(-8)}.`);
+    const textMessage = getWhatsappMessageForStatus(order, type);
+    const msg = encodeURIComponent(textMessage);
     window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
   };
 
@@ -134,6 +162,7 @@ export default function OrdersPage() {
         >
           <option value="">Todos los estados</option>
           <option value="pending">Pendientes</option>
+          <option value="processing">En Proceso</option>
           <option value="attended">Atendidos</option>
           <option value="cancelled">Cancelados</option>
         </select>
@@ -199,10 +228,31 @@ export default function OrdersPage() {
                       {order.status === 'pending' && (
                         <>
                           <button
+                            onClick={() => handleUpdateStatus(order.id, 'processing')}
+                            className="btn-icon process-btn"
+                            title="Marcar en Proceso"
+                            aria-label="Marcar en Proceso"
+                          >
+                            <Loader2 size={16} className="spinner-hover" />
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                            className="btn-icon cancel-btn"
+                            title="Marcar como Cancelado"
+                            aria-label="Marcar como Cancelado"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+
+                      {order.status === 'processing' && (
+                        <>
+                          <button
                             onClick={() => handleUpdateStatus(order.id, 'attended')}
                             className="btn-icon check-btn"
-                            title="Marcar como Atendido"
-                            aria-label="Marcar como Atendido"
+                            title="Marcar como Atendido / Listo"
+                            aria-label="Marcar como Atendido / Listo"
                           >
                             <Check size={16} />
                           </button>
@@ -284,10 +334,13 @@ export default function OrdersPage() {
                   </div>
                   <div>
                     <label>Teléfono:</label>
-                    <div className="phone-row">
-                      <p>{selectedOrder.customer_phone}</p>
-                      <button onClick={() => handleWhatsappContact(selectedOrder)} className="btn-whatsapp">
-                        <Phone size={14} /> WhatsApp
+                    <div className="phone-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <p style={{ margin: 0, marginRight: '0.5rem', fontWeight: 600 }}>{selectedOrder.customer_phone}</p>
+                      <button onClick={() => handleWhatsappContact(selectedOrder, 'status')} className="btn-whatsapp" title="Enviar notificación automática de acuerdo al estado actual">
+                        <Phone size={13} /> Notificar Estado
+                      </button>
+                      <button onClick={() => handleWhatsappContact(selectedOrder, 'general')} className="btn-whatsapp-secondary" title="Enviar mensaje de contacto general">
+                        Contacto General
                       </button>
                     </div>
                   </div>
@@ -330,18 +383,39 @@ export default function OrdersPage() {
 
               {/* State updates inside details */}
               {selectedOrder.status === 'pending' && (
-                <div className="modal-actions-bar">
+                <div className="modal-actions-bar" style={{ display: 'flex', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
                   <button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'attended')}
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')}
                     className="btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
-                    <Check size={16} /> Marcar como Atendido
+                    <Loader2 size={16} className="spinner-hover" /> Preparar Pedido
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')}
                     className="btn-secondary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
-                    <XCircle size={16} /> Marcar como Cancelado
+                    <XCircle size={16} /> Cancelar Pedido
+                  </button>
+                </div>
+              )}
+
+              {selectedOrder.status === 'processing' && (
+                <div className="modal-actions-bar" style={{ display: 'flex', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                  <button
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'attended')}
+                    className="btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <Check size={16} /> Completar / Listo
+                  </button>
+                  <button
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')}
+                    className="btn-secondary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <XCircle size={16} /> Cancelar Pedido
                   </button>
                 </div>
               )}
@@ -782,6 +856,45 @@ export default function OrdersPage() {
 
         .modal-actions-bar button {
           flex: 1;
+        }
+
+        .badge-info {
+          background: rgba(14, 165, 233, 0.15);
+          color: #0ea5e9;
+          border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+
+        .process-btn:hover {
+          border-color: #0ea5e9;
+          color: #0ea5e9;
+          background: rgba(14, 165, 233, 0.1);
+        }
+
+        .btn-whatsapp-secondary {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.3rem 0.6rem;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          font-size: 0.75rem;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: var(--transition);
+        }
+
+        .btn-whatsapp-secondary:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary);
+        }
+
+        .spinner-hover {
+          transition: transform 0.8s ease;
+        }
+        .process-btn:hover .spinner-hover {
+          transform: rotate(360deg);
         }
       `}</style>
     </div>

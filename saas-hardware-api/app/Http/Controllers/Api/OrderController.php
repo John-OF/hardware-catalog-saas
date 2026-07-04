@@ -20,7 +20,7 @@ class OrderController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Filtro por estado
-        if ($request->has('status') && in_array($request->status, ['pending', 'attended', 'cancelled'])) {
+        if ($request->has('status') && in_array($request->status, ['pending', 'processing', 'attended', 'cancelled'])) {
             $query->where('status', $request->status);
         }
 
@@ -53,7 +53,7 @@ class OrderController extends Controller
     public function update(Request $request, Order $order): JsonResponse
     {
         $data = $request->validate([
-            'status' => 'required|string|in:pending,attended,cancelled',
+            'status' => 'required|string|in:pending,processing,attended,cancelled',
         ]);
 
         $order->update([

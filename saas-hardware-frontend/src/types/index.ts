@@ -92,7 +92,7 @@ export interface Order {
   customer_name: string;
   customer_phone: string;
   customer_note: string | null;
-  status: 'pending' | 'attended' | 'cancelled';
+  status: 'pending' | 'processing' | 'attended' | 'cancelled';
   total: number;
   items: OrderItem[];
   items_count?: number;
