@@ -14,6 +14,21 @@ use Illuminate\Support\Facades\DB;
 
 class PublicCatalogController extends Controller
 {
+    public function resolveDomain(Request $request): JsonResponse
+    {
+        $domain = $request->query('domain') ?? $request->getHost();
+
+        $tenant = Tenant::where('custom_domain', $domain)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$tenant) {
+            return response()->json(['message' => 'No se encontró ninguna tienda asociada a este dominio.'], 404);
+        }
+
+        return response()->json($tenant);
+    }
+
     public function tenant(string $slug): JsonResponse
     {
         $tenant = Cache::remember("tenant:{$slug}", 300, function () use ($slug) {
@@ -42,6 +57,7 @@ class PublicCatalogController extends Controller
         $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request) {
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
+                ->where('status', 'published')
                 ->with(['category:id,name,icon', 'images'])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
                 ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
@@ -69,6 +85,7 @@ class PublicCatalogController extends Controller
         $product = Product::where('tenant_id', $tenant->id)
             ->where('id', $productId)
             ->where('is_active', true)
+            ->where('status', 'published')
             ->with(['category', 'images'])
             ->firstOrFail();
 
@@ -156,5 +173,29 @@ class PublicCatalogController extends Controller
         });
 
         return response()->json($order->load('items'), 201);
+    }
+
+    public function pages(string $slug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $pages = \App\Models\Page::where('tenant_id', $tenant->id)
+            ->where('is_active', true)
+            ->select(['id', 'title', 'slug'])
+            ->get();
+
+        return response()->json($pages);
+    }
+
+    public function pageDetail(string $slug, string $pageSlug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $page = \App\Models\Page::where('tenant_id', $tenant->id)
+            ->where('slug', $pageSlug)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        return response()->json($page);
     }
 }

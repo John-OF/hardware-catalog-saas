@@ -27,6 +27,7 @@ class TenantController extends Controller
             'primary_color'   => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'logo_url'        => 'sometimes|nullable|url|max:500',
             'logo'            => 'nullable|image|mimes:jpeg,png,webp|max:2048',
+            'custom_domain'   => 'sometimes|nullable|string|max:100|unique:tenants,custom_domain,' . $tenant->id,
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
             'banner'          => 'nullable|image|mimes:jpeg,png,webp|max:5120',
@@ -39,11 +40,17 @@ class TenantController extends Controller
             'theme.banner_url'    => 'nullable|url|max:500',
             'theme.accent_color'  => 'nullable|regex:/^#[0-9A-Fa-f]{6}$/',
             'theme.color_mode'    => 'nullable|in:dark,light',
+            'theme.layout'        => 'nullable|in:grid,compact,list',
+            'theme.font'          => 'nullable|in:sans,serif,mono,heading',
+            'theme.sections'      => 'nullable|string',
 
             // Branding de la pestaña del navegador (título y favicon)
             'theme.page_title'    => 'nullable|string|max:60',
-            'theme.favicon_url'   => 'nullable|url|max:500',
         ]);
+
+        if (isset($data['theme'])) {
+            $data['theme'] = array_merge($tenant->theme ?? [], $data['theme']);
+        }
 
         if ($request->hasFile('logo')) {
             $urls = $this->imageService->uploadProductImage($request->file('logo'), $tenant->slug . '/logo');

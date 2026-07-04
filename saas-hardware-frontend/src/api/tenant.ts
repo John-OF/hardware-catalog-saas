@@ -6,6 +6,7 @@ export interface UpdateTenantPayload {
   whatsapp_number?: string;
   primary_color?: string;
   logo_url?: string | null;
+  custom_domain?: string | null;
   theme?: TenantTheme;
   // Archivos opcionales: si se envían, el backend los sube y usa su URL.
   logoFile?: File | null;
@@ -28,6 +29,7 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
   if (payload.whatsapp_number !== undefined) fd.append('whatsapp_number', payload.whatsapp_number);
   if (payload.primary_color !== undefined) fd.append('primary_color', payload.primary_color);
   if (payload.logo_url !== undefined && payload.logo_url !== null) fd.append('logo_url', payload.logo_url);
+  if (payload.custom_domain !== undefined) fd.append('custom_domain', payload.custom_domain ?? '');
 
   // Campos del theme como arreglo anidado: theme[clave]=valor
   if (payload.theme) {

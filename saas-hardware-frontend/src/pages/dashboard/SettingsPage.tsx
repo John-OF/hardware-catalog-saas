@@ -1,19 +1,33 @@
 import { useEffect, useState } from 'react';
-import { toast } from 'react-hot-toast';
-import { Save, Store, Palette, Sparkles, Loader2, Sun, Moon, Globe } from 'lucide-react';
 import { useTenantStore } from '../../stores/tenantStore';
 import { updateTenant } from '../../api/tenant';
 import type { UpdateTenantPayload } from '../../api/tenant';
+import { 
+  Store, 
+  Palette, 
+  Sparkles, 
+  Globe, 
+  Loader2, 
+  Save,
+  Moon,
+  Sun,
+  Layout,
+  ArrowUp,
+  ArrowDown
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
 
 export default function SettingsPage() {
-  const tenant = useTenantStore((s) => s.tenant);
-  const setTenant = useTenantStore((s) => s.setTenant);
+  const { tenant, setTenant } = useTenantStore();
 
+  // Estados locales para el formulario
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#2563eb');
+  
+  // Estados para el tema (colores, portada, etc.)
   const [accentColor, setAccentColor] = useState('#06b6d4');
   const [colorMode, setColorMode] = useState<'dark' | 'light'>('dark');
   const [heroTitle, setHeroTitle] = useState('');
@@ -21,6 +35,13 @@ export default function SettingsPage() {
   const [bannerUrl, setBannerUrl] = useState('');
   const [pageTitle, setPageTitle] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
+  
+  // Fase 4: Nuevos Estados
+  const [customDomain, setCustomDomain] = useState('');
+  const [layout, setLayout] = useState<'grid' | 'compact' | 'list'>('grid');
+  const [font, setFont] = useState<'sans' | 'serif' | 'mono' | 'heading'>('sans');
+  const [sections, setSections] = useState<{ id: string; type: string; title: string; enabled: boolean }[]>([]);
+
   const [isSaving, setIsSaving] = useState(false);
 
   // Archivos subidos (alternativa a la URL) para logo, banner y favicon.
@@ -35,6 +56,8 @@ export default function SettingsPage() {
     setWhatsapp(tenant.whatsapp_number ?? '');
     setLogoUrl(tenant.logo_url ?? '');
     setPrimaryColor(tenant.primary_color ?? '#2563eb');
+    setCustomDomain(tenant.custom_domain ?? '');
+    
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
     setColorMode(th.color_mode ?? 'dark');
@@ -43,6 +66,25 @@ export default function SettingsPage() {
     setBannerUrl(th.banner_url ?? '');
     setPageTitle(th.page_title ?? '');
     setFaviconUrl(th.favicon_url ?? '');
+    
+    setLayout(th.layout ?? 'grid');
+    setFont(th.font ?? 'sans');
+
+    // Parsear secciones editables de la portada
+    let parsedSections = [];
+    try {
+      parsedSections = typeof th.sections === 'string' ? JSON.parse(th.sections) : (th.sections ?? []);
+    } catch (e) {
+      console.error(e);
+    }
+    if (!parsedSections || parsedSections.length === 0) {
+      parsedSections = [
+        { id: '1', type: 'hero', title: 'Banner Principal (Hero)', enabled: true },
+        { id: '2', type: 'categories', title: 'Categorías Destacadas', enabled: true },
+        { id: '3', type: 'featured', title: 'Vitrina de Productos', enabled: true }
+      ];
+    }
+    setSections(parsedSections);
   }, [tenant]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +96,7 @@ export default function SettingsPage() {
       whatsapp_number: whatsapp,
       primary_color: primaryColor,
       logo_url: logoUrl || null,
+      custom_domain: customDomain || null,
       theme: {
         hero_title: heroTitle || null,
         hero_subtitle: heroSubtitle || null,
@@ -62,6 +105,9 @@ export default function SettingsPage() {
         color_mode: colorMode,
         page_title: pageTitle || null,
         favicon_url: faviconUrl || null,
+        layout,
+        font,
+        sections: JSON.stringify(sections) // Serializamos para enviarlo en FormData
       },
       logoFile,
       bannerFile,
@@ -75,7 +121,7 @@ export default function SettingsPage() {
       setLogoFile(null);
       setBannerFile(null);
       setFaviconFile(null);
-      toast.success('Personalización guardada con éxito');
+      toast.success('Configuración de diseño guardada con éxito');
     } catch (err: any) {
       console.error(err);
       const msg = err?.response?.data?.message ?? 'No se pudo guardar la configuración.';
@@ -127,6 +173,73 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Dominio Personalizado */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Globe size={18} />
+          <div>
+            <h3>Dominio personalizado</h3>
+            <p>Configura tu propio dominio en producción (ej. tienda.misitio.com).</p>
+          </div>
+        </div>
+        <div className="settings-grid">
+          <div className="form-group full">
+            <label>Dominio Propio</label>
+            <input 
+              className="premium-input" 
+              value={customDomain} 
+              onChange={(e) => setCustomDomain(e.target.value.toLowerCase().trim())} 
+              placeholder="ejemplo.com o tienda.componentespc.com" 
+              maxLength={255} 
+            />
+            <span className="helper-text">
+              Deja en blanco para usar la URL por defecto: <code>http://localhost:5173/{tenant.slug}</code>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Estructura y Estilos */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Layout size={18} />
+          <div>
+            <h3>Estructura y Tipografía</h3>
+            <p>Elige el tipo de grilla de productos y la fuente tipográfica de la tienda.</p>
+          </div>
+        </div>
+        <div className="settings-grid">
+          <div className="form-group">
+            <label>Plantilla del Catálogo (Layout)</label>
+            <select 
+              value={layout} 
+              onChange={(e) => setLayout(e.target.value as any)} 
+              className="premium-input"
+              style={{ height: '42px', background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
+            >
+              <option value="grid">Boutique (Tarjetas Grandes)</option>
+              <option value="compact">Mayorista (Grilla Compacta)</option>
+              <option value="list">Industrial (Fila Densa / Lista)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label>Fuente Tipográfica</label>
+            <select 
+              value={font} 
+              onChange={(e) => setFont(e.target.value as any)} 
+              className="premium-input"
+              style={{ height: '42px', background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
+            >
+              <option value="sans">Interfaz Moderna (Inter / Sans)</option>
+              <option value="serif">Editorial / Elegante (Merriweather / Serif)</option>
+              <option value="mono">Código / Tecnológico (Fira Code / Mono)</option>
+              <option value="heading">Marca de Impacto (Outfit / Montserrat)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
       {/* Colores y tema */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
@@ -165,13 +278,82 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Secciones de la Portada */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Sparkles size={18} />
+          <div>
+            <h3>Secciones de la Portada</h3>
+            <p>Reordena y activa/desactiva los bloques de la página de inicio del catálogo público.</p>
+          </div>
+        </div>
+
+        <div className="sections-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+          {sections.map((sec, idx) => (
+            <div key={sec.id} className="section-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <input 
+                  type="checkbox" 
+                  checked={sec.enabled} 
+                  onChange={(e) => {
+                    const copy = [...sections];
+                    copy[idx].enabled = e.target.checked;
+                    setSections(copy);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: sec.enabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>{sec.title}</span>
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Bloque: <code>{sec.type}</code>
+                  </span>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button
+                  type="button"
+                  disabled={idx === 0}
+                  onClick={() => {
+                    const copy = [...sections];
+                    const temp = copy[idx];
+                    copy[idx] = copy[idx - 1];
+                    copy[idx - 1] = temp;
+                    setSections(copy);
+                  }}
+                  className="btn-icon"
+                  style={{ padding: '4px', opacity: idx === 0 ? 0.3 : 1 }}
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  disabled={idx === sections.length - 1}
+                  onClick={() => {
+                    const copy = [...sections];
+                    const temp = copy[idx];
+                    copy[idx] = copy[idx + 1];
+                    copy[idx + 1] = temp;
+                    setSections(copy);
+                  }}
+                  className="btn-icon"
+                  style={{ padding: '4px', opacity: idx === sections.length - 1 ? 0.3 : 1 }}
+                >
+                  <ArrowDown size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Portada / Hero */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
           <Sparkles size={18} />
           <div>
-            <h3>Portada del catálogo</h3>
-            <p>Textos e imagen principal de tu vitrina pública.</p>
+            <h3>Contenido del Hero (Banner Principal)</h3>
+            <p>Textos e imagen principal que aparecerán en la sección Hero de la portada.</p>
           </div>
         </div>
         <div className="settings-grid">
@@ -253,6 +435,8 @@ export default function SettingsPage() {
         .settings-actions { display: flex; justify-content: flex-end; }
         .settings-actions .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; }
         .spinner { animation: spin 0.8s linear infinite; }
+        .helper-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .helper-text code { background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 4px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } }
       `}</style>

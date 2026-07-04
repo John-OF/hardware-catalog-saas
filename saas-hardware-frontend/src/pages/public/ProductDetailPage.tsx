@@ -14,7 +14,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getPublicTenant, getPublicProduct } from '../../api/public';
+import { getPublicTenant, getPublicProduct, resolveTenantDomain } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
@@ -22,23 +22,32 @@ import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
+  const isCustomDomain = !slug;
+  const currentDomain = window.location.hostname;
   const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState<string | null>(null);
 
   // Fetch Tenant Info (to maintain active styling/colors)
   const { data: tenant } = useQuery<Tenant>({
-    queryKey: ['publicTenant', slug],
-    queryFn: () => getPublicTenant(slug!),
-    enabled: !!slug,
+    queryKey: ['publicTenant', slug || currentDomain],
+    queryFn: async () => {
+      if (slug) {
+        return getPublicTenant(slug);
+      } else {
+        return resolveTenantDomain(currentDomain);
+      }
+    },
   });
+
+  const resolvedSlug = tenant?.slug;
 
   useTenantTheme(tenant);
 
   // Fetch Product Info
   const { data: product, isLoading, isError } = useQuery<Product>({
-    queryKey: ['publicProduct', slug, id],
-    queryFn: () => getPublicProduct(slug!, id!),
-    enabled: !!slug && !!id,
+    queryKey: ['publicProduct', resolvedSlug, id],
+    queryFn: () => getPublicProduct(resolvedSlug!, id!),
+    enabled: !!resolvedSlug && !!id,
   });
 
   // Título y favicon de la pestaña: "Producto · Mi Tienda"
@@ -53,8 +62,8 @@ export default function ProductDetailPage() {
   const addItem = useCartStore((s) => s.addItem);
 
   const handleAddToCart = () => {
-    if (!product || !slug) return;
-    addItem(slug, product);
+    if (!product || !resolvedSlug) return;
+    addItem(resolvedSlug, product);
     toast.success(`${product.name} agregado al pedido`);
   };
 
@@ -91,15 +100,15 @@ export default function ProductDetailPage() {
       if (e.key === 'Escape') {
         if (isLightboxOpen) {
           setIsLightboxOpen(false);
-        } else if (slug) {
-          navigate(`/${slug}`);
+        } else {
+          navigate(isCustomDomain ? '/' : `/${resolvedSlug}`);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLightboxOpen, slug, navigate]);
+  }, [isLightboxOpen, slug, resolvedSlug, isCustomDomain, navigate]);
 
   // Whatsapp redirect handler
   const handleWhatsappQuery = () => {
@@ -145,7 +154,7 @@ export default function ProductDetailPage() {
         <ShoppingBag size={48} />
         <h2>Producto no encontrado</h2>
         <p>El producto que buscas no existe en este catálogo o ha sido desactivado.</p>
-        <Link to={`/${slug}`} className="btn-primary" style={{textDecoration: 'none'}}>Volver al Catálogo</Link>
+        <Link to={isCustomDomain ? '/' : `/${resolvedSlug}`} className="btn-primary" style={{textDecoration: 'none'}}>Volver al Catálogo</Link>
         <style>{`
           .error-container {
             display: flex;
@@ -169,7 +178,7 @@ export default function ProductDetailPage() {
     <div className="product-detail-container animate-fade-in">
       {/* Back button */}
       <div className="back-navigation">
-        <Link to={`/${slug}`} className="btn-secondary back-btn">
+        <Link to={isCustomDomain ? '/' : `/${resolvedSlug}`} className="btn-secondary back-btn">
           <ArrowLeft size={16} />
           <span>Volver al catálogo</span>
         </Link>
@@ -337,7 +346,11 @@ export default function ProductDetailPage() {
           {product.description && (
             <div className="detail-description-section">
               <h3>Descripción</h3>
-              <p>{product.description}</p>
+              <div 
+                className="rich-description-html" 
+                dangerouslySetInnerHTML={{ __html: product.description }} 
+                style={{ fontSize: '0.95rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}
+              />
             </div>
           )}
 

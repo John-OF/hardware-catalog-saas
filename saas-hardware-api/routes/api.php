@@ -20,11 +20,17 @@ Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
 
 // Catálogo público (consultado por el frontend sin login)
+Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDomain']);
+
 Route::prefix('public/{slug}')->group(function () {
     Route::get('/',          [PublicCatalogController::class, 'tenant']);
     Route::get('/categories', [PublicCatalogController::class, 'categories']);
     Route::get('/products',  [PublicCatalogController::class, 'products']);
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
+    
+    // Páginas informativas públicas
+    Route::get('/pages', [PublicCatalogController::class, 'pages']);
+    Route::get('/pages/{page_slug}', [PublicCatalogController::class, 'pageDetail']);
 
     // Crear solicitud de pedido (público, limitado para evitar spam)
     Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
@@ -58,4 +64,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     // Pedidos
     Route::apiResource('orders', OrderController::class);
+
+    // Páginas informativas privadas
+    Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
 });

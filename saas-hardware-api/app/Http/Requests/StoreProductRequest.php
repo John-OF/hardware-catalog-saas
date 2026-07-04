@@ -41,6 +41,7 @@ class StoreProductRequest extends FormRequest
             'gallery'             => 'nullable|array',
             'gallery.*'           => 'image|mimes:jpeg,jpg,png,webp|max:10240',
             'is_active'           => 'nullable|boolean',
+            'status'              => 'nullable|string|in:draft,published',
         ];
     }
 }

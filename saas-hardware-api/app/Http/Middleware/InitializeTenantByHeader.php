@@ -13,15 +13,18 @@ class InitializeTenantByHeader
     {
         // El frontend envía el slug del tenant en el header X-Tenant
         $slug = $request->header('X-Tenant');
+        $tenant = null;
 
-        if (!$slug) {
-            return response()->json(['message' => 'Tenant no especificado.'], 400);
+        if ($slug) {
+            $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        } else {
+            // Resolver por dominio personalizado
+            $host = $request->getHost();
+            $tenant = Tenant::where('custom_domain', $host)->where('is_active', true)->first();
         }
 
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
-
         if (!$tenant) {
-            return response()->json(['message' => 'Tienda no encontrada o inactiva.'], 404);
+            return response()->json(['message' => 'Tienda no encontrada, inactiva o no especificada.'], 404);
         }
 
         // Prevenir vulnerabilidad BOLA: Validar pertenencia del usuario autenticado al tenant

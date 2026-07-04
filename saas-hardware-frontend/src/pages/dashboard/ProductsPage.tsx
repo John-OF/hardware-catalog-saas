@@ -59,6 +59,7 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [status, setStatus] = useState<'draft' | 'published'>('published');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -227,6 +228,7 @@ export default function ProductsPage() {
     setCategoryId('');
     setDescription('');
     setIsActive(true);
+    setStatus('published');
     setImageFile(null);
     setImagePreview(null);
     setGalleryFiles([]);
@@ -249,6 +251,7 @@ export default function ProductsPage() {
     setCategoryId(product.category_id || '');
     setDescription(product.description || '');
     setIsActive(product.is_active);
+    setStatus(product.status || 'published');
     setImageFile(null);
     setImagePreview(product.thumbnail_url);
     setGalleryFiles([]);
@@ -322,6 +325,7 @@ export default function ProductsPage() {
     formData.append('category_id', categoryId);
     formData.append('description', description);
     formData.append('is_active', isActive ? '1' : '0');
+    formData.append('status', status);
 
     if (imageFile) {
       formData.append('image', imageFile);
@@ -678,11 +682,16 @@ export default function ProductsPage() {
                         </div>
                       </td>
                       <td>
-                        {product.is_active ? (
-                          <span className="badge badge-success"><Eye size={12} style={{marginRight: '3.5px'}} /> Visible</span>
-                        ) : (
-                          <span className="badge badge-danger"><EyeOff size={12} style={{marginRight: '3.5px'}} /> Oculto</span>
-                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
+                          {product.is_active ? (
+                            <span className="badge badge-success"><Eye size={12} style={{marginRight: '3.5px'}} /> Visible</span>
+                          ) : (
+                            <span className="badge badge-danger"><EyeOff size={12} style={{marginRight: '3.5px'}} /> Oculto</span>
+                          )}
+                          {product.status === 'draft' && (
+                            <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontSize: '0.7rem' }}>Borrador</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div className="table-actions">
@@ -940,7 +949,60 @@ export default function ProductsPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="prod-desc">Descripción</label>
+                <label htmlFor="prod-desc">Descripción (Soporta HTML)</label>
+                <div className="rich-toolbar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem', border: '1px solid var(--border)', borderBottom: 'none', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '4px 4px 0 0' }}>
+                  <button
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                    onClick={() => {
+                      const txtarea = document.getElementById('prod-desc') as HTMLTextAreaElement;
+                      if (!txtarea) return;
+                      const start = txtarea.selectionStart;
+                      const end = txtarea.selectionEnd;
+                      const text = txtarea.value;
+                      const selected = text.substring(start, end);
+                      const replacement = `<strong>${selected}</strong>`;
+                      setDescription(text.substring(0, start) + replacement + text.substring(end));
+                    }}
+                    title="Negrita"
+                  >
+                    Negrita
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem', fontStyle: 'italic' }}
+                    onClick={() => {
+                      const txtarea = document.getElementById('prod-desc') as HTMLTextAreaElement;
+                      if (!txtarea) return;
+                      const start = txtarea.selectionStart;
+                      const end = txtarea.selectionEnd;
+                      const text = txtarea.value;
+                      const selected = text.substring(start, end);
+                      const replacement = `<em>${selected}</em>`;
+                      setDescription(text.substring(0, start) + replacement + text.substring(end));
+                    }}
+                    title="Cursiva"
+                  >
+                    Cursiva
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem' }}
+                    onClick={() => {
+                      const txtarea = document.getElementById('prod-desc') as HTMLTextAreaElement;
+                      if (!txtarea) return;
+                      const start = txtarea.selectionStart;
+                      const end = txtarea.selectionEnd;
+                      const text = txtarea.value;
+                      const selected = text.substring(start, end);
+                      const replacement = `<ul>\n  <li>${selected || 'Elemento'}</li>\n</ul>`;
+                      setDescription(text.substring(0, start) + replacement + text.substring(end));
+                    }}
+                    title="Lista"
+                  >
+                    Lista
+                  </button>
+                </div>
                 <textarea
                   id="prod-desc"
                   rows={4}
@@ -948,6 +1010,7 @@ export default function ProductsPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="premium-input textarea-input"
+                  style={{ borderRadius: '0 0 4px 4px', borderTop: 'none' }}
                 />
               </div>
 
@@ -991,6 +1054,20 @@ export default function ProductsPage() {
               </div>
 
               <div className="form-group">
+                <label htmlFor="prod-status">Estado de Publicación</label>
+                <select
+                  id="prod-status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="premium-input"
+                  style={{ background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', height: '42px', borderRadius: 'var(--radius-md)' }}
+                >
+                  <option value="published">Publicado</option>
+                  <option value="draft">Borrador</option>
+                </select>
+              </div>
+
+              <div className="form-group">
                 <label>Visibilidad del Catálogo</label>
                 <div className="toggle-switch-wrapper">
                   <input
@@ -1001,7 +1078,7 @@ export default function ProductsPage() {
                     className="toggle-checkbox"
                   />
                   <label htmlFor="prod-active" className="toggle-label"></label>
-                  <span className="toggle-text">{isActive ? 'Público en el catálogo' : 'Oculto / Borrador'}</span>
+                  <span className="toggle-text">{isActive ? 'Público en el catálogo' : 'Oculto'}</span>
                 </div>
               </div>
 

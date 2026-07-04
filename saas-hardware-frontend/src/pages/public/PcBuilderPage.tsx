@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
-import { getPublicTenant, getPublicProducts } from '../../api/public';
+import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
@@ -45,6 +45,8 @@ interface CompatibilityIssue {
 
 export default function PcBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
+  const isCustomDomain = !slug;
+  const currentDomain = window.location.hostname;
   const addItem = useCartStore((s) => s.addItem);
 
   // Selecciones actuales (key de paso -> producto seleccionado)
@@ -57,22 +59,36 @@ export default function PcBuilderPage() {
 
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant } = useQuery<Tenant>({
-    queryKey: ['publicTenant', slug],
-    queryFn: () => getPublicTenant(slug!),
-    enabled: !!slug,
+    queryKey: ['publicTenant', slug || currentDomain],
+    queryFn: async () => {
+      if (slug) {
+        return getPublicTenant(slug);
+      } else {
+        return resolveTenantDomain(currentDomain);
+      }
+    },
   });
+
+  const resolvedSlug = tenant?.slug;
+
+  const getPublicPath = (path: string) => {
+    if (isCustomDomain) {
+      return path;
+    }
+    return `/${resolvedSlug}${path}`;
+  };
 
   useTenantBranding(tenant);
   useTenantTheme(tenant);
 
   // Fetch Categories to map step keys
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['publicCategories', slug],
+    queryKey: ['publicCategories', resolvedSlug],
     queryFn: async () => {
-      const res = await api.get<Category[]>(`/public/${slug}/categories`);
+      const res = await api.get<Category[]>(`/public/${resolvedSlug}/categories`);
       return res.data;
     },
-    enabled: !!slug,
+    enabled: !!resolvedSlug,
   });
 
   // Encontrar la categoría real correspondiente al paso activo
@@ -84,14 +100,14 @@ export default function PcBuilderPage() {
 
   // Fetch Products de la categoría seleccionada para el paso activo
   const { data: paginatedProducts, isLoading: isLoadingProducts } = useQuery<PaginatedResponse<Product>>({
-    queryKey: ['builderProducts', slug, matchedCategory?.id, searchQuery, productPage],
-    queryFn: () => getPublicProducts(slug!, {
+    queryKey: ['builderProducts', resolvedSlug, matchedCategory?.id, searchQuery, productPage],
+    queryFn: () => getPublicProducts(resolvedSlug!, {
       category_id: matchedCategory?.id,
       search: searchQuery || undefined,
       in_stock: true,
       page: productPage,
     }),
-    enabled: !!slug && !!matchedCategory,
+    enabled: !!resolvedSlug && !!matchedCategory,
   });
 
   const availableProducts = paginatedProducts?.data || [];
@@ -330,7 +346,7 @@ export default function PcBuilderPage() {
     <div className="pc-builder-page animate-fade-in">
       {/* Top Header */}
       <header className="catalog-header glass-card">
-        <Link to={`/${slug}`} className="back-catalog-link">
+        <Link to={getPublicPath('/')} className="back-catalog-link">
           <ArrowLeft size={16} /> Volver al Catálogo
         </Link>
         <div className="header-title">

@@ -12,7 +12,8 @@ import {
   X,
   ChevronRight,
   Settings,
-  ShoppingCart
+  ShoppingCart,
+  FileText
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -179,6 +180,16 @@ export default function DashboardPage() {
           >
             <ShoppingCart size={20} />
             <span>Pedidos</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink 
+            to="/dashboard/pages" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <FileText size={20} />
+            <span>Páginas</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

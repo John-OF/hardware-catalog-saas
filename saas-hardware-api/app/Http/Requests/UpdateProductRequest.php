@@ -42,6 +42,7 @@ class UpdateProductRequest extends FormRequest
             'gallery.*'           => 'image|mimes:jpeg,jpg,png,webp|max:10240',
             'deleted_image_ids'   => 'nullable',
             'is_active'           => 'nullable|boolean',
+            'status'              => 'nullable|string|in:draft,published',
         ];
     }
 }

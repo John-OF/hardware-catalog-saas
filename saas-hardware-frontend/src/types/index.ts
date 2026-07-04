@@ -6,6 +6,9 @@ export interface TenantTheme {
   color_mode?: 'dark' | 'light' | null;
   page_title?: string | null;
   favicon_url?: string | null;
+  layout?: 'grid' | 'compact' | 'list' | null;
+  font?: 'sans' | 'serif' | 'mono' | 'heading' | null;
+  sections?: any;
 }
 
 export interface Tenant {
@@ -18,6 +21,7 @@ export interface Tenant {
   whatsapp_number: string;
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;
+  custom_domain: string | null;
 }
 
 export interface User {
@@ -65,6 +69,7 @@ export interface Product {
   thumbnail_url: string | null;
   images?: ProductImage[];
   is_active: boolean;
+  status: 'draft' | 'published';
   created_at: string;
 }
 
@@ -106,4 +111,14 @@ export interface AuthResponse {
   token: string;
   user: User;
   tenant: Tenant;
+}
+
+export interface Page {
+  id: string;
+  tenant_id: string;
+  title: string;
+  slug: string;
+  content: string | null;
+  is_active: boolean;
+  created_at?: string;
 }

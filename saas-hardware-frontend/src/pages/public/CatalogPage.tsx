@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -18,16 +18,19 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
-import { getPublicTenant, getPublicProducts } from '../../api/public';
+import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
+import { getPublicPages } from '../../api/pages';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import CartDrawer from '../../components/public/CartDrawer';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
-import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
+import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
+  const isCustomDomain = !slug;
+  const currentDomain = window.location.hostname;
 
   // States
   const [search, setSearch] = useState('');
@@ -50,7 +53,7 @@ export default function CatalogPage() {
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(slug!, product);
+    addItem(resolvedSlug!, product);
     toast.success(`${product.name} agregado al pedido`);
   };
 
@@ -74,11 +77,31 @@ export default function CatalogPage() {
     });
   };
 
+  // Redireccionar en localhost si falta el slug
+  const isSaaSBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isSaaSBase && !slug) {
+    return <Navigate to="/login" replace />;
+  }
+
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant, isError: isErrorTenant } = useQuery<Tenant>({
-    queryKey: ['publicTenant', slug],
-    queryFn: () => getPublicTenant(slug!),
-    enabled: !!slug,
+    queryKey: ['publicTenant', slug || currentDomain],
+    queryFn: async () => {
+      if (slug) {
+        return getPublicTenant(slug);
+      } else {
+        return resolveTenantDomain(currentDomain);
+      }
+    },
+  });
+
+  const resolvedSlug = tenant?.slug;
+
+  // Fetch Pages públicas
+  const { data: publicPages = [] } = useQuery<Page[]>({
+    queryKey: ['publicPages', resolvedSlug],
+    queryFn: () => getPublicPages(resolvedSlug!),
+    enabled: !!resolvedSlug,
   });
 
   // Título y favicon de la pestaña según el tenant
@@ -99,45 +122,52 @@ export default function CatalogPage() {
   //     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
   // });
   // Indeed, there is no public categories list endpoint.
-  // But wait! If we want to show category filters in the public page, we can list them from products, or we can add a public categories endpoint, 
-  // OR we can make a query. Let's check: in `PublicCatalogController.php`, can we get categories?
-  // Wait! In `PublicCatalogController.php`, the products are fetched with category:
-  // `->with('category:id,name,icon')`
-  // Also, we can extract the categories from the products list in the frontend! 
-  // That works, but it only displays categories of the current page.
-  // Let's check if we can add a public categories route in the backend or if we can query it easily.
-  // Wait, can we edit `routes/api.php` and `PublicCatalogController.php` to add a public categories endpoint?
-  // Yes, that would be a very nice addition to make filtering 100% robust and clean!
-  // Let's check if Category has `tenant_id` and can be retrieved publicly. Yes!
-  // Let's add `Route::get('/categories', [PublicCatalogController::class, 'categories']);` to `routes/api.php` under the public prefix!
-  // First, let's write the frontend code. I will use the products categories for now, or fetch from the new endpoint. Let's add the endpoint in the backend to make the app flawless.
-  // Let's write `PublicCatalogController@categories` and add the route.
-  // Wait, let's first check if we can write `CatalogPage.tsx` expecting a `/public/{slug}/categories` endpoint, and then implement it. Yes! That is extremely clean.
-  
   const { data: publicCategories = [] } = useQuery<Category[]>({
-    queryKey: ['publicCategories', slug],
+    queryKey: ['publicCategories', resolvedSlug],
     queryFn: async () => {
-      const res = await api.get<Category[]>(`/public/${slug}/categories`);
+      const res = await api.get<Category[]>(`/public/${resolvedSlug}/categories`);
       return res.data;
     },
-    enabled: !!slug,
+    enabled: !!resolvedSlug,
   });
 
   // Fetch Public Products
   const { data: paginatedData, isLoading: isLoadingProducts } = useQuery<PaginatedResponse<Product>>({
-    queryKey: ['publicProducts', slug, search, selectedCategory, inStock, selectedSpecs, page],
-    queryFn: () => getPublicProducts(slug!, {
+    queryKey: ['publicProducts', resolvedSlug, search, selectedCategory, inStock, selectedSpecs, page],
+    queryFn: () => getPublicProducts(resolvedSlug!, {
       category_id: selectedCategory || undefined,
       search: search || undefined,
       in_stock: inStock || undefined,
       specs: Object.keys(selectedSpecs).length > 0 ? selectedSpecs : undefined,
       page,
     }),
-    enabled: !!slug,
+    enabled: !!resolvedSlug,
   });
+
+  // Parsear secciones editables de la portada para CMS
+  let parsedSections: any[] = [];
+  try {
+    parsedSections = typeof tenant?.theme?.sections === 'string'
+      ? JSON.parse(tenant.theme.sections)
+      : (tenant?.theme?.sections ?? []);
+  } catch (e) {}
+
+  if (!parsedSections || parsedSections.length === 0) {
+    parsedSections = [
+      { id: '1', type: 'hero', enabled: true },
+      { id: '2', type: 'featured', enabled: true }
+    ];
+  }
 
   const products = paginatedData?.data || [];
   const totalPages = paginatedData?.last_page || 1;
+
+  const getPublicPath = (path: string) => {
+    if (isCustomDomain) {
+      return path;
+    }
+    return `/${resolvedSlug}${path}`;
+  };
 
   // Extract unique spec values from products list
   useEffect(() => {
@@ -212,7 +242,7 @@ export default function CatalogPage() {
   }
 
   return (
-    <div className="public-catalog-container animate-fade-in">
+    <div className="public-catalog-container animate-fade-in" style={{ fontFamily: getFontFamily(tenant.theme?.font) }}>
       {/* Header Store */}
       <header className="catalog-header glass-card">
         <div className="header-logo-area">
@@ -227,7 +257,7 @@ export default function CatalogPage() {
         </div>
         <div className="header-contact">
           <Link
-            to={`/${slug}/builder`}
+            to={getPublicPath('/builder')}
             className="btn-secondary builder-header-btn"
             style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', fontSize: '0.85rem' }}
           >
@@ -253,255 +283,270 @@ export default function CatalogPage() {
         </div>
       </header>
 
-      {/* Hero Catalog */}
-      <section
-        className="catalog-hero glass-card"
-        style={tenant.theme?.banner_url ? {
-          backgroundImage: `linear-gradient(to right, rgba(11,15,25,0.92), rgba(11,15,25,0.55)), url(${tenant.theme.banner_url})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        } : undefined}
-      >
-        <div className="hero-content">
-          <span
-            className="hero-badge"
-            style={tenant.theme?.accent_color ? { color: tenant.theme.accent_color, borderColor: tenant.theme.accent_color } : undefined}
-          >
-            CATÁLOGO VIRTUAL
-          </span>
-          <h1>{tenant.theme?.hero_title || 'Encuentra las mejores piezas de hardware'}</h1>
-          <p>{tenant.theme?.hero_subtitle || 'Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.'}</p>
-        </div>
-        <div className="hero-glow"></div>
-      </section>
-
-      {/* Catalog Content Layout */}
-      <div className="catalog-content-layout">
-        {/* Filters Sidebar */}
-        <aside className="catalog-sidebar glass-card">
-          <div className="sidebar-section">
-            <h3>Categorías</h3>
-            <div className="category-filters-list">
-              <button 
-                onClick={() => { setSelectedCategory(''); setPage(1); }} 
-                className={`category-filter-btn ${selectedCategory === '' ? 'active' : ''}`}
+      {/* Renderizado de secciones editables de la portada */}
+      {parsedSections
+        .filter((sec: any) => sec.enabled)
+        .map((sec: any) => {
+          if (sec.type === 'hero') {
+            return (
+              <section
+                key={sec.id}
+                className="catalog-hero glass-card animate-fade-in"
+                style={tenant.theme?.banner_url ? {
+                  backgroundImage: `linear-gradient(to right, rgba(11,15,25,0.92), rgba(11,15,25,0.55)), url(${tenant.theme.banner_url})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                } : undefined}
               >
-                <span className="category-filter-label"><LayoutGrid size={16} /> Todos</span>
-              </button>
-              {publicCategories.map((cat) => (
-                <button 
-                  key={cat.id} 
-                  onClick={() => { setSelectedCategory(cat.id); setPage(1); }} 
-                  className={`category-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                >
-                  <span className="category-filter-label"><CategoryIcon slug={cat.icon} size={16} /> {cat.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="sidebar-section">
-            <h3>Disponibilidad</h3>
-            <label className="checkbox-filter-label">
-              <input
-                type="checkbox"
-                checked={inStock}
-                onChange={(e) => { setInStock(e.target.checked); setPage(1); }}
-                className="custom-checkbox"
-              />
-              <span>Sólo en stock</span>
-            </label>
-          </div>
-
-          {/* Dynamic Technical Specs Filters */}
-          {Object.keys(availableSpecs).length > 0 && (
-            <div className="sidebar-section specs-filters-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h3 style={{ margin: 0 }}>Especificaciones</h3>
-                {Object.keys(selectedSpecs).length > 0 && (
-                  <button 
-                    type="button" 
-                    onClick={() => { setSelectedSpecs({}); setPage(1); }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                <div className="hero-content">
+                  <span
+                    className="hero-badge"
+                    style={tenant.theme?.accent_color ? { color: tenant.theme.accent_color, borderColor: tenant.theme.accent_color } : undefined}
                   >
-                    Limpiar
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {Object.entries(availableSpecs).map(([specKey, specValues]) => (
-                  <div key={specKey} className="spec-filter-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    <span className="spec-filter-title" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {specKey}
-                    </span>
-                    <div className="spec-filter-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                      {Array.from(specValues).map((val) => {
-                        const isSelected = selectedSpecs[specKey] === val;
-                        return (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => {
-                              setSelectedSpecs((prev) => {
-                                const copy = { ...prev };
-                                if (isSelected) {
-                                  delete copy[specKey];
-                                } else {
-                                  copy[specKey] = val;
-                                }
-                                return copy;
-                              });
-                              setPage(1);
-                            }}
-                            className={`spec-pill-btn ${isSelected ? 'active' : ''}`}
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.25rem 0.6rem',
-                              borderRadius: '20px',
-                              border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                              background: isSelected ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                              color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
-                              cursor: 'pointer',
-                              transition: 'var(--transition)',
-                              fontWeight: isSelected ? 600 : 'normal'
-                            }}
-                          >
-                            {val}
-                          </button>
-                        );
-                      })}
+                    CATÁLOGO VIRTUAL
+                  </span>
+                  <h1>{tenant.theme?.hero_title || 'Encuentra las mejores piezas de hardware'}</h1>
+                  <p>{tenant.theme?.hero_subtitle || 'Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.'}</p>
+                </div>
+                <div className="hero-glow"></div>
+              </section>
+            );
+          }
+
+          if (sec.type === 'featured') {
+            return (
+              <div key={sec.id} className="catalog-content-layout animate-fade-in">
+                {/* Filters Sidebar */}
+                <aside className="catalog-sidebar glass-card">
+                  <div className="sidebar-section">
+                    <h3>Categorías</h3>
+                    <div className="category-filters-list">
+                      <button 
+                        onClick={() => { setSelectedCategory(''); setPage(1); }} 
+                        className={`category-filter-btn ${selectedCategory === '' ? 'active' : ''}`}
+                      >
+                        <span className="category-filter-label"><LayoutGrid size={16} /> Todos</span>
+                      </button>
+                      {publicCategories.map((cat) => (
+                        <button 
+                          key={cat.id} 
+                          onClick={() => { setSelectedCategory(cat.id); setPage(1); }} 
+                          className={`category-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+                        >
+                          <span className="category-filter-label"><CategoryIcon slug={cat.icon} size={16} /> {cat.name}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </aside>
 
-        {/* Main Grid Area */}
-        <div className="catalog-main-area">
-          {/* Topbar Search */}
-          <div className="search-bar-row glass-card">
-            <div className="search-box">
-              <Search size={18} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Buscar componente..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="premium-input"
-              />
-            </div>
-          </div>
+                  <div className="sidebar-section">
+                    <h3>Disponibilidad</h3>
+                    <label className="checkbox-filter-label">
+                      <input
+                        type="checkbox"
+                        checked={inStock}
+                        onChange={(e) => { setInStock(e.target.checked); setPage(1); }}
+                        className="custom-checkbox"
+                      />
+                      <span>Sólo en stock</span>
+                    </label>
+                  </div>
 
-          {/* Products Grid */}
-          {isLoadingProducts ? (
-            <div className="inner-loader">
-              <Loader2 className="spinner" size={32} />
-              <p>Buscando componentes...</p>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="empty-catalog glass-card">
-              <FolderOpen size={44} className="empty-icon" />
-              <h3>No se encontraron componentes</h3>
-              <p>Intenta cambiar los filtros o el texto de búsqueda.</p>
-            </div>
-          ) : (
-            <>
-              <div className="catalog-grid">
-                {products.map((product) => (
-                  <Link 
-                    key={product.id} 
-                    to={`/${slug}/product/${product.id}`} 
-                    className="product-catalog-card glass-card"
-                  >
-                    <div className="card-image-wrapper">
-                      {product.stock > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleCompare(e, product)}
-                          className={`compare-toggle-badge ${comparedProducts.some(p => p.id === product.id) ? 'active' : ''}`}
-                          title="Comparar especificaciones"
-                        >
-                          {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
-                        </button>
-                      )}
-                      {product.thumbnail_url ? (
-                        <img src={product.thumbnail_url} alt={product.name} />
-                      ) : (
-                        <div className="image-placeholder">
-                          <ShoppingBag size={32} />
+                  {/* Dynamic Technical Specs Filters */}
+                  {Object.keys(availableSpecs).length > 0 && (
+                    <div className="sidebar-section specs-filters-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <h3 style={{ margin: 0 }}>Especificaciones</h3>
+                        {Object.keys(selectedSpecs).length > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => { setSelectedSpecs({}); setPage(1); }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            Limpiar
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {Object.entries(availableSpecs).map(([specKey, specValues]) => (
+                          <div key={specKey} className="spec-filter-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                            <span className="spec-filter-title" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {specKey}
+                            </span>
+                            <div className="spec-filter-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                              {Array.from(specValues).map((val) => {
+                                const isSelected = selectedSpecs[specKey] === val;
+                                return (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedSpecs((prev) => {
+                                        const copy = { ...prev };
+                                        if (isSelected) {
+                                          delete copy[specKey];
+                                        } else {
+                                          copy[specKey] = val;
+                                        }
+                                        return copy;
+                                      });
+                                      setPage(1);
+                                    }}
+                                    className={`spec-pill-btn ${isSelected ? 'active' : ''}`}
+                                    style={{
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem 0.6rem',
+                                      borderRadius: '20px',
+                                      border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                      background: isSelected ? 'rgba(var(--primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                                      color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                                      cursor: 'pointer',
+                                      transition: 'var(--transition)',
+                                      fontWeight: isSelected ? 600 : 'normal'
+                                    }}
+                                  >
+                                    {val}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </aside>
+
+                {/* Main Grid Area */}
+                <div className="catalog-main-area">
+                  {/* Topbar Search */}
+                  <div className="search-bar-row glass-card">
+                    <div className="search-box">
+                      <Search size={18} className="search-icon" />
+                      <input
+                        type="text"
+                        placeholder="Buscar componente..."
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        className="premium-input"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Products Grid */}
+                  {isLoadingProducts ? (
+                    <div className="inner-loader">
+                      <Loader2 className="spinner" size={32} />
+                      <p>Buscando componentes...</p>
+                    </div>
+                  ) : products.length === 0 ? (
+                    <div className="empty-catalog glass-card">
+                      <FolderOpen size={44} className="empty-icon" />
+                      <h3>No se encontraron componentes</h3>
+                      <p>Intenta cambiar los filtros o el texto de búsqueda.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`catalog-grid layout-${tenant.theme?.layout || 'grid'}`}>
+                        {products.map((product) => (
+                          <Link 
+                            key={product.id} 
+                            to={getPublicPath(`/product/${product.id}`)} 
+                            className="product-catalog-card glass-card"
+                          >
+                            <div className="card-image-wrapper">
+                              {product.stock > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleCompare(e, product)}
+                                  className={`compare-toggle-badge ${comparedProducts.some(p => p.id === product.id) ? 'active' : ''}`}
+                                  title="Comparar especificaciones"
+                                >
+                                  {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
+                                </button>
+                              )}
+                              {product.thumbnail_url ? (
+                                <img src={product.thumbnail_url} alt={product.name} />
+                              ) : (
+                                <div className="image-placeholder">
+                                  <ShoppingBag size={32} />
+                                </div>
+                              )}
+                              {product.stock === 0 && (
+                                <span className="card-badge sold-out">Agotado</span>
+                              )}
+                              {product.stock > 0 && product.stock < 5 && (
+                                <span className="card-badge low-stock">Pocas Unidades</span>
+                              )}
+                              {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
+                                <span className="card-badge sale">Oferta</span>
+                              )}
+                            </div>
+
+                            <div className="card-details">
+                              <span className="card-brand">{product.brand || 'Genérico'}</span>
+                              <h3 className="card-title">{product.name}</h3>
+                              <div className="card-footer">
+                                <span className="card-price">
+                                  {product.sale_price !== null && product.sale_price !== undefined ? (
+                                    <>
+                                      <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
+                                        ${parseFloat(product.price.toString()).toFixed(2)}
+                                      </span>
+                                      <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                                    </>
+                                  ) : (
+                                    `$${parseFloat(product.price.toString()).toFixed(2)}`
+                                  )}
+                                </span>
+                                <span className="view-detail-link">
+                                  Ver más <ChevronRight size={14} />
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="card-add-btn"
+                                onClick={(e) => handleAddToCart(e, product)}
+                                disabled={product.stock === 0}
+                              >
+                                <Plus size={15} /> {product.stock === 0 ? 'Agotado' : 'Agregar'}
+                              </button>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="pagination-bar">
+                          <button 
+                            onClick={() => setPage(page - 1)} 
+                            disabled={page === 1}
+                            className="btn-secondary pag-btn"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <span className="page-indicator">Página {page} de {totalPages}</span>
+                          <button 
+                            onClick={() => setPage(page + 1)} 
+                            disabled={page === totalPages}
+                            className="btn-secondary pag-btn"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
                         </div>
                       )}
-                      {product.stock === 0 && (
-                        <span className="card-badge sold-out">Agotado</span>
-                      )}
-                      {product.stock > 0 && product.stock < 5 && (
-                        <span className="card-badge low-stock">Pocas Unidades</span>
-                      )}
-                      {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
-                        <span className="card-badge sale">Oferta</span>
-                      )}
-                    </div>
-
-                    <div className="card-details">
-                      <span className="card-brand">{product.brand || 'Genérico'}</span>
-                      <h3 className="card-title">{product.name}</h3>
-                      <div className="card-footer">
-                        <span className="card-price">
-                          {product.sale_price !== null && product.sale_price !== undefined ? (
-                            <>
-                              <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
-                                ${parseFloat(product.price.toString()).toFixed(2)}
-                              </span>
-                              <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
-                            </>
-                          ) : (
-                            `$${parseFloat(product.price.toString()).toFixed(2)}`
-                          )}
-                        </span>
-                        <span className="view-detail-link">
-                          Ver más <ChevronRight size={14} />
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="card-add-btn"
-                        onClick={(e) => handleAddToCart(e, product)}
-                        disabled={product.stock === 0}
-                      >
-                        <Plus size={15} /> {product.stock === 0 ? 'Agotado' : 'Agregar'}
-                      </button>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="pagination-bar">
-                  <button 
-                    onClick={() => setPage(page - 1)} 
-                    disabled={page === 1}
-                    className="btn-secondary pag-btn"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="page-indicator">Página {page} de {totalPages}</span>
-                  <button 
-                    onClick={() => setPage(page + 1)} 
-                    disabled={page === totalPages}
-                    className="btn-secondary pag-btn"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+                    </>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            );
+          }
 
-        <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={slug!} tenant={tenant} />
+          return null;
+        })}
+
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={resolvedSlug!} tenant={tenant} />
 
         {/* Barra Flotante de Comparación */}
         {comparedProducts.length > 0 && (
@@ -642,9 +687,28 @@ export default function CatalogPage() {
             </div>
           </div>
         )}
-      </div>
+
+        <footer className="catalog-footer text-muted" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', padding: '3rem 0', borderTop: '1px solid var(--border)', marginTop: '3rem', fontSize: '0.85rem' }}>
+          {publicPages.length > 0 && (
+            <div className="footer-links" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {publicPages.map((page) => (
+                <Link 
+                  key={page.id} 
+                  to={getPublicPath(`/p/${page.slug}`)} 
+                  style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}
+                  className="hover-underline"
+                >
+                  {page.title}
+                </Link>
+              ))}
+            </div>
+          )}
+          <p>&copy; {new Date().getFullYear()} {tenant?.name}. Todos los derechos reservados.</p>
+        </footer>
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;600;700;800&display=swap');
+
         .public-catalog-container {
           max-width: 1280px;
           margin: 0 auto;
@@ -911,6 +975,91 @@ export default function CatalogPage() {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
           gap: 1.5rem;
+        }
+
+        /* Compact Layout Variations */
+        .catalog-grid.layout-compact {
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 0.75rem;
+        }
+        .catalog-grid.layout-compact .product-catalog-card {
+          padding: 0.5rem;
+        }
+        .catalog-grid.layout-compact .card-details {
+          padding: 0.5rem;
+          gap: 0.35rem;
+        }
+
+        /* List Layout Variations */
+        .catalog-grid.layout-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .catalog-grid.layout-list .product-catalog-card {
+          flex-direction: row;
+          align-items: center;
+          height: 120px;
+          gap: 1.5rem;
+          padding: 0.75rem 1.5rem;
+        }
+        .catalog-grid.layout-list .card-image-wrapper {
+          width: 90px;
+          height: 90px;
+          aspect-ratio: 1/1;
+          flex-shrink: 0;
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+        .catalog-grid.layout-list .card-details {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr;
+          align-items: center;
+          gap: 1.5rem;
+          padding: 0;
+          text-align: left;
+        }
+        .catalog-grid.layout-list .card-brand {
+          margin: 0;
+        }
+        .catalog-grid.layout-list .card-title {
+          margin: 0;
+          font-size: 1.05rem;
+        }
+        .catalog-grid.layout-list .card-footer {
+          margin: 0;
+          justify-content: flex-start;
+          gap: 1rem;
+        }
+        .catalog-grid.layout-list .card-add-btn {
+          width: auto;
+          margin: 0;
+          padding: 0.5rem 1.25rem;
+          justify-self: end;
+        }
+        @media (max-width: 768px) {
+          .catalog-grid.layout-list .product-catalog-card {
+            flex-direction: column;
+            height: auto;
+            align-items: stretch;
+            padding: 1rem;
+            gap: 1rem;
+          }
+          .catalog-grid.layout-list .card-image-wrapper {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16/9;
+          }
+          .catalog-grid.layout-list .card-details {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+          }
+          .catalog-grid.layout-list .card-add-btn {
+            width: 100%;
+          }
         }
 
         .product-catalog-card {
@@ -1326,4 +1475,13 @@ export default function CatalogPage() {
     </div>
   );
 }
+
+const getFontFamily = (fontName?: string | null) => {
+  switch (fontName) {
+    case 'serif': return "'Merriweather', Georgia, serif";
+    case 'mono': return "Consolas, 'Fira Code', Monaco, monospace";
+    case 'heading': return "'Outfit', 'Montserrat', sans-serif";
+    default: return "'Inter', system-ui, sans-serif";
+  }
+};
 

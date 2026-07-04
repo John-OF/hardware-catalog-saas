@@ -36,3 +36,8 @@ export const createPublicOrder = async (slug: string, payload: CreateOrderPayloa
   const response = await api.post<Order>(`/public/${slug}/orders`, payload);
   return response.data;
 };
+
+export const resolveTenantDomain = async (domain: string): Promise<Tenant> => {
+  const response = await api.get<Tenant>('/public/resolve-domain', { params: { domain } });
+  return response.data;
+};
