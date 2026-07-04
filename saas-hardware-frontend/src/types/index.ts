@@ -70,6 +70,7 @@ export interface Product {
   images?: ProductImage[];
   is_active: boolean;
   status: 'draft' | 'published';
+  views_count?: number;
   created_at: string;
 }
 

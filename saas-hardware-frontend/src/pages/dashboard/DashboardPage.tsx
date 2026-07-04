@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Settings,
   ShoppingCart,
-  FileText
+  FileText,
+  BarChart3
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -87,10 +88,12 @@ export default function DashboardPage() {
 
   // Determinar título de sección según ruta
   const getSectionTitle = () => {
+    if (location.pathname.endsWith('/dashboard') || location.pathname.endsWith('/dashboard/')) return 'Resumen';
     if (location.pathname.includes('/dashboard/products')) return 'Productos';
     if (location.pathname.includes('/dashboard/categories')) return 'Categorías';
     if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
     if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
+    if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
     return 'Dashboard';
   };
 
@@ -153,6 +156,17 @@ export default function DashboardPage() {
         </div>
 
         <nav className="sidebar-nav">
+          <NavLink 
+            to="/dashboard" 
+            end
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <BarChart3 size={20} />
+            <span>Resumen</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
           <NavLink 
             to="/dashboard/products" 
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}

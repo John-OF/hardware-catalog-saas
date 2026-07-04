@@ -11,6 +11,7 @@ import CatalogPage from '../pages/public/CatalogPage';
 import ProductDetailPage from '../pages/public/ProductDetailPage';
 import PcBuilderPage from '../pages/public/PcBuilderPage';
 import PageDetailPage from '../pages/public/PageDetailPage';
+import OverviewPage from '../pages/dashboard/OverviewPage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
     path: '/dashboard',
     element: <PrivateRoute><DashboardPage /></PrivateRoute>,
     children: [
+      { index: true,        element: <OverviewPage /> },
       { path: 'products',   element: <ProductsPage /> },
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'settings',   element: <SettingsPage /> },

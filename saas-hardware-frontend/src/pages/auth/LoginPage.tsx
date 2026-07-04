@@ -20,7 +20,7 @@ export default function LoginPage() {
   useEffect(() => {
     // Si ya está autenticado, redirigir directo al dashboard
     if (isAuthenticated) {
-      navigate('/dashboard/products', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -41,8 +41,8 @@ export default function LoginPage() {
 
       toast.success(`¡Bienvenido de nuevo, ${response.user.name}!`);
       
-      // Redirigir al panel de productos
-      navigate('/dashboard/products', { replace: true });
+      // Redirigir al panel de control principal
+      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error(error);
       const message = error.response?.data?.message || 'Las credenciales ingresadas son incorrectas.';

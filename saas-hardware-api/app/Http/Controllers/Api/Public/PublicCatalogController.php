@@ -46,6 +46,9 @@ class PublicCatalogController extends Controller
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
+        // Increment catalog views count
+        $tenant->increment('views_count');
+
         // Obtener la versión de caché actual para el tenant (soporte de invalidación en driver file)
         $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn() => 1);
 
@@ -88,6 +91,9 @@ class PublicCatalogController extends Controller
             ->where('status', 'published')
             ->with(['category', 'images'])
             ->firstOrFail();
+
+        // Increment product views count
+        $product->increment('views_count');
 
         return response()->json($product);
     }
