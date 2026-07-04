@@ -18,9 +18,10 @@ import {
   Upload,
   AlertCircle,
   Copy,
-  CheckSquare
+  CheckSquare,
+  GripVertical
 } from 'lucide-react';
-import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts } from '../../api/products';
+import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import type { Product, Category, PaginatedResponse } from '../../types';
 
@@ -86,7 +87,58 @@ export default function ProductsPage() {
     }),
   });
 
-  const products = paginatedData?.data || [];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [draggedProductIndex, setDraggedProductIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (paginatedData?.data) {
+      setProducts(paginatedData.data);
+    } else {
+      setProducts([]);
+    }
+  }, [paginatedData]);
+
+  // Mutación para Reordenar Productos
+  const reorderMutation = useMutation({
+    mutationFn: reorderProducts,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Orden de productos actualizado');
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || 'Error al reordenar los productos';
+      toast.error(msg);
+      if (paginatedData?.data) {
+        setProducts(paginatedData.data);
+      }
+    }
+  });
+
+  const handleDragStartProduct = (e: React.DragEvent, index: number) => {
+    setDraggedProductIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOverProduct = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedProductIndex === null || draggedProductIndex === index) return;
+    
+    const updatedList = [...products];
+    const draggedItem = updatedList[draggedProductIndex];
+    updatedList.splice(draggedProductIndex, 1);
+    updatedList.splice(index, 0, draggedItem);
+    
+    setDraggedProductIndex(index);
+    setProducts(updatedList);
+  };
+
+  const handleDragEndProduct = () => {
+    setDraggedProductIndex(null);
+    const ids = products.map(p => p.id);
+    reorderMutation.mutate(ids);
+  };
+
   const totalPages = paginatedData?.last_page || 1;
 
   // Reset bulk selection on page/filters change
@@ -525,6 +577,7 @@ export default function ProductsPage() {
             <table className="premium-table">
               <thead>
                 <tr>
+                  <th style={{ width: '30px' }}></th>
                   <th style={{ width: '40px', textAlign: 'center' }}>
                     <input 
                       type="checkbox" 
@@ -543,11 +596,22 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((product) => {
+                {products.map((product, index) => {
                   const isSelected = selectedProductIds.includes(product.id);
                   const isLowStock = product.stock <= (product.low_stock_threshold ?? 5);
                   return (
-                    <tr key={product.id} className={isSelected ? 'row-selected' : ''} style={{ background: isSelected ? 'rgba(var(--primary-rgb), 0.03)' : undefined }}>
+                    <tr
+                      key={product.id}
+                      className={`${isSelected ? 'row-selected' : ''} ${draggedProductIndex === index ? 'row-dragging' : ''}`}
+                      style={{ background: isSelected ? 'rgba(var(--primary-rgb), 0.03)' : undefined }}
+                      draggable
+                      onDragStart={(e) => handleDragStartProduct(e, index)}
+                      onDragOver={(e) => handleDragOverProduct(e, index)}
+                      onDragEnd={handleDragEndProduct}
+                    >
+                      <td style={{ textAlign: 'center', cursor: 'grab' }} className="drag-handle-cell" title="Arrastrar para ordenar">
+                        <GripVertical size={16} />
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         <input 
                           type="checkbox" 
@@ -1196,6 +1260,26 @@ export default function ProductsPage() {
 
         .premium-table tbody tr:hover {
           background: rgba(255, 255, 255, 0.015);
+        }
+
+        .premium-table tbody tr.row-dragging {
+          opacity: 0.35;
+          background: rgba(255, 255, 255, 0.02) !important;
+        }
+
+        .drag-handle-cell {
+          cursor: grab;
+          color: var(--text-muted);
+          transition: color 0.15s ease;
+          width: 30px;
+        }
+
+        .drag-handle-cell:hover {
+          color: var(--primary);
+        }
+
+        .drag-handle-cell:active {
+          cursor: grabbing;
         }
 
         .table-img-wrapper {

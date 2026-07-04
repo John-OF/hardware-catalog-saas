@@ -53,6 +53,7 @@ class PublicCatalogController extends Controller
                         }
                     }
                 })
+                ->orderBy('sort_order')
                 ->orderByDesc('created_at')
                 ->paginate(24)
                 ->toArray();

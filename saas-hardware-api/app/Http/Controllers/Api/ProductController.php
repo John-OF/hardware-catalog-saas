@@ -24,6 +24,7 @@ class ProductController extends Controller
                       ->orWhere('sku', 'like', "%{$request->search}%");
             }))
             ->when($request->active_only, fn($q) => $q->where('is_active', true))
+            ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->paginate(20);
 
@@ -384,5 +385,29 @@ class ProductController extends Controller
         }
 
         return response()->json($newProduct->load(['category', 'images']), 201);
+    }
+
+    /**
+     * Reordena los productos según el orden especificado.
+     */
+    public function reorder(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|uuid|exists:products,id',
+        ]);
+
+        $tenant = app('currentTenant');
+
+        foreach ($data['ids'] as $index => $id) {
+            Product::where('id', $id)
+                ->where('tenant_id', $tenant->id)
+                ->update(['sort_order' => $index]);
+        }
+
+        // Invalidar caché pública
+        \Illuminate\Support\Facades\Cache::increment("tenant:{$tenant->slug}:cache_version");
+
+        return response()->json(['message' => 'Productos reordenados correctamente']);
     }
 }

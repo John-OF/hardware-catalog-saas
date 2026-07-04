@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { 
@@ -10,13 +10,15 @@ import {
   Sliders, 
   Eye, 
   EyeOff, 
-  Loader2 
+  Loader2,
+  GripVertical
 } from 'lucide-react';
 import {
   getCategories,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  reorderCategories
 } from '../../api/categories';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import type { Category } from '../../types';
@@ -37,6 +39,58 @@ export default function CategoriesPage() {
     queryKey: ['categories'],
     queryFn: getCategories,
   });
+
+  const [localCategories, setLocalCategories] = useState<Category[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Sync with react-query data
+  useEffect(() => {
+    if (categories) {
+      const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
+      setLocalCategories(sorted);
+    }
+  }, [categories]);
+
+  // Mutación para Reordenar
+  const reorderMutation = useMutation({
+    mutationFn: reorderCategories,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success('Orden de categorías actualizado');
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || 'Error al reordenar las categorías';
+      toast.error(msg);
+      if (categories) {
+        setLocalCategories([...categories].sort((a, b) => a.sort_order - b.sort_order));
+      }
+    }
+  });
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const updatedList = [...localCategories];
+    const draggedItem = updatedList[draggedIndex];
+    updatedList.splice(draggedIndex, 1);
+    updatedList.splice(index, 0, draggedItem);
+    
+    setDraggedIndex(index);
+    setLocalCategories(updatedList);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    const ids = localCategories.map(c => c.id);
+    reorderMutation.mutate(ids);
+  };
 
   // Mutación para Crear
   const createMutation = useMutation({
@@ -147,7 +201,7 @@ export default function CategoriesPage() {
           <Loader2 className="spinner" size={32} />
           <p>Cargando categorías...</p>
         </div>
-      ) : categories.length === 0 ? (
+      ) : localCategories.length === 0 ? (
         <div className="empty-state glass-card">
           <FolderPlus size={48} className="empty-icon" />
           <h3>No hay categorías creadas</h3>
@@ -159,11 +213,23 @@ export default function CategoriesPage() {
         </div>
       ) : (
         <div className="categories-grid">
-          {categories.map((category) => (
-            <div key={category.id} className="category-card glass-card">
+          {localCategories.map((category, index) => (
+            <div
+              key={category.id}
+              className={`category-card glass-card ${draggedIndex === index ? 'dragging' : ''}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+            >
               <div className="category-card-header">
-                <div className="category-icon-sphere">
-                  <CategoryIcon slug={category.icon} size={28} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div className="drag-handle" title="Arrastrar para ordenar" style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                    <GripVertical size={18} />
+                  </div>
+                  <div className="category-icon-sphere">
+                    <CategoryIcon slug={category.icon} size={28} />
+                  </div>
                 </div>
                 <div className="category-status">
                   {category.is_active ? (
@@ -374,6 +440,22 @@ export default function CategoriesPage() {
           display: flex;
           flex-direction: column;
           gap: 1.25rem;
+          transition: transform 0.2s, opacity 0.2s, border-color 0.2s;
+        }
+
+        .category-card.dragging {
+          opacity: 0.4;
+          border: 1.5px dashed var(--primary) !important;
+          transform: scale(0.98);
+          background: rgba(255, 255, 255, 0.01);
+        }
+
+        .drag-handle {
+          transition: color 0.15s ease;
+        }
+
+        .drag-handle:hover {
+          color: var(--primary) !important;
         }
 
         .category-card-header {

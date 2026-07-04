@@ -20,7 +20,7 @@ class Product extends Model
     protected $fillable = [
         'category_id', 'sku', 'name', 'brand', 'price', 'sale_price',
         'stock', 'low_stock_threshold', 'description', 'specs',
-        'image_url', 'thumbnail_url', 'is_active',
+        'image_url', 'thumbnail_url', 'is_active', 'sort_order',
     ];
 
     protected $casts = [
@@ -29,6 +29,7 @@ class Product extends Model
         'sale_price'           => 'decimal:2',
         'low_stock_threshold'  => 'integer',
         'is_active'            => 'boolean',
+        'sort_order'           => 'integer',
     ];
 
     protected static function booted()

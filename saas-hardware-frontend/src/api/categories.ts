@@ -24,3 +24,7 @@ export const updateCategory = async (id: string, data: any): Promise<Category> =
 export const deleteCategory = async (id: string): Promise<void> => {
   await api.delete(`/categories/${id}`);
 };
+
+export const reorderCategories = async (ids: string[]): Promise<void> => {
+  await api.post('/categories/reorder', { ids });
+};

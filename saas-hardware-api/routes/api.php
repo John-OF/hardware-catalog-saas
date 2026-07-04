@@ -46,12 +46,14 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::put('/tenant',    [TenantController::class, 'update']);
 
     // Productos
+    Route::post('products/reorder', [ProductController::class, 'reorder']);
     Route::post('products/import', [ProductController::class, 'import']);
     Route::post('products/bulk', [ProductController::class, 'bulkAction']);
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate']);
     Route::apiResource('products', ProductController::class);
 
     // Categorías
+    Route::post('categories/reorder', [CategoryController::class, 'reorder']);
     Route::apiResource('categories', CategoryController::class);
 
     // Pedidos

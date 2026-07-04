@@ -74,3 +74,7 @@ export const bulkActionProducts = async (payload: BulkActionPayload): Promise<{ 
   const response = await api.post<{ message: string }>('/products/bulk', payload);
   return response.data;
 };
+
+export const reorderProducts = async (ids: string[]): Promise<void> => {
+  await api.post('/products/reorder', { ids });
+};
