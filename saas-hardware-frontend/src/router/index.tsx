@@ -8,12 +8,14 @@ import SettingsPage from '../pages/dashboard/SettingsPage';
 import OrdersPage from '../pages/dashboard/OrdersPage';
 import CatalogPage from '../pages/public/CatalogPage';
 import ProductDetailPage from '../pages/public/ProductDetailPage';
+import PcBuilderPage from '../pages/public/PcBuilderPage';
 
 export const router = createBrowserRouter([
   // Rutas públicas
   { path: '/login', element: <LoginPage /> },
   { path: '/:slug', element: <CatalogPage /> },
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },
+  { path: '/:slug/builder', element: <PcBuilderPage /> },
 
   // Rutas privadas (dashboard)
   {

@@ -12,7 +12,9 @@ import {
   MessageCircle,
   LayoutGrid,
   ShoppingCart,
-  Plus
+  Plus,
+  Cpu,
+  X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
@@ -50,6 +52,26 @@ export default function CatalogPage() {
     e.stopPropagation();
     addItem(slug!, product);
     toast.success(`${product.name} agregado al pedido`);
+  };
+
+  // Comparador de productos
+  const [comparedProducts, setComparedProducts] = useState<Product[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  const handleToggleCompare = (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setComparedProducts((prev) => {
+      const exists = prev.find((p) => p.id === product.id);
+      if (exists) {
+        return prev.filter((p) => p.id !== product.id);
+      }
+      if (prev.length >= 3) {
+        toast.error('Puedes comparar un máximo de 3 productos a la vez.');
+        return prev;
+      }
+      return [...prev, product];
+    });
   };
 
   // Fetch Tenant Info
@@ -204,6 +226,13 @@ export default function CatalogPage() {
           <h2>{tenant.name}</h2>
         </div>
         <div className="header-contact">
+          <Link
+            to={`/${slug}/builder`}
+            className="btn-secondary builder-header-btn"
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', fontSize: '0.85rem' }}
+          >
+            <Cpu size={16} /> Armador PC
+          </Link>
           <button
             type="button"
             className="cart-trigger"
@@ -387,6 +416,16 @@ export default function CatalogPage() {
                     className="product-catalog-card glass-card"
                   >
                     <div className="card-image-wrapper">
+                      {product.stock > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleCompare(e, product)}
+                          className={`compare-toggle-badge ${comparedProducts.some(p => p.id === product.id) ? 'active' : ''}`}
+                          title="Comparar especificaciones"
+                        >
+                          {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
+                        </button>
+                      )}
                       {product.thumbnail_url ? (
                         <img src={product.thumbnail_url} alt={product.name} />
                       ) : (
@@ -463,6 +502,146 @@ export default function CatalogPage() {
         </div>
 
         <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={slug!} tenant={tenant} />
+
+        {/* Barra Flotante de Comparación */}
+        {comparedProducts.length > 0 && (
+          <div className="floating-compare-bar glass-card animate-slide-up">
+            <div className="compare-bar-content">
+              <div className="compare-thumbs">
+                {comparedProducts.map((p) => (
+                  <div key={p.id} className="compare-thumb-wrapper">
+                    {p.thumbnail_url ? (
+                      <img src={p.thumbnail_url} alt={p.name} />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                        <ShoppingBag size={16} />
+                      </div>
+                    )}
+                    <button type="button" onClick={(e) => handleToggleCompare(e, p)} className="remove-thumb-btn">
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {Array.from({ length: 3 - comparedProducts.length }).map((_, i) => (
+                  <div key={i} className="compare-thumb-placeholder">
+                    <span>+</span>
+                  </div>
+                ))}
+              </div>
+              <div className="compare-bar-actions">
+                <button
+                  type="button"
+                  onClick={() => setIsCompareModalOpen(true)}
+                  className="btn-primary btn-compare-go"
+                  disabled={comparedProducts.length < 2}
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                >
+                  Comparar ({comparedProducts.length})
+                </button>
+                <button type="button" onClick={() => setComparedProducts([])} className="btn-clear-compare">
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Comparación */}
+        {isCompareModalOpen && (
+          <div className="modal-overlay compare-modal-overlay" onClick={() => setIsCompareModalOpen(false)}>
+            <div className="compare-modal-content glass-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
+              <div className="drawer-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>Comparación de especificaciones</h3>
+                <button onClick={() => setIsCompareModalOpen(false)} className="drawer-close" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="compare-table-wrapper">
+                <table className="compare-table">
+                  <thead>
+                    <tr>
+                      <th style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>Especificación</th>
+                      {comparedProducts.map((p) => (
+                        <th key={p.id} style={{ width: `${80 / comparedProducts.length}%` }}>
+                          <div className="compare-header-item">
+                            {p.thumbnail_url ? (
+                              <img src={p.thumbnail_url} alt={p.name} className="compare-header-img" />
+                            ) : (
+                              <div className="compare-header-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                <ShoppingBag size={24} />
+                              </div>
+                            )}
+                            <span className="compare-header-brand">{p.brand || 'Genérico'}</span>
+                            <h4 className="compare-header-title">{p.name}</h4>
+                            <span className="compare-header-price">
+                              ${parseFloat((p.sale_price !== null ? p.sale_price : p.price).toString()).toFixed(2)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleAddToCart(e, p)}
+                              disabled={p.stock === 0}
+                              className="btn-primary compare-add-btn"
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', marginTop: '0.5rem', width: '100%' }}
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Categoría</strong></td>
+                      {comparedProducts.map((p) => (
+                        <td key={p.id}>{p.category?.name || 'Sin Categoría'}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td><strong>Disponibilidad</strong></td>
+                      {comparedProducts.map((p) => (
+                        <td key={p.id} className={p.stock > 0 ? 'text-success' : 'text-danger'} style={{ fontWeight: 600 }}>
+                          {p.stock > 0 ? `En Stock (${p.stock})` : 'Agotado'}
+                        </td>
+                      ))}
+                    </tr>
+                    {(() => {
+                      const keysSet = new Set<string>();
+                      comparedProducts.forEach((p) => {
+                        if (p.specs) {
+                          Object.keys(p.specs).forEach((k) => {
+                            if (k.trim() !== '') keysSet.add(k);
+                          });
+                        }
+                      });
+                      const allKeys = Array.from(keysSet);
+                      if (allKeys.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={comparedProducts.length + 1} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                              No hay especificaciones técnicas adicionales registradas.
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return allKeys.map((key) => (
+                        <tr key={key}>
+                          <td><strong>{key}</strong></td>
+                          {comparedProducts.map((p) => (
+                            <td key={p.id}>
+                              {p.specs?.[key] !== undefined && p.specs?.[key] !== '' ? String(p.specs[key]) : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -939,6 +1118,200 @@ export default function CatalogPage() {
           font-size: 0.85rem;
           color: var(--text-secondary);
         }
+
+        /* Comparación */
+        .compare-toggle-badge {
+          position: absolute;
+          top: 0.75rem;
+          right: 0.75rem;
+          background: rgba(11, 15, 25, 0.7);
+          backdrop-filter: blur(4px);
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          padding: 0.3rem 0.6rem;
+          font-size: 0.7rem;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: var(--transition);
+          z-index: 5;
+          font-weight: 600;
+        }
+        .compare-toggle-badge:hover {
+          background: var(--primary);
+          color: white;
+          border-color: var(--primary);
+        }
+        .compare-toggle-badge.active {
+          background: rgba(var(--primary-rgb), 0.2);
+          color: var(--primary);
+          border-color: var(--primary);
+        }
+
+        .floating-compare-bar {
+          position: fixed;
+          bottom: 2rem;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(13, 18, 32, 0.85);
+          backdrop-filter: blur(12px);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          padding: 0.75rem 1.5rem;
+          z-index: 500;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          width: calc(100% - 4rem);
+          max-width: 600px;
+        }
+        .compare-bar-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 1.5rem;
+        }
+        .compare-thumbs {
+          display: flex;
+          gap: 0.5rem;
+        }
+        .compare-thumb-wrapper {
+          position: relative;
+          width: 48px;
+          height: 48px;
+          border-radius: 6px;
+          background: rgba(0,0,0,0.2);
+          border: 1px solid var(--border);
+          overflow: hidden;
+        }
+        .compare-thumb-wrapper img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .remove-thumb-btn {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          background: var(--danger);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 14px;
+          height: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .compare-thumb-placeholder {
+          width: 48px;
+          height: 48px;
+          border-radius: 6px;
+          border: 1px dashed var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          font-size: 1.2rem;
+        }
+        .compare-bar-actions {
+          display: flex;
+          gap: 0.75rem;
+          align-items: center;
+        }
+        .btn-clear-compare {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          cursor: pointer;
+          font-size: 0.85rem;
+        }
+        .btn-clear-compare:hover {
+          color: var(--danger);
+        }
+
+        .compare-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(3, 7, 18, 0.75);
+          backdrop-filter: blur(6px);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+        }
+        .compare-modal-content {
+          width: 100%;
+          max-width: 860px;
+          max-height: 85vh;
+          overflow-y: auto;
+          border-radius: var(--radius-lg);
+          padding: 2rem;
+          background: #0d1220;
+        }
+        .compare-table-wrapper {
+          overflow-x: auto;
+          margin-top: 1.5rem;
+        }
+        .compare-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 0.9rem;
+        }
+        .compare-table th, .compare-table td {
+          padding: 1rem;
+          border-bottom: 1px solid var(--border);
+          vertical-align: top;
+        }
+        .compare-table th {
+          background: rgba(255,255,255,0.01);
+        }
+        .compare-header-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 0.5rem;
+        }
+        .compare-header-img {
+          width: 64px;
+          height: 64px;
+          border-radius: 6px;
+          object-fit: cover;
+          background: rgba(0,0,0,0.25);
+          border: 1px solid var(--border);
+        }
+        .compare-header-brand {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+        .compare-header-title {
+          font-size: 0.85rem;
+          margin: 0;
+          font-weight: 600;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          min-height: 2.4rem;
+        }
+        .compare-header-price {
+          font-size: 1rem;
+          color: var(--primary);
+          font-weight: 700;
+        }
+        .compare-add-btn {
+          padding: 0.4rem 0.8rem;
+          font-size: 0.75rem;
+          width: 100%;
+          justify-content: center;
+        }
+        .text-success { color: #34d399; }
+        .text-danger { color: #f87171; }
 
         /* Responsive */
         @media (max-width: 960px) {
