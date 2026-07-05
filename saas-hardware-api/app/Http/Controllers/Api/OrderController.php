@@ -48,7 +48,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Actualiza el estado de un pedido (pending -> attended / cancelled).
+     * Actualiza el estado de un pedido (pending -> attended / cancelled) y ajusta stock.
      */
     public function update(Request $request, Order $order): JsonResponse
     {
@@ -56,19 +56,57 @@ class OrderController extends Controller
             'status' => 'required|string|in:pending,processing,attended,cancelled',
         ]);
 
-        $order->update([
-            'status' => $data['status'],
-        ]);
+        $oldStatus = $order->status;
+        $newStatus = $data['status'];
+
+        if ($oldStatus !== $newStatus) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($order, $oldStatus, $newStatus) {
+                // Actualizar estado del pedido
+                $order->update([
+                    'status' => $newStatus,
+                ]);
+
+                // Si pasa a "attended" (atendido) desde cualquier otro estado -> descontar stock
+                if ($newStatus === 'attended' && $oldStatus !== 'attended') {
+                    foreach ($order->items as $item) {
+                        if ($item->product_id) {
+                            \App\Models\Product::where('id', $item->product_id)
+                                ->decrement('stock', $item->quantity);
+                        }
+                    }
+                }
+
+                // Si sale de "attended" hacia cualquier otro estado (ej: cancelado o revertido) -> devolver stock
+                if ($oldStatus === 'attended' && $newStatus !== 'attended') {
+                    foreach ($order->items as $item) {
+                        if ($item->product_id) {
+                            \App\Models\Product::where('id', $item->product_id)
+                                ->increment('stock', $item->quantity);
+                        }
+                    }
+                }
+            });
+        }
 
         return response()->json($order->load('items'));
     }
 
     /**
-     * Elimina un pedido del historial.
+     * Elimina un pedido del historial y devuelve stock si estaba atendido.
      */
     public function destroy(Order $order): JsonResponse
     {
-        $order->delete();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($order) {
+            if ($order->status === 'attended') {
+                foreach ($order->items as $item) {
+                    if ($item->product_id) {
+                        \App\Models\Product::where('id', $item->product_id)
+                            ->increment('stock', $item->quantity);
+                    }
+                }
+            }
+            $order->delete();
+        });
         return response()->json(null, 204);
     }
 }
