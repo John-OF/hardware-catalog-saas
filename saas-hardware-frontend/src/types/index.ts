@@ -71,6 +71,9 @@ export interface Product {
   is_active: boolean;
   status: 'draft' | 'published';
   views_count?: number;
+  reviews_avg_rating?: string | number | null;
+  reviews_count?: number;
+  reviews?: Review[];
   created_at: string;
 }
 
@@ -122,4 +125,19 @@ export interface Page {
   content: string | null;
   is_active: boolean;
   created_at?: string;
+}
+
+export interface Review {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  customer_name: string;
+  customer_email: string | null;
+  rating: number;
+  comment: string | null;
+  is_approved: boolean;
+  verified_purchase: boolean;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
 }

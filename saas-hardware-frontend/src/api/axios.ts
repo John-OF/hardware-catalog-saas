@@ -12,9 +12,11 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token  = sessionStorage.getItem('token');
   const tenant = sessionStorage.getItem('tenant_slug');
+  const visitorId = localStorage.getItem('visitor_id');
 
   if (token)  config.headers['Authorization'] = `Bearer ${token}`;
   if (tenant) config.headers['X-Tenant'] = tenant;
+  if (visitorId) config.headers['X-Visitor-Id'] = visitorId;
 
   return config;
 });

@@ -23,6 +23,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+593');
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -48,9 +49,11 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
     if (items.length === 0) return;
     setSending(true);
     try {
+      const submittedPhone = phone.trim() ? (countryCode + phone.trim()) : '';
+
       const order = await createPublicOrder(slug, {
         customer_name: name,
-        customer_phone: phone,
+        customer_phone: submittedPhone,
         customer_note: note || undefined,
         items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
       });
@@ -134,7 +137,29 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                 <strong>{money(totalAmount)}</strong>
               </div>
               <input className="premium-input" placeholder="Tu nombre" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
-              <input className="premium-input" placeholder="Tu WhatsApp / teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} required />
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
+                >
+                  <option value="+593">EC +593</option>
+                  <option value="+51">PE +51</option>
+                  <option value="+57">CO +57</option>
+                  <option value="+52">MX +52</option>
+                  <option value="+34">ES +34</option>
+                  <option value="">Otro</option>
+                </select>
+                <input 
+                  className="premium-input" 
+                  placeholder="Tu WhatsApp / teléfono" 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))} 
+                  maxLength={30} 
+                  required 
+                  style={{ flex: 1, margin: 0 }}
+                />
+              </div>
               <textarea className="premium-input" placeholder="Nota (opcional): forma de entrega, dudas..." value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} />
               <button type="submit" className="btn-primary cart-submit" disabled={sending}>
                 {sending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}

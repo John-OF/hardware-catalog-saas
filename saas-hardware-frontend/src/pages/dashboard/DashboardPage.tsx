@@ -14,7 +14,8 @@ import {
   Settings,
   ShoppingCart,
   FileText,
-  BarChart3
+  BarChart3,
+  MessageSquare
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -94,6 +95,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
     if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
     if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
+    if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
     return 'Dashboard';
   };
 
@@ -204,6 +206,16 @@ export default function DashboardPage() {
           >
             <FileText size={20} />
             <span>Páginas</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink 
+            to="/dashboard/reviews" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <MessageSquare size={20} />
+            <span>Reseñas</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

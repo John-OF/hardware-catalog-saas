@@ -1,5 +1,5 @@
 import api from './axios';
-import type { Tenant, Product, PaginatedResponse, Order } from '../types';
+import type { Tenant, Product, PaginatedResponse, Order, Review } from '../types';
 
 export interface CreateOrderPayload {
   customer_name: string;
@@ -39,5 +39,21 @@ export const createPublicOrder = async (slug: string, payload: CreateOrderPayloa
 
 export const resolveTenantDomain = async (domain: string): Promise<Tenant> => {
   const response = await api.get<Tenant>('/public/resolve-domain', { params: { domain } });
+  return response.data;
+};
+
+export interface CreateReviewPayload {
+  customer_name: string;
+  customer_email?: string;
+  rating: number;
+  comment?: string;
+}
+
+export const createPublicReview = async (
+  slug: string,
+  productId: string,
+  payload: CreateReviewPayload
+): Promise<Review> => {
+  const response = await api.post<Review>(`/public/${slug}/products/${productId}/reviews`, payload);
   return response.data;
 };

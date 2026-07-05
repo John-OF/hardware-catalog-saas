@@ -7,6 +7,7 @@ import CategoriesPage from '../pages/dashboard/CategoriesPage';
 import SettingsPage from '../pages/dashboard/SettingsPage';
 import OrdersPage from '../pages/dashboard/OrdersPage';
 import PagesPage from '../pages/dashboard/PagesPage';
+import ReviewsPage from '../pages/dashboard/ReviewsPage';
 import CatalogPage from '../pages/public/CatalogPage';
 import ProductDetailPage from '../pages/public/ProductDetailPage';
 import PcBuilderPage from '../pages/public/PcBuilderPage';
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: 'settings',   element: <SettingsPage /> },
       { path: 'orders',     element: <OrdersPage /> },
       { path: 'pages',      element: <PagesPage /> },
+      { path: 'reviews',    element: <ReviewsPage /> },
     ],
   },
 

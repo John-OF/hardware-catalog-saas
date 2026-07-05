@@ -62,6 +62,8 @@ class PublicCatalogController extends Controller
                 ->where('is_active', true)
                 ->where('status', 'published')
                 ->with(['category:id,name,icon', 'images'])
+                ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
+                ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
                 ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
@@ -81,7 +83,7 @@ class PublicCatalogController extends Controller
         return response()->json($products);
     }
 
-    public function product(string $slug, string $productId): JsonResponse
+    public function product(Request $request, string $slug, string $productId): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
@@ -89,13 +91,163 @@ class PublicCatalogController extends Controller
             ->where('id', $productId)
             ->where('is_active', true)
             ->where('status', 'published')
-            ->with(['category', 'images'])
+            ->with(['category', 'images', 'reviews' => fn($q) => $q->where('is_approved', true)->orderByDesc('created_at')])
+            ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
+            ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
             ->firstOrFail();
 
         // Increment product views count
         $product->increment('views_count');
 
-        return response()->json($product);
+        // Check if the current user or visitor has already reviewed this product
+        $user = $request->user('sanctum');
+        $visitorId = $request->header('X-Visitor-Id') ?? $request->query('visitor_id');
+        $userReview = null;
+
+        if ($user || $visitorId) {
+            $userReview = \App\Models\Review::where('product_id', $product->id)
+                ->where(function ($q) use ($user, $visitorId) {
+                    if ($user) {
+                        $q->where('user_id', $user->id);
+                    }
+                    if ($visitorId) {
+                        $q->orWhere('visitor_id', $visitorId);
+                    }
+                })
+                ->first();
+        }
+
+        $productArray = $product->toArray();
+        $productArray['user_review'] = $userReview;
+
+        return response()->json($productArray);
+    }
+
+    public function storeReview(Request $request, string $slug, string $productId): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $product = Product::where('tenant_id', $tenant->id)
+            ->where('id', $productId)
+            ->where('is_active', true)
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'customer_name'   => 'required|string|max:150',
+            'customer_email'  => 'nullable|email|max:150',
+            'customer_phone'  => 'nullable|string|max:30',
+            'rating'          => 'required|integer|min:1|max:5',
+            'comment'         => 'nullable|string|max:1000',
+            'visitor_id'      => 'nullable|string|max:100',
+            'turnstile_token' => 'required|string',
+        ]);
+
+        // Capa 1: Validación de Turnstile
+        $turnstileToken = $data['turnstile_token'];
+        $secretKey = env('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA');
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->asForm()
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret' => $secretKey,
+                    'response' => $turnstileToken,
+                    'remoteip' => $request->ip(),
+                ]);
+
+            if (!$response->json('success')) {
+                \Illuminate\Support\Facades\Log::warning('Turnstile verification failed', [
+                    'response' => $response->json(),
+                    'token' => $turnstileToken,
+                    'ip' => $request->ip()
+                ]);
+                return response()->json(['message' => 'Validación anti-bot (Turnstile) fallida. Recarga e inténtalo de nuevo.'], 422);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Turnstile connection exception', [
+                'error' => $e->getMessage()
+            ]);
+            
+            // En desarrollo local, si hay un problema de red externo o cURL, permitimos bypass para no trabar pruebas
+            if (config('app.env') === 'local') {
+                \Illuminate\Support\Facades\Log::info('Bypassing Turnstile in local environment due to connection error.');
+            } else {
+                return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
+            }
+        }
+
+        // Capa 2: Control de identidad (evitar dobles reseñas)
+        $user = $request->user('sanctum');
+        $visitorId = $data['visitor_id'] ?? $request->header('X-Visitor-Id');
+
+        $existingReview = \App\Models\Review::where('product_id', $product->id)
+            ->where(function ($q) use ($user, $visitorId) {
+                if ($user) {
+                    $q->where('user_id', $user->id);
+                }
+                if ($visitorId) {
+                    $q->orWhere('visitor_id', $visitorId);
+                }
+            })
+            ->first();
+
+        if ($existingReview) {
+            return response()->json(['message' => 'Ya has enviado una reseña para este producto.'], 422);
+        }
+
+        // Capa 3: Estado Inteligente (Compra Verificada & Auto-aprobación)
+        $verifiedPurchase = false;
+        $customerPhone = $data['customer_phone'] ?? null;
+
+        if ($customerPhone) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $customerPhone);
+            
+            if (!empty($cleanPhone)) {
+                $verifiedPurchase = \App\Models\Order::where('tenant_id', $tenant->id)
+                    ->where('status', 'attended')
+                    ->where(function ($q) use ($customerPhone, $cleanPhone) {
+                        $q->where('customer_phone', $customerPhone)
+                          ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}"]);
+                    })
+                    ->whereHas('items', function ($iq) use ($product) {
+                        $iq->where('product_id', $product->id);
+                    })
+                    ->exists();
+            }
+        }
+
+        if ($user) {
+            // Caso A: Usuario Logueado
+            $isApproved = true;
+        } elseif ($verifiedPurchase) {
+            // Caso B: Compra Verificada (Anónimo)
+            $isApproved = true;
+        } else {
+            // Caso C: Anónimo Puro (Sin historial de compra)
+            $isApproved = false;
+        }
+
+        $review = $product->reviews()->create([
+            'tenant_id'         => $tenant->id,
+            'user_id'           => $user ? $user->id : null,
+            'visitor_id'        => $user ? null : $visitorId,
+            'customer_name'     => $data['customer_name'],
+            'customer_email'    => $data['customer_email'] ?? null,
+            'rating'            => $data['rating'],
+            'comment'           => $data['comment'] ?? null,
+            'verified_purchase' => $verifiedPurchase,
+            'is_approved'       => $isApproved,
+        ]);
+
+        $message = $isApproved
+            ? '¡Reseña publicada con éxito!'
+            : 'Tu reseña ha sido enviada. Se mostrará en el catálogo una vez aprobada por la tienda.';
+
+        return response()->json([
+            'review'      => $review,
+            'message'     => $message,
+            'is_approved' => $isApproved
+        ], 201);
     }
 
     public function categories(string $slug): JsonResponse

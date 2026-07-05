@@ -14,7 +14,8 @@ import {
   ShoppingCart,
   Plus,
   Cpu,
-  X
+  X,
+  Star
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
@@ -484,7 +485,16 @@ export default function CatalogPage() {
                             </div>
 
                             <div className="card-details">
-                              <span className="card-brand">{product.brand || 'Genérico'}</span>
+                              <div className="card-brand-rating-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="card-brand">{product.brand || 'Genérico'}</span>
+                                {product.reviews_count && product.reviews_count > 0 ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
+                                    <Star size={11} fill="#fbbf24" style={{ display: 'inline' }} />
+                                    <span>{parseFloat(product.reviews_avg_rating!.toString()).toFixed(1)}</span>
+                                    <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: '0.72rem' }}>({product.reviews_count})</span>
+                                  </div>
+                                ) : null}
+                              </div>
                               <h3 className="card-title">{product.name}</h3>
                               <div className="card-footer">
                                 <span className="card-price">

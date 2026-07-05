@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft,
   ShoppingBag,
@@ -11,13 +11,15 @@ import {
   Plus,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Star
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getPublicTenant, getPublicProduct, resolveTenantDomain } from '../../api/public';
+import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
+import { useAuthStore } from '../../stores/authStore';
 import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
@@ -26,6 +28,91 @@ export default function ProductDetailPage() {
   const currentDomain = window.location.hostname;
   const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState<string | null>(null);
+
+  // Auth info
+  const token = useAuthStore((s) => s.token);
+  const isLoggedIn = !!token;
+
+  // Review form state
+  const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+593');
+  const [formRating, setFormRating] = useState(5);
+  const [formComment, setFormComment] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  // Generate visitor_id if it doesn't exist
+  useEffect(() => {
+    let visitorId = localStorage.getItem('visitor_id');
+    if (!visitorId) {
+      visitorId = crypto.randomUUID?.() || 'v_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('visitor_id', visitorId);
+    }
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (365 * 24 * 60 * 60 * 1000));
+    document.cookie = `visitor_id=${visitorId};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  }, []);
+
+  // Load Turnstile script dynamically
+  useEffect(() => {
+    const scriptId = 'cloudflare-turnstile-script';
+    let script = document.getElementById(scriptId) as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  // Render Turnstile widget
+  useEffect(() => {
+    if (isReviewFormOpen && turnstileContainerRef.current) {
+      const checkTurnstile = setInterval(() => {
+        if ((window as any).turnstile) {
+          clearInterval(checkTurnstile);
+          
+          if (widgetIdRef.current) {
+            try {
+              (window as any).turnstile.remove(widgetIdRef.current);
+            } catch (e) {
+              console.error(e);
+            }
+          }
+          
+          widgetIdRef.current = (window as any).turnstile.render(turnstileContainerRef.current, {
+            sitekey: import.meta.env.VITE_TURNSTILE_SITEKEY || '1x00000000000000000000AA',
+            callback: (token: string) => {
+              setTurnstileToken(token);
+            },
+            'error-callback': () => {
+              toast.error('Error al cargar la validación anti-bot.');
+            }
+          });
+        }
+      }, 100);
+
+      return () => {
+        clearInterval(checkTurnstile);
+        if (widgetIdRef.current && (window as any).turnstile) {
+          try {
+            (window as any).turnstile.remove(widgetIdRef.current);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      };
+    }
+  }, [isReviewFormOpen]);
 
   // Fetch Tenant Info (to maintain active styling/colors)
   const { data: tenant } = useQuery<Tenant>({
@@ -40,6 +127,57 @@ export default function ProductDetailPage() {
   });
 
   const resolvedSlug = tenant?.slug;
+
+  const reviewMutation = useMutation({
+    mutationFn: (payload: { customer_name: string; customer_email?: string; customer_phone?: string; rating: number; comment?: string; visitor_id?: string; turnstile_token: string }) =>
+      createPublicReview(resolvedSlug!, id!, payload),
+    onSuccess: (data: any) => {
+      toast.success(data.message || '¡Gracias! Tu reseña ha sido guardada.');
+      queryClient.invalidateQueries({ queryKey: ['publicProduct', resolvedSlug, id] });
+      setFormName('');
+      setFormEmail('');
+      setFormPhone('');
+      setFormRating(5);
+      setFormComment('');
+      setTurnstileToken(null);
+      setIsReviewFormOpen(false);
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message || 'Error al enviar la reseña. Inténtalo de nuevo.';
+      toast.error(msg);
+      if (widgetIdRef.current && (window as any).turnstile) {
+        (window as any).turnstile.reset(widgetIdRef.current);
+      }
+      setTurnstileToken(null);
+    }
+  });
+
+  const handleReviewSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim()) {
+      toast.error('Por favor, ingresa tu nombre.');
+      return;
+    }
+    if (!turnstileToken) {
+      toast.error('Por favor, completa la verificación anti-bot.');
+      return;
+    }
+    
+    // Si no está logueado y provee un teléfono, combinamos código de país y número
+    const submittedPhone = (!isLoggedIn && formPhone.trim()) 
+      ? (countryCode + formPhone.trim()) 
+      : undefined;
+
+    reviewMutation.mutate({
+      customer_name: formName,
+      customer_email: formEmail || undefined,
+      customer_phone: submittedPhone,
+      rating: formRating,
+      comment: formComment || undefined,
+      visitor_id: localStorage.getItem('visitor_id') || undefined,
+      turnstile_token: turnstileToken
+    });
+  };
 
   useTenantTheme(tenant);
 
@@ -280,6 +418,25 @@ export default function ProductDetailPage() {
           </div>
 
           <h1 className="detail-title">{product.name}</h1>
+          {product.reviews_count && product.reviews_count > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '-0.75rem', marginBottom: '0.25rem' }}>
+              <div style={{ display: 'flex', color: '#fbbf24' }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={14}
+                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? '#fbbf24' : 'none'}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                {parseFloat(product.reviews_avg_rating!.toString()).toFixed(1)}
+              </span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                ({product.reviews_count} {product.reviews_count === 1 ? 'calificación' : 'calificaciones'})
+              </span>
+            </div>
+          ) : null}
 
           {/* Pricing & Stock card */}
           <div className="pricing-stock-card">
@@ -373,6 +530,241 @@ export default function ProductDetailPage() {
             </div>
           )}
 
+        </div>
+      </div>
+
+      {/* Reviews Section */}
+      <div className="reviews-section glass-card animate-scale-in" style={{ padding: '2rem', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)', margin: 0 }}>
+              Calificaciones y Reseñas
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', color: '#fbbf24' }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={16}
+                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? '#fbbf24' : 'none'}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                {product.reviews_avg_rating ? parseFloat(product.reviews_avg_rating.toString()).toFixed(1) : '0.0'} de 5
+              </span>
+              <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+                ({product.reviews_count || 0} {product.reviews_count === 1 ? 'reseña' : 'reseñas'})
+              </span>
+            </div>
+          </div>
+
+          {(product as any)?.user_review ? (
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              Ya calificaste este producto
+            </span>
+          ) : (
+            <button
+              onClick={() => setIsReviewFormOpen(!isReviewFormOpen)}
+              className="btn-secondary"
+              style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem' }}
+            >
+              {isReviewFormOpen ? 'Cancelar' : 'Escribir Reseña'}
+            </button>
+          )}
+        </div>
+
+        {/* User's existing review (even if pending approval) */}
+        {(product as any)?.user_review && (
+          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '1.25rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Tu Calificación</span>
+              <span className={`badge ${(product as any).user_review.is_approved ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: (product as any).user_review.is_approved ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: (product as any).user_review.is_approved ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                {(product as any).user_review.is_approved ? 'Publicada' : 'Pendiente de aprobación'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', color: '#fbbf24', gap: '0.1rem' }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} size={12} fill={i < (product as any).user_review.rating ? '#fbbf24' : 'none'} />
+              ))}
+            </div>
+            {(product as any).user_review.comment && (
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{(product as any).user_review.comment}</p>
+            )}
+          </div>
+        )}
+
+        {/* Review Form */}
+        {isReviewFormOpen && !(product as any)?.user_review && (
+          <form onSubmit={handleReviewSubmit} className="review-form" style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-primary)', marginBottom: '0.25rem', marginTop: 0 }}>Nueva Calificación</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: isLoggedIn ? '1fr 1fr' : '1fr 1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 500 }}>
+                  Nombre <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Tu nombre"
+                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              {!isLoggedIn && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Teléfono / WhatsApp
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
+                    >
+                      <option value="+593">EC +593</option>
+                      <option value="+51">PE +51</option>
+                      <option value="+57">CO +57</option>
+                      <option value="+52">MX +52</option>
+                      <option value="+34">ES +34</option>
+                      <option value="">Otro</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={formPhone}
+                      onChange={(e) => setFormPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="Ej. 999888777"
+                      style={{ flex: 1, padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                    />
+                  </div>
+                  <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', lineHeight: '1.25' }}>
+                    Opcional. Si deseas la insignia dorada de Compra Verificada, ingresa el teléfono con el que realizaste tu pedido (este dato nunca será visible públicamente).
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 500 }}>
+                  Correo electrónico (no se publicará)
+                </label>
+                <input
+                  type="email"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  placeholder="tu@correo.com"
+                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 500 }}>
+                Calificación <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setFormRating(star)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#fbbf24' }}
+                  >
+                    <Star
+                      size={24}
+                      fill={star <= formRating ? '#fbbf24' : 'none'}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 500 }}>
+                Comentario
+              </label>
+              <textarea
+                value={formComment}
+                onChange={(e) => setFormComment(e.target.value)}
+                placeholder="Escribe tu opinión sobre el producto..."
+                rows={3}
+                style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Cloudflare Turnstile container */}
+            <div 
+              ref={turnstileContainerRef} 
+              className="cf-turnstile-wrapper" 
+              style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}
+            />
+
+            <button
+              type="submit"
+              disabled={reviewMutation.isPending}
+              className="btn-primary"
+              style={{ padding: '0.6rem 1.5rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              {reviewMutation.isPending && <Loader2 size={16} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />}
+              <span>Enviar Reseña</span>
+            </button>
+          </form>
+        )}
+
+        {/* Reviews List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {product.reviews && product.reviews.length > 0 ? (
+            product.reviews.map((review) => (
+              <div
+                key={review.id}
+                style={{
+                  borderBottom: '1px solid var(--border)',
+                  paddingBottom: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {review.customer_name}
+                      </h4>
+                      {review.verified_purchase && (
+                        <span style={{ fontSize: '0.68rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                          Compra Verificada
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', color: '#fbbf24', marginTop: '0.2rem' }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          size={14}
+                          fill={i < review.rating ? '#fbbf24' : 'none'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {new Date(review.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                {review.comment && (
+                  <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                    {review.comment}
+                  </p>
+                )}
+              </div>
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)' }}>
+              <p style={{ margin: 0, fontSize: '0.95rem' }}>Nadie ha calificado este producto todavía. ¡Sé el primero!</p>
+            </div>
+          )}
         </div>
       </div>
 
