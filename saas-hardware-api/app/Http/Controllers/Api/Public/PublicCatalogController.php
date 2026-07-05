@@ -117,8 +117,99 @@ class PublicCatalogController extends Controller
                 ->first();
         }
 
+        // Algoritmo básico de productos relacionados (Cross-selling)
+        $relatedQuery = Product::where('tenant_id', $tenant->id)
+            ->where('id', '!=', $product->id)
+            ->where('is_active', true)
+            ->where('status', 'published')
+            ->with(['category', 'images']);
+
+        $categoryName = strtolower($product->category?->name ?? '');
+
+        // Identificar palabras clave en el nombre o specs para compatibilidad
+        $specsString = json_encode($product->specs ?? []);
+        $productString = strtolower($product->name . ' ' . $specsString);
+
+        $socket = null;
+        if (preg_match('/\b(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)\b/i', $productString, $matches)) {
+            $socket = $matches[1];
+        }
+
+        $ramType = null;
+        if (preg_match('/\b(ddr5|ddr4)\b/i', $productString, $matches)) {
+            $ramType = $matches[1];
+        }
+
+        // Definir categorías sugeridas complementarias según el tipo de producto
+        $targetCategoryNames = [];
+        if (str_contains($categoryName, 'procesador') || str_contains($categoryName, 'processor')) {
+            $targetCategoryNames = ['placas madre', 'memoria ram'];
+        } elseif (str_contains($categoryName, 'placa') || str_contains($categoryName, 'madre') || str_contains($categoryName, 'motherboard')) {
+            $targetCategoryNames = ['procesadores', 'memoria ram'];
+        } elseif (str_contains($categoryName, 'tarjeta') || str_contains($categoryName, 'video') || str_contains($categoryName, 'gpu')) {
+            $targetCategoryNames = ['fuentes de poder', 'gabinetes'];
+        } elseif (str_contains($categoryName, 'fuente') || str_contains($categoryName, 'poder') || str_contains($categoryName, 'power')) {
+            $targetCategoryNames = ['tarjetas de video', 'procesadores'];
+        } elseif (str_contains($categoryName, 'gabinete') || str_contains($categoryName, 'case')) {
+            $targetCategoryNames = ['fuentes de poder', 'enfriamiento'];
+        } elseif (str_contains($categoryName, 'ram') || str_contains($categoryName, 'memoria')) {
+            $targetCategoryNames = ['placas madre', 'procesadores'];
+        } elseif (str_contains($categoryName, 'almacenamiento') || str_contains($categoryName, 'ssd') || str_contains($categoryName, 'disco')) {
+            $targetCategoryNames = ['placas madre', 'procesadores'];
+        }
+
+        // Obtener sugerencias complementarias
+        $complementaryProducts = collect();
+        if (!empty($targetCategoryNames)) {
+            $complementaryProducts = (clone $relatedQuery)
+                ->whereHas('category', function ($q) use ($targetCategoryNames) {
+                    $q->where(function ($sub) use ($targetCategoryNames) {
+                        foreach ($targetCategoryNames as $name) {
+                            $sub->orWhere('name', 'like', "%{$name}%");
+                        }
+                    });
+                })
+                ->get();
+        }
+
+        // Ordenar complementarios que compartan socket o tipo de memoria al inicio
+        if ($socket || $ramType) {
+            $complementaryProducts = $complementaryProducts->sortByDesc(function ($p) use ($socket, $ramType) {
+                $pSpecs = json_encode($p->specs ?? []);
+                $pString = strtolower($p->name . ' ' . $pSpecs);
+                $score = 0;
+                if ($socket && str_contains($pString, strtolower($socket))) {
+                    $score += 10;
+                }
+                if ($ramType && str_contains($pString, strtolower($ramType))) {
+                    $score += 5;
+                }
+                return $score;
+            });
+        }
+
+        // Obtener sugerencias de la misma categoría (alternativos)
+        $alternativeProducts = (clone $relatedQuery)
+            ->where('category_id', $product->category_id)
+            ->limit(4)
+            ->get();
+
+        // Mezclar ambos y rellenar con destacados (más vistos) si falta cubrir la cuota de 6
+        $related = $complementaryProducts->merge($alternativeProducts);
+
+        if ($related->count() < 6) {
+            $fallbacks = (clone $relatedQuery)
+                ->orderByDesc('views_count')
+                ->limit(6)
+                ->get();
+            $related = $related->merge($fallbacks);
+        }
+
+        $relatedList = $related->unique('id')->take(6)->values();
+
         $productArray = $product->toArray();
         $productArray['user_review'] = $userReview;
+        $productArray['related_products'] = $relatedList->toArray();
 
         return response()->json($productArray);
     }

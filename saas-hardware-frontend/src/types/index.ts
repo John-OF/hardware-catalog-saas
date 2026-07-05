@@ -74,6 +74,7 @@ export interface Product {
   reviews_avg_rating?: string | number | null;
   reviews_count?: number;
   reviews?: Review[];
+  related_products?: Product[];
   created_at: string;
 }
 

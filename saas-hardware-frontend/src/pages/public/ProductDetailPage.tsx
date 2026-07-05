@@ -33,6 +33,9 @@ export default function ProductDetailPage() {
   const token = useAuthStore((s) => s.token);
   const isLoggedIn = !!token;
 
+  // Cart info
+  const cartItems = useCartStore((s) => s.items);
+
   // Review form state
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [formName, setFormName] = useState('');
@@ -312,6 +315,9 @@ export default function ProductDetailPage() {
     );
   }
 
+  const mainCartItem = cartItems.find((item) => item.product.id === product?.id);
+  const mainQtyInCart = mainCartItem ? mainCartItem.quantity : 0;
+
   return (
     <div className="product-detail-container animate-fade-in">
       {/* Back button */}
@@ -483,11 +489,25 @@ export default function ProductDetailPage() {
           <div className="detail-cta-row">
             <button
               onClick={handleAddToCart}
-              className="btn-secondary add-cart-btn"
+              className={`btn-secondary add-cart-btn ${mainQtyInCart > 0 ? 'added' : ''}`}
               disabled={product.stock === 0}
             >
-              <Plus size={18} />
-              <span>{product.stock === 0 ? 'Agotado' : 'Agregar al pedido'}</span>
+              {product.stock === 0 ? (
+                <>
+                  <Plus size={18} />
+                  <span>Agotado</span>
+                </>
+              ) : mainQtyInCart > 0 ? (
+                <>
+                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  <span>En el carrito ({mainQtyInCart})</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={18} />
+                  <span>Agregar al pedido</span>
+                </>
+              )}
             </button>
             <button
               onClick={handleWhatsappQuery}
@@ -532,6 +552,144 @@ export default function ProductDetailPage() {
 
         </div>
       </div>
+
+      {/* Related Products / Cross-selling Section */}
+      {product.related_products && product.related_products.length > 0 && (
+        <div className="related-products-section glass-card animate-scale-in" style={{ padding: '2rem', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontFamily: 'var(--font-heading)', color: 'var(--text-primary)', margin: 0 }}>
+              Productos Compatibles y Recomendados
+            </h2>
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Sugerencias para armar tu configuración ideal o alternativas recomendadas.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.25rem' }}>
+            {product.related_products.map((p) => {
+              const hasSale = p.sale_price !== null && p.sale_price !== undefined;
+              const price = hasSale ? p.sale_price : p.price;
+              const displayImageUrl = p.images?.[0]?.image_url || p.image_url;
+
+              return (
+                <div 
+                  key={p.id} 
+                  className="related-product-card"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.015)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    transition: 'transform 0.2s ease, border-color 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    const path = resolvedSlug ? `/${resolvedSlug}/product/${p.id}` : `/product/${p.id}`;
+                    navigate(path);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  <div style={{ position: 'relative', width: '100%', height: '140px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {displayImageUrl ? (
+                      <img 
+                        src={displayImageUrl} 
+                        alt={p.name} 
+                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <ShoppingBag size={32} style={{ color: 'var(--text-muted)' }} />
+                    )}
+                    {p.stock === 0 && (
+                      <span className="card-badge sold-out" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--danger)', color: 'white', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                        Agotado
+                      </span>
+                    )}
+                    {hasSale && p.stock > 0 && (
+                      <span className="card-badge sale" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--primary)', color: 'white', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                        Oferta
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600, textTransform: 'uppercase' }}>
+                      {p.category?.name}
+                    </span>
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 600, lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '2.5rem', lineHeight: '1.25' }}>
+                      {p.name}
+                    </h4>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {hasSale && (
+                        <span style={{ fontSize: '0.75rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                          ${Number(p.price).toFixed(2)}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.98rem', fontWeight: 700, color: 'white' }}>
+                        ${Number(price).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {(() => {
+                      const relCartItem = cartItems.find((item) => item.product.id === p.id);
+                      const relQty = relCartItem ? relCartItem.quantity : 0;
+
+                      return (
+                        <button 
+                          type="button"
+                          disabled={p.stock === 0}
+                          className="btn-icon"
+                          style={{ 
+                            padding: '0.35rem 0.6rem', 
+                            borderRadius: '20px', 
+                            background: relQty > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)', 
+                            color: p.stock === 0 ? 'var(--text-muted)' : relQty > 0 ? '#10b981' : 'var(--primary)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                            fontSize: '0.8rem',
+                            border: relQty > 0 ? '1px solid rgba(16, 185, 129, 0.2)' : 'none'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (p.stock > 0) {
+                              addItem(resolvedSlug || '', p);
+                              toast.success('Producto agregado al pedido.');
+                            }
+                          }}
+                        >
+                          {relQty > 0 ? (
+                            <>
+                              <CheckCircle size={14} />
+                              <span>({relQty})</span>
+                            </>
+                          ) : (
+                            <Plus size={14} />
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <style>{`
+            .related-product-card:hover {
+              transform: translateY(-4px);
+              border-color: var(--primary) !important;
+              box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* Reviews Section */}
       <div className="reviews-section glass-card animate-scale-in" style={{ padding: '2rem', borderRadius: 'var(--radius-xl)', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid var(--border)' }}>
@@ -1048,6 +1206,8 @@ export default function ProductDetailPage() {
           gap: 0.5rem;
         }
         .add-cart-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .add-cart-btn.added { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.05); }
+        .add-cart-btn.added:hover:not(:disabled) { background: #10b981; color: #fff; }
 
         .whatsapp-buy-btn {
           flex: 1;

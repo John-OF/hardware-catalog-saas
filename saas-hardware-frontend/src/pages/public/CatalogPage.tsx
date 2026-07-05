@@ -15,7 +15,8 @@ import {
   Plus,
   Cpu,
   X,
-  Star
+  Star,
+  CheckCircle
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
@@ -50,6 +51,7 @@ export default function CatalogPage() {
   // Carrito
   const addItem = useCartStore((s) => s.addItem);
   const cartCount = useCartStore((s) => s.totalItems());
+  const cartItems = useCartStore((s) => s.items);
 
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -449,81 +451,96 @@ export default function CatalogPage() {
                   ) : (
                     <>
                       <div className={`catalog-grid layout-${tenant.theme?.layout || 'grid'}`}>
-                        {products.map((product) => (
-                          <Link 
-                            key={product.id} 
-                            to={getPublicPath(`/product/${product.id}`)} 
-                            className="product-catalog-card glass-card"
-                          >
-                            <div className="card-image-wrapper">
-                              {product.stock > 0 && (
+                        {products.map((product) => {
+                          const cartItem = cartItems.find((item) => item.product.id === product.id);
+                          const qtyInCart = cartItem ? cartItem.quantity : 0;
+
+                          return (
+                            <Link 
+                              key={product.id} 
+                              to={getPublicPath(`/product/${product.id}`)} 
+                              className="product-catalog-card glass-card"
+                            >
+                              <div className="card-image-wrapper">
+                                {product.stock > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleToggleCompare(e, product)}
+                                    className={`compare-toggle-badge ${comparedProducts.some(p => p.id === product.id) ? 'active' : ''}`}
+                                    title="Comparar especificaciones"
+                                  >
+                                    {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
+                                  </button>
+                                )}
+                                {product.thumbnail_url ? (
+                                  <img src={product.thumbnail_url} alt={product.name} />
+                                ) : (
+                                  <div className="image-placeholder">
+                                    <ShoppingBag size={32} />
+                                  </div>
+                                )}
+                                {product.stock === 0 && (
+                                  <span className="card-badge sold-out">Agotado</span>
+                                )}
+                                {product.stock > 0 && product.stock < 5 && (
+                                  <span className="card-badge low-stock">Pocas Unidades</span>
+                                )}
+                                {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
+                                  <span className="card-badge sale">Oferta</span>
+                                )}
+                              </div>
+
+                              <div className="card-details">
+                                <div className="card-brand-rating-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span className="card-brand">{product.brand || 'Genérico'}</span>
+                                  {product.reviews_count && product.reviews_count > 0 ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
+                                      <Star size={11} fill="#fbbf24" style={{ display: 'inline' }} />
+                                      <span>{parseFloat(product.reviews_avg_rating!.toString()).toFixed(1)}</span>
+                                      <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: '0.72rem' }}>({product.reviews_count})</span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <h3 className="card-title">{product.name}</h3>
+                                <div className="card-footer">
+                                  <span className="card-price">
+                                    {product.sale_price !== null && product.sale_price !== undefined ? (
+                                      <>
+                                        <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
+                                          ${parseFloat(product.price.toString()).toFixed(2)}
+                                        </span>
+                                        <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                                      </>
+                                    ) : (
+                                      `$${parseFloat(product.price.toString()).toFixed(2)}`
+                                    )}
+                                  </span>
+                                  <span className="view-detail-link">
+                                    Ver más <ChevronRight size={14} />
+                                  </span>
+                                </div>
                                 <button
                                   type="button"
-                                  onClick={(e) => handleToggleCompare(e, product)}
-                                  className={`compare-toggle-badge ${comparedProducts.some(p => p.id === product.id) ? 'active' : ''}`}
-                                  title="Comparar especificaciones"
+                                  className={`card-add-btn ${qtyInCart > 0 ? 'added' : ''}`}
+                                  onClick={(e) => handleAddToCart(e, product)}
+                                  disabled={product.stock === 0}
                                 >
-                                  {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
-                                </button>
-                              )}
-                              {product.thumbnail_url ? (
-                                <img src={product.thumbnail_url} alt={product.name} />
-                              ) : (
-                                <div className="image-placeholder">
-                                  <ShoppingBag size={32} />
-                                </div>
-                              )}
-                              {product.stock === 0 && (
-                                <span className="card-badge sold-out">Agotado</span>
-                              )}
-                              {product.stock > 0 && product.stock < 5 && (
-                                <span className="card-badge low-stock">Pocas Unidades</span>
-                              )}
-                              {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
-                                <span className="card-badge sale">Oferta</span>
-                              )}
-                            </div>
-
-                            <div className="card-details">
-                              <div className="card-brand-rating-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="card-brand">{product.brand || 'Genérico'}</span>
-                                {product.reviews_count && product.reviews_count > 0 ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
-                                    <Star size={11} fill="#fbbf24" style={{ display: 'inline' }} />
-                                    <span>{parseFloat(product.reviews_avg_rating!.toString()).toFixed(1)}</span>
-                                    <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: '0.72rem' }}>({product.reviews_count})</span>
-                                  </div>
-                                ) : null}
-                              </div>
-                              <h3 className="card-title">{product.name}</h3>
-                              <div className="card-footer">
-                                <span className="card-price">
-                                  {product.sale_price !== null && product.sale_price !== undefined ? (
+                                  {product.stock === 0 ? (
+                                    'Agotado'
+                                  ) : qtyInCart > 0 ? (
                                     <>
-                                      <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
-                                        ${parseFloat(product.price.toString()).toFixed(2)}
-                                      </span>
-                                      <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                                      <CheckCircle size={15} /> En carrito ({qtyInCart})
                                     </>
                                   ) : (
-                                    `$${parseFloat(product.price.toString()).toFixed(2)}`
+                                    <>
+                                      <Plus size={15} /> Agregar
+                                    </>
                                   )}
-                                </span>
-                                <span className="view-detail-link">
-                                  Ver más <ChevronRight size={14} />
-                                </span>
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                className="card-add-btn"
-                                onClick={(e) => handleAddToCart(e, product)}
-                                disabled={product.stock === 0}
-                              >
-                                <Plus size={15} /> {product.stock === 0 ? 'Agotado' : 'Agregar'}
-                              </button>
-                            </div>
-                          </Link>
-                        ))}
+                            </Link>
+                          );
+                        })}
                       </div>
 
                       {/* Pagination */}
@@ -1202,6 +1219,8 @@ export default function CatalogPage() {
         }
         .card-add-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
         .card-add-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--border); color: var(--text-muted); background: transparent; }
+        .card-add-btn.added { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.05); }
+        .card-add-btn.added:hover:not(:disabled) { background: #10b981; color: #fff; }
 
         .header-contact {
           display: flex;
