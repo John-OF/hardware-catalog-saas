@@ -10,7 +10,10 @@ const api = axios.create({
 
 // Antes de cada petición: inyectar token y header de tenant
 api.interceptors.request.use((config) => {
-  const token  = sessionStorage.getItem('token');
+  const isPublicRequest = config.url?.includes('public/');
+  const token = isPublicRequest 
+    ? localStorage.getItem('customer_token')
+    : sessionStorage.getItem('token');
   const tenant = sessionStorage.getItem('tenant_slug');
   const visitorId = localStorage.getItem('visitor_id');
 
@@ -21,13 +24,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Si el servidor responde 401: limpiar sesión y redirigir
+// Si el servidor responde 401: limpiar sesión y redirigir (solo para admins)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      sessionStorage.clear();
-      window.location.href = '/login';
+      const isPublicRequest = error.config?.url?.includes('public/');
+      if (isPublicRequest) {
+        localStorage.removeItem('customer_token');
+        localStorage.removeItem('customer_user');
+        // Opcional: recargar para limpiar estado global de Zustand si es necesario
+      } else {
+        sessionStorage.clear();
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

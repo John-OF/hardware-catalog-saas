@@ -406,9 +406,12 @@ class PublicCatalogController extends Controller
             ];
         }
 
-        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total) {
+        $userId = auth('sanctum')->id();
+
+        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total, $userId) {
             $order = Order::create([
                 'tenant_id'      => $tenant->id,
+                'user_id'        => $userId,
                 'customer_name'  => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'],
                 'customer_note'  => $data['customer_note'] ?? null,

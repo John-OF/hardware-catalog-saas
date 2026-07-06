@@ -16,7 +16,9 @@ import {
   Cpu,
   X,
   Star,
-  CheckCircle
+  CheckCircle,
+  User,
+  Heart
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
@@ -24,9 +26,11 @@ import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../a
 import { getPublicPages } from '../../api/pages';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import CartDrawer from '../../components/public/CartDrawer';
+import CustomerAccountModal from '../../components/public/CustomerAccountModal';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
+import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
 
 export default function CatalogPage() {
@@ -63,6 +67,10 @@ export default function CatalogPage() {
   // Comparador de productos
   const [comparedProducts, setComparedProducts] = useState<Product[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  // Customer Auth
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const { isAuthenticated: isCustomerAuthenticated, favoriteIds, setFavoriteIds, toggleFavoriteId } = useCustomerAuthStore();
 
   const handleToggleCompare = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -195,6 +203,19 @@ export default function CatalogPage() {
     }
   }, [paginatedData, selectedSpecs]);
 
+  // Fetch customer favorites on load if logged in
+  useEffect(() => {
+    if (isCustomerAuthenticated && resolvedSlug) {
+      api.get(`/public/${resolvedSlug}/favorites`)
+        .then((res) => {
+          setFavoriteIds(res.data.map((p: any) => p.id));
+        })
+        .catch(() => {
+          // Ignore failures silently on load
+        });
+    }
+  }, [isCustomerAuthenticated, resolvedSlug]);
+
   if (isLoadingTenant) {
     return (
       <div className="loader-container">
@@ -266,6 +287,18 @@ export default function CatalogPage() {
           >
             <Cpu size={16} /> Armador PC
           </Link>
+          <button
+            type="button"
+            className="cart-trigger"
+            onClick={() => setAccountModalOpen(true)}
+            aria-label="Mi cuenta"
+            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <User size={20} />
+            {isCustomerAuthenticated && (
+              <span className="cart-badge" style={{ backgroundColor: '#22c55e', width: '8px', height: '8px', minWidth: '8px', padding: 0 }} />
+            )}
+          </button>
           <button
             type="button"
             className="cart-trigger"
@@ -462,6 +495,46 @@ export default function CatalogPage() {
                               className="product-catalog-card glass-card"
                             >
                               <div className="card-image-wrapper">
+                                {isCustomerAuthenticated && (
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      try {
+                                        const res = await api.post(`/public/${resolvedSlug}/favorites/${product.id}`);
+                                        toast.success(res.data.message);
+                                        toggleFavoriteId(product.id);
+                                      } catch {
+                                        toast.error('Error al actualizar favoritos');
+                                      }
+                                    }}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '0.5rem',
+                                      right: '0.5rem',
+                                      zIndex: 10,
+                                      background: 'rgba(15, 23, 42, 0.75)',
+                                      border: '1px solid var(--border)',
+                                      borderRadius: '50%',
+                                      width: '30px',
+                                      height: '30px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s',
+                                      padding: 0
+                                    }}
+                                    title={favoriteIds.includes(product.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                  >
+                                    <Heart 
+                                      size={14} 
+                                      fill={favoriteIds.includes(product.id) ? '#ef4444' : 'none'} 
+                                      style={{ color: favoriteIds.includes(product.id) ? '#ef4444' : 'var(--text-muted)' }} 
+                                    />
+                                  </button>
+                                )}
                                 {product.stock > 0 && (
                                   <button
                                     type="button"
@@ -574,6 +647,11 @@ export default function CatalogPage() {
         })}
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={resolvedSlug!} tenant={tenant} />
+      <CustomerAccountModal 
+        isOpen={accountModalOpen} 
+        onClose={() => setAccountModalOpen(false)} 
+        tenantSlug={resolvedSlug!} 
+      />
 
         {/* Barra Flotante de Comparación */}
         {comparedProducts.length > 0 && (

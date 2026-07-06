@@ -12,14 +12,17 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Star
+  Star,
+  Heart
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import api from '../../api/axios';
 import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Product } from '../../types';
 
 export default function ProductDetailPage() {
@@ -32,6 +35,9 @@ export default function ProductDetailPage() {
   // Auth info
   const token = useAuthStore((s) => s.token);
   const isLoggedIn = !!token;
+
+  // Customer Auth info
+  const { isAuthenticated: isCustomerAuthenticated, favoriteIds, toggleFavoriteId } = useCustomerAuthStore();
 
   // Cart info
   const cartItems = useCartStore((s) => s.items);
@@ -486,11 +492,12 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Call to action */}
-          <div className="detail-cta-row">
+          <div className="detail-cta-row" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <button
               onClick={handleAddToCart}
               className={`btn-secondary add-cart-btn ${mainQtyInCart > 0 ? 'added' : ''}`}
               disabled={product.stock === 0}
+              style={{ flex: 1 }}
             >
               {product.stock === 0 ? (
                 <>
@@ -513,9 +520,47 @@ export default function ProductDetailPage() {
               onClick={handleWhatsappQuery}
               className="btn-primary whatsapp-buy-btn"
               disabled={product.stock === 0}
+              style={{ flex: 1 }}
             >
               <Phone size={18} />
               <span>Consultar</span>
+            </button>
+            <button
+              onClick={async () => {
+                if (!isCustomerAuthenticated) {
+                  toast.error('Inicia sesión para guardar en favoritos.');
+                  return;
+                }
+                try {
+                  const res = await api.post(`/public/${resolvedSlug}/favorites/${product.id}`);
+                  toast.success(res.data.message);
+                  toggleFavoriteId(product.id);
+                } catch {
+                  toast.error('Error al actualizar favoritos');
+                }
+              }}
+              className="btn-secondary favorite-btn"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '46px',
+                height: '46px',
+                minWidth: '46px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border)',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                padding: 0
+              }}
+              title={favoriteIds.includes(product.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            >
+              <Heart 
+                size={20} 
+                fill={favoriteIds.includes(product.id) ? '#ef4444' : 'none'} 
+                style={{ color: favoriteIds.includes(product.id) ? '#ef4444' : 'var(--text-muted)' }} 
+              />
             </button>
           </div>
 

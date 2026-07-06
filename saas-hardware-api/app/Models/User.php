@@ -31,4 +31,14 @@ class User extends Authenticatable
         'is_active'         => 'boolean',
         'password'          => 'hashed',    // bcrypt automático en Laravel 10+
     ];
+
+    public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function favorites(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'user_favorites')->withTimestamps();
+    }
 }

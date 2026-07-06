@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Public\PublicCatalogController;
+use App\Http\Controllers\Api\Public\PublicAuthController;
+use App\Http\Controllers\Api\Public\PublicFavoritesController;
+use App\Http\Controllers\Api\Public\PublicOrdersController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -38,6 +41,21 @@ Route::prefix('public/{slug}')->group(function () {
     // Crear solicitud de pedido (público, limitado para evitar spam)
     Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
         ->middleware('throttle:10,1');
+
+    // Autenticación de cliente
+    Route::post('/auth/register', [PublicAuthController::class, 'register'])
+        ->middleware('throttle:5,1');
+    Route::post('/auth/login', [PublicAuthController::class, 'login'])
+        ->middleware('throttle:5,1');
+
+    // Rutas protegidas para clientes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/auth/logout', [PublicAuthController::class, 'logout']);
+        Route::get('/auth/me', [PublicAuthController::class, 'me']);
+        Route::get('/my-orders', [PublicOrdersController::class, 'index']);
+        Route::get('/favorites', [PublicFavoritesController::class, 'index']);
+        Route::post('/favorites/{product}', [PublicFavoritesController::class, 'toggle']);
+    });
 });
 
 /*
