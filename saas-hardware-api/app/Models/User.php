@@ -20,7 +20,7 @@ class User extends Authenticatable
     }
 
     protected $fillable = [
-        'tenant_id', 'name', 'email', 'password', 'role', 'is_active',
+        'tenant_id', 'name', 'email', 'phone', 'password', 'role', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useCustomerAuthStore } from '../stores/customerAuthStore';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
@@ -31,9 +32,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const isPublicRequest = error.config?.url?.includes('public/');
       if (isPublicRequest) {
-        localStorage.removeItem('customer_token');
-        localStorage.removeItem('customer_user');
-        // Opcional: recargar para limpiar estado global de Zustand si es necesario
+        useCustomerAuthStore.getState().clearCustomerAuth();
       } else {
         sessionStorage.clear();
         window.location.href = '/login';

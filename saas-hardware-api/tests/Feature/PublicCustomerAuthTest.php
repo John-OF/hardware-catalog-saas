@@ -45,6 +45,7 @@ class PublicCustomerAuthTest extends TestCase
         $response = $this->postJson("/api/public/tiendapresencial/auth/register", [
             'name' => 'Comprador Uno',
             'email' => 'comprador@gmail.com',
+            'phone' => '+5491122334455',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -53,6 +54,7 @@ class PublicCustomerAuthTest extends TestCase
         $response->assertJsonStructure(['token', 'user']);
         $this->assertDatabaseHas('users', [
             'email' => 'comprador@gmail.com',
+            'phone' => '+5491122334455',
             'role' => 'customer',
             'tenant_id' => $this->tenant->id,
         ]);

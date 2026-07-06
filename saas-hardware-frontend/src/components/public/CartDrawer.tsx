@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { X, Trash2, Plus, Minus, ShoppingCart, Loader2, Send } from 'lucide-react';
 import { useCartStore } from '../../stores/cartStore';
+import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
 import type { Tenant } from '../../types';
 
@@ -13,6 +14,22 @@ interface CartDrawerProps {
 }
 
 const money = (n: number) => `$${n.toFixed(2)}`;
+
+const parsePhone = (fullPhone: string) => {
+  const codes = ['+593', '+51', '+57', '+52', '+34'];
+  for (const code of codes) {
+    if (fullPhone.startsWith(code)) {
+      return {
+        code,
+        number: fullPhone.substring(code.length)
+      };
+    }
+  }
+  return {
+    code: '',
+    number: fullPhone
+  };
+};
 
 export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerProps) {
   const items = useCartStore((s) => s.items);
@@ -26,6 +43,19 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   const [countryCode, setCountryCode] = useState('+593');
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
+
+  const { user, isAuthenticated: isCustomerAuthenticated } = useCustomerAuthStore();
+
+  useEffect(() => {
+    if (open && isCustomerAuthenticated && user) {
+      if (user.name) setName(user.name);
+      if (user.phone) {
+        const parsed = parsePhone(user.phone);
+        setCountryCode(parsed.code);
+        setPhone(parsed.number);
+      }
+    }
+  }, [isCustomerAuthenticated, user, open]);
 
   const buildWhatsappMessage = (orderId: string) => {
     const lines = items.map((i) => {

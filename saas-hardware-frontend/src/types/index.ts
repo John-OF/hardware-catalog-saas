@@ -29,7 +29,8 @@ export interface User {
   tenant_id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff';
+  phone?: string;
+  role: 'admin' | 'staff' | 'customer';
   is_active: boolean;
 }
 

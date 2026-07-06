@@ -13,11 +13,12 @@ interface CustomerAuthState {
 }
 
 export const useCustomerAuthStore = create<CustomerAuthState>((set) => {
-  const token = localStorage.getItem('customer_token');
+  const rawToken = localStorage.getItem('customer_token');
+  const token = (rawToken === 'null' || rawToken === 'undefined') ? null : rawToken;
   let user: User | null = null;
   try {
     const savedUser = localStorage.getItem('customer_user');
-    user = savedUser ? JSON.parse(savedUser) : null;
+    user = (savedUser && savedUser !== 'null' && savedUser !== 'undefined') ? JSON.parse(savedUser) : null;
   } catch {
     user = null;
   }

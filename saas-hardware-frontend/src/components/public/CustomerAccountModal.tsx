@@ -9,7 +9,10 @@ import {
   Mail, 
   Lock, 
   Loader2, 
-  UserPlus
+  UserPlus,
+  Eye,
+  EyeOff,
+  Phone
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
@@ -30,6 +33,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+593');
   
   // Data states
   const [loading, setLoading] = useState(false);
@@ -53,8 +60,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
       const res = await api.get(`/public/${tenantSlug}/favorites`);
       setFavorites(res.data);
       setFavoriteIds(res.data.map((p: any) => p.id));
-    } catch {
-      toast.error('Error al cargar favoritos');
+    } catch (err: any) {
+      if (err.response?.status !== 401) {
+        toast.error('Error al cargar favoritos');
+      }
     }
   };
 
@@ -63,8 +72,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
     try {
       const res = await api.get(`/public/${tenantSlug}/my-orders`);
       setOrders(res.data);
-    } catch {
-      toast.error('Error al cargar el historial de pedidos');
+    } catch (err: any) {
+      if (err.response?.status !== 401) {
+        toast.error('Error al cargar el historial de pedidos');
+      }
     }
   };
 
@@ -99,11 +110,13 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
       toast.error('Las contraseñas no coinciden.');
       return;
     }
+    const submittedPhone = phone.trim() ? (countryCode + phone.trim()) : '';
     setLoading(true);
     try {
       const res = await api.post(`/public/${tenantSlug}/auth/register`, {
         name,
         email,
+        phone: submittedPhone || undefined,
         password,
         password_confirmation: passwordConfirmation,
       });
@@ -476,13 +489,13 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                     <div style={{ position: 'relative' }}>
                       <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                       <input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         style={{
                           width: '100%',
-                          padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                          padding: '0.6rem 2.5rem 0.6rem 2.25rem',
                           background: 'rgba(0,0,0,0.2)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
@@ -490,6 +503,25 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                           fontSize: '0.9rem'
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
@@ -559,17 +591,39 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Contraseña</label>
-                    <div style={{ position: 'relative' }}>
-                      <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Mínimo 8 caracteres"
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>WhatsApp / Celular <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>(Opcional)</span></label>
+                    <div style={{ display: 'flex', gap: '0.25rem', position: 'relative' }}>
+                      <Phone size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', zIndex: 5 }} />
+                      <select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
                         style={{
-                          width: '100%',
-                          padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                          padding: '0.6rem 0.5rem 0.6rem 2.25rem',
+                          background: 'rgba(0,0,0,0.2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          color: '#fff',
+                          fontSize: '0.9rem',
+                          width: '115px',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="+593" style={{ background: '#1e293b' }}>EC +593</option>
+                        <option value="+51" style={{ background: '#1e293b' }}>PE +51</option>
+                        <option value="+57" style={{ background: '#1e293b' }}>CO +57</option>
+                        <option value="+52" style={{ background: '#1e293b' }}>MX +52</option>
+                        <option value="+34" style={{ background: '#1e293b' }}>ES +34</option>
+                        <option value="" style={{ background: '#1e293b' }}>Otro</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="Ej. 991234567"
+                        style={{
+                          flex: 1,
+                          padding: '0.6rem 0.75rem',
                           background: 'rgba(0,0,0,0.2)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
@@ -578,20 +632,23 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                         }}
                       />
                     </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', opacity: 0.7, marginTop: '2px', lineHeight: '1.2' }}>
+                      Opcional. Solo se usará para agilizar y coordinar la entrega de tus pedidos.
+                    </span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Confirmar Contraseña</label>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Contraseña</label>
                     <div style={{ position: 'relative' }}>
                       <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                       <input
-                        type="password"
-                        value={passwordConfirmation}
-                        onChange={(e) => setPasswordConfirmation(e.target.value)}
-                        placeholder="••••••••"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Mínimo 8 caracteres"
                         style={{
                           width: '100%',
-                          padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                          padding: '0.6rem 2.5rem 0.6rem 2.25rem',
                           background: 'rgba(0,0,0,0.2)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
@@ -599,6 +656,66 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                           fontSize: '0.9rem'
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Confirmar Contraseña</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type={showPasswordConfirmation ? "text" : "password"}
+                        value={passwordConfirmation}
+                        onChange={(e) => setPasswordConfirmation(e.target.value)}
+                        placeholder="••••••••"
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 2.5rem 0.6rem 2.25rem',
+                          background: 'rgba(0,0,0,0.2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          color: '#fff',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                      >
+                        {showPasswordConfirmation ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 

@@ -22,6 +22,7 @@ class PublicAuthController extends Controller
         $data = $request->validate([
             'name'     => 'required|string|max:200',
             'email'    => 'required|email',
+            'phone'    => 'nullable|string|max:30',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -40,6 +41,7 @@ class PublicAuthController extends Controller
         $user = new User([
             'name'     => $data['name'],
             'email'    => $data['email'],
+            'phone'    => $data['phone'] ?? null,
             'password' => $data['password'], // El cast 'hashed' se encarga de hashear en User model
             'role'     => 'customer',
             'is_active'=> true,
