@@ -78,7 +78,7 @@ export default function PcBuilderPage() {
     return `/${resolvedSlug}${path}`;
   };
 
-  useTenantBranding(tenant);
+  useTenantBranding(tenant, 'Armador de PC compatible', 'Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada.');
   useTenantTheme(tenant);
 
   // Fetch Categories to map step keys

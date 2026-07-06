@@ -46,8 +46,8 @@ export default function PageDetailPage() {
     return `/${resolvedSlug}${path}`;
   };
 
-  // Apply fonts/colors
-  useTenantBranding(tenant || null);
+  // Apply fonts/colors and SEO meta-tags
+  useTenantBranding(tenant || null, page?.title, page?.content);
   useTenantTheme(tenant || null);
 
   const isLoading = isLoadingTenant || isLoadingPage;

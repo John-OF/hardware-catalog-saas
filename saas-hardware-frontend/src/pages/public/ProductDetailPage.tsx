@@ -191,8 +191,8 @@ export default function ProductDetailPage() {
     enabled: !!resolvedSlug && !!id,
   });
 
-  // Título y favicon de la pestaña: "Producto · Mi Tienda"
-  useTenantBranding(tenant, product?.name);
+  // Título, favicon y SEO metadata de la pestaña: "Producto · Mi Tienda"
+  useTenantBranding(tenant, product?.name, product?.description, product?.images?.[0]?.image_url || product?.image_url);
 
   useEffect(() => {
     if (product) {
