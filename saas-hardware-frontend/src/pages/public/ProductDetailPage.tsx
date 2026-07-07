@@ -13,11 +13,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
-  Heart
+  Heart,
+  Bell
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
-import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview } from '../../api/public';
+import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview, subscribeStockNotification } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { useCartStore } from '../../stores/cartStore';
@@ -51,6 +52,11 @@ export default function ProductDetailPage() {
   const [formRating, setFormRating] = useState(5);
   const [formComment, setFormComment] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  // "Avísame cuando llegue" form state
+  const [notifyName, setNotifyName] = useState('');
+  const [notifyContact, setNotifyContact] = useState('');
+  const [notifySubmitted, setNotifySubmitted] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -160,6 +166,32 @@ export default function ProductDetailPage() {
       setTurnstileToken(null);
     }
   });
+
+  const notifyMutation = useMutation({
+    mutationFn: (payload: { customer_name: string; customer_contact: string }) =>
+      subscribeStockNotification(resolvedSlug!, id!, payload),
+    onSuccess: (data) => {
+      toast.success(data.message || '¡Listo! Te avisaremos cuando llegue.');
+      setNotifySubmitted(true);
+      setNotifyName('');
+      setNotifyContact('');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'No se pudo registrar tu aviso. Inténtalo de nuevo.');
+    }
+  });
+
+  const handleNotifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifyName.trim() || !notifyContact.trim()) {
+      toast.error('Ingresa tu nombre y un contacto (WhatsApp o email).');
+      return;
+    }
+    notifyMutation.mutate({
+      customer_name: notifyName.trim(),
+      customer_contact: notifyContact.trim(),
+    });
+  };
 
   const handleReviewSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -563,6 +595,47 @@ export default function ProductDetailPage() {
               />
             </button>
           </div>
+
+          {/* "Avísame cuando llegue" — solo si el producto está agotado */}
+          {product.stock === 0 && (
+            <div className="notify-stock-box">
+              {notifySubmitted ? (
+                <div className="notify-success">
+                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  <span>Te avisaremos apenas este producto vuelva a estar disponible.</span>
+                </div>
+              ) : (
+                <>
+                  <div className="notify-header">
+                    <Bell size={16} />
+                    <span>¿Lo quieres? Te avisamos cuando llegue</span>
+                  </div>
+                  <form onSubmit={handleNotifySubmit} className="notify-form">
+                    <input
+                      type="text"
+                      placeholder="Tu nombre"
+                      value={notifyName}
+                      onChange={(e) => setNotifyName(e.target.value)}
+                      className="notify-input"
+                      maxLength={150}
+                    />
+                    <input
+                      type="text"
+                      placeholder="WhatsApp o email"
+                      value={notifyContact}
+                      onChange={(e) => setNotifyContact(e.target.value)}
+                      className="notify-input"
+                      maxLength={150}
+                    />
+                    <button type="submit" className="btn-primary notify-submit" disabled={notifyMutation.isPending}>
+                      {notifyMutation.isPending ? <Loader2 size={16} className="spinner" /> : <Bell size={16} />}
+                      <span>Avísame</span>
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Description */}
           {product.description && (
@@ -1232,6 +1305,64 @@ export default function ProductDetailPage() {
           display: block;
           font-size: 0.75rem;
           color: var(--text-muted);
+        }
+
+        /* "Avísame cuando llegue" */
+        .notify-stock-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .notify-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          margin-bottom: 0.75rem;
+        }
+
+        .notify-header svg { color: var(--primary); }
+
+        .notify-form {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .notify-input {
+          flex: 1 1 140px;
+          min-width: 0;
+          padding: 0.6rem 0.75rem;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: var(--bg-app, rgba(0, 0, 0, 0.15));
+          color: var(--text-primary);
+          font-size: 0.9rem;
+        }
+
+        .notify-input:focus {
+          outline: none;
+          border-color: var(--primary);
+        }
+
+        .notify-submit {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+        }
+
+        .notify-success {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.9rem;
+          color: var(--text-secondary);
         }
 
         /* Buy button */

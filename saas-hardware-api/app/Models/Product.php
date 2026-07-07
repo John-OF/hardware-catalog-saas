@@ -48,6 +48,43 @@ class Product extends Model
                 \Illuminate\Support\Facades\Cache::increment("tenant:{$tenant->slug}:cache_version");
             }
         });
+
+        // "Avísame cuando llegue": al reponer stock (de 0 a >0) notificar a los interesados
+        static::updated(function ($product) {
+            if ($product->wasChanged('stock')
+                && (int) $product->getOriginal('stock') <= 0
+                && (int) $product->stock > 0) {
+                $product->notifyStockSubscribers();
+            }
+        });
+    }
+
+    /**
+     * Notifica a los clientes en lista de espera que el producto volvió a estar disponible
+     * y marca sus avisos como enviados. Sin infraestructura de correo (fase 7), el envío se
+     * simula por log; al cablear el mailer bastará con reemplazar el bloque de Log por el envío real.
+     */
+    public function notifyStockSubscribers(): int
+    {
+        $pending = $this->stockNotifications()->whereNull('notified_at')->get();
+
+        foreach ($pending as $subscription) {
+            \Illuminate\Support\Facades\Log::info('Aviso de reposición de stock (simulado)', [
+                'tenant_id'   => $this->tenant_id,
+                'product_id'  => $this->id,
+                'product'     => $this->name,
+                'to_name'     => $subscription->customer_name,
+                'to_contact'  => $subscription->customer_contact,
+            ]);
+        }
+
+        if ($pending->isNotEmpty()) {
+            $this->stockNotifications()
+                ->whereNull('notified_at')
+                ->update(['notified_at' => now()]);
+        }
+
+        return $pending->count();
     }
 
     public function category(): BelongsTo
@@ -63,6 +100,11 @@ class Product extends Model
     public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    public function stockNotifications(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StockNotification::class);
     }
 
     // Accessor útil para el frontend

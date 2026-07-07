@@ -18,6 +18,7 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $products = Product::with(['category', 'images'])
+            ->withCount(['stockNotifications as waitlist_count' => fn($q) => $q->whereNull('notified_at')])
             ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
             ->when($request->search, fn($q) => $q->where(function ($query) use ($request) {
                 $query->where('name', 'like', "%{$request->search}%")

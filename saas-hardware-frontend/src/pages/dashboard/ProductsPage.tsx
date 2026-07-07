@@ -19,7 +19,8 @@ import {
   AlertCircle,
   Copy,
   CheckSquare,
-  GripVertical
+  GripVertical,
+  Bell
 } from 'lucide-react';
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
@@ -679,6 +680,11 @@ export default function ProductsPage() {
                               'Disponible'
                             )}
                           </span>
+                          {product.stock === 0 && (product.waitlist_count ?? 0) > 0 && (
+                            <span className="waitlist-badge" title="Clientes esperando reposición">
+                              <Bell size={11} /> {product.waitlist_count} en espera
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>
@@ -1432,6 +1438,20 @@ export default function ProductsPage() {
           font-size: 0.7rem;
           color: var(--text-muted);
           margin-top: 0.1rem;
+        }
+
+        .waitlist-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+          margin-top: 0.3rem;
+          padding: 0.1rem 0.4rem;
+          border-radius: 999px;
+          font-size: 0.65rem;
+          font-weight: 600;
+          color: var(--primary);
+          background: color-mix(in srgb, var(--primary) 12%, transparent);
+          width: fit-content;
         }
 
         .table-actions {

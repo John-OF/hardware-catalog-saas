@@ -57,3 +57,20 @@ export const createPublicReview = async (
   const response = await api.post<Review>(`/public/${slug}/products/${productId}/reviews`, payload);
   return response.data;
 };
+
+export interface StockNotificationPayload {
+  customer_name: string;
+  customer_contact: string;
+}
+
+export const subscribeStockNotification = async (
+  slug: string,
+  productId: string,
+  payload: StockNotificationPayload
+): Promise<{ message: string }> => {
+  const response = await api.post<{ message: string }>(
+    `/public/${slug}/products/${productId}/notify-me`,
+    payload
+  );
+  return response.data;
+};

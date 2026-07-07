@@ -341,6 +341,56 @@ class PublicCatalogController extends Controller
         ], 201);
     }
 
+    /**
+     * "Avísame cuando llegue": el cliente deja su contacto para un producto agotado.
+     * Al reponer stock, el modelo Product notifica a los interesados.
+     */
+    public function storeStockNotification(Request $request, string $slug, string $productId): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $product = Product::where('tenant_id', $tenant->id)
+            ->where('id', $productId)
+            ->where('is_active', true)
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'customer_name'    => 'required|string|max:150',
+            'customer_contact' => 'required|string|max:150', // teléfono o email
+        ]);
+
+        // Solo tiene sentido si el producto está agotado
+        if ($product->stock > 0) {
+            return response()->json([
+                'message' => 'Este producto ya está disponible. ¡Puedes pedirlo ahora!',
+            ], 422);
+        }
+
+        // Registro idempotente: si ya estaba anotado (y aún sin avisar), no duplicar
+        $notification = \App\Models\StockNotification::firstOrCreate(
+            [
+                'product_id'       => $product->id,
+                'customer_contact' => $data['customer_contact'],
+            ],
+            [
+                'tenant_id'     => $tenant->id,
+                'customer_name' => $data['customer_name'],
+            ]
+        );
+
+        // Si un aviso previo ya fue enviado y el cliente se reinscribe, reabrir el interés
+        if (! $notification->wasRecentlyCreated && $notification->notified_at !== null) {
+            $notification->update([
+                'customer_name' => $data['customer_name'],
+                'notified_at'   => null,
+            ]);
+        }
+
+        return response()->json([
+            'message' => '¡Listo! Te avisaremos cuando este producto vuelva a estar disponible.',
+        ], 201);
+    }
+
     public function categories(string $slug): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();

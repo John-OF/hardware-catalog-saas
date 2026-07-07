@@ -33,6 +33,10 @@ Route::prefix('public/{slug}')->group(function () {
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
     Route::post('/products/{product}/reviews', [PublicCatalogController::class, 'storeReview'])
         ->middleware(['throttle:10,1', 'throttle:anonymous_reviews']);
+
+    // "Avísame cuando llegue" — registrar interés en un producto agotado
+    Route::post('/products/{product}/notify-me', [PublicCatalogController::class, 'storeStockNotification'])
+        ->middleware('throttle:10,1');
     
     // Páginas informativas públicas
     Route::get('/pages', [PublicCatalogController::class, 'pages']);

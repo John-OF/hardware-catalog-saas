@@ -76,6 +76,7 @@ export interface Product {
   reviews_count?: number;
   reviews?: Review[];
   related_products?: Product[];
+  waitlist_count?: number;
   created_at: string;
 }
 
