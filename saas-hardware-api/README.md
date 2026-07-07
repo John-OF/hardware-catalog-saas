@@ -1,58 +1,127 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# saas-hardware-api
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API REST en **Laravel 13** (PHP 8.3) del proyecto [Hardware Catalog SaaS](../README.md). Expone el catálogo público por tienda, la gestión completa del panel de administración y las cuentas de clientes finales, todo bajo un esquema **multi-tenant de base de datos única**.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel 13 · PHP 8.3
+- [Laravel Sanctum](https://laravel.com/docs/sanctum) — autenticación por tokens (admins de tienda y clientes)
+- [spatie/laravel-multitenancy](https://github.com/spatie/laravel-multitenancy) — aislamiento por tenant
+- [Intervention Image v4](https://image.intervention.io) — optimización de imágenes a WebP
+- Flysystem S3 — almacenamiento compatible con S3 / Cloudflare R2
+- UUIDs (v7) como claves primarias
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Multitenancy
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Todos los tenants comparten una base de datos; cada fila lleva `tenant_id`. El tenant activo se resuelve según el tipo de ruta:
 
-## Learning Laravel
+- **Rutas privadas** (`auth:sanctum` + middleware `tenant`): por el header `X-Tenant: {slug}` — ver `app/Http/Middleware/InitializeTenantByHeader.php`.
+- **Rutas públicas** (`/api/public/{slug}/...`): por el slug en la URL.
+- **Dominios personalizados**: `GET /api/public/resolve-domain` devuelve el tenant asociado al dominio desde el que se sirve el frontend.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Puesta en marcha
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+# Configura DB_CONNECTION y DB_* en .env (MySQL/MariaDB o SQLite)
+php artisan migrate
+php artisan storage:link   # necesario para servir imágenes en local
+php artisan serve --port=8000
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+La API queda en `http://localhost:8000` (el frontend espera `http://localhost:8000/api` por defecto).
 
-## Contributing
+### Variables de entorno relevantes
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Variable | Uso |
+|---|---|
+| `DB_CONNECTION`, `DB_*` | Conexión de base de datos |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_URL` | Almacenamiento S3/R2 para imágenes en producción. Sin configurar, `ImageService` usa el disco `public` local |
+| `TURNSTILE_SECRET_KEY` | Clave secreta de Cloudflare Turnstile para validar reseñas. Sin configurar, usa la clave de prueba (siempre pasa) — solo apta para local |
 
-## Code of Conduct
+## Endpoints
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Públicos (sin autenticación)
 
-## Security Vulnerabilities
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/api/auth/register` | Alta de una nueva tienda (tenant + usuario admin) |
+| POST | `/api/auth/login` | Login de administrador |
+| GET | `/api/public/resolve-domain` | Resuelve tenant por dominio personalizado |
+| GET | `/api/public/{slug}` | Datos y branding de la tienda |
+| GET | `/api/public/{slug}/categories` | Categorías activas |
+| GET | `/api/public/{slug}/products` | Productos con búsqueda, filtros (categoría, disponibilidad, especificaciones) y paginación |
+| GET | `/api/public/{slug}/products/{product}` | Ficha de producto (incluye relacionados y reseñas) |
+| POST | `/api/public/{slug}/products/{product}/reviews` | Crear reseña — valida token de Turnstile y aplica rate limiting |
+| POST | `/api/public/{slug}/orders` | Crear solicitud de pedido |
+| GET | `/api/public/{slug}/pages` · `/pages/{page_slug}` | Páginas informativas |
+| POST | `/api/public/{slug}/auth/register` · `/auth/login` | Cuenta de cliente final |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Cliente autenticado (Bearer token, dentro de `/api/public/{slug}`)
 
-## License
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST·GET | `/auth/logout` · `/auth/me` | Sesión del cliente |
+| GET | `/my-orders` | Historial de pedidos |
+| GET | `/favorites` | Productos favoritos |
+| POST | `/favorites/{product}` | Alternar favorito |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Administración (Bearer token + `X-Tenant: {slug}`)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión |
+| GET | `/api/dashboard/stats` | Métricas de la tienda |
+| GET·PUT | `/api/tenant` | Configuración y branding |
+| CRUD | `/api/products` | Productos |
+| POST | `/api/products/reorder` | Reordenar (drag & drop) |
+| POST | `/api/products/import` | Importación masiva por CSV |
+| POST | `/api/products/bulk` | Acciones masivas |
+| POST | `/api/products/{product}/duplicate` | Duplicar producto |
+| CRUD | `/api/categories` (+ `POST /reorder`) | Categorías |
+| CRUD | `/api/orders` | Pedidos |
+| GET·PUT·DELETE | `/api/reviews` | Moderación de reseñas |
+| CRUD | `/api/pages` | Páginas informativas |
+
+### Flujo de pedidos y stock
+
+Los pedidos tienen estados `pending → processing → attended / cancelled`. Al pasar a `attended` se **descuenta el stock** de los productos del pedido; al salir de `attended` (cancelación o reversión) se repone. Eliminar un pedido atendido también repone stock.
+
+## Estructura
+
+```
+app/
+├── Http/
+│   ├── Controllers/Api/
+│   │   ├── AuthController.php          # Registro de tiendas y sesión de admins
+│   │   ├── TenantController.php        # Configuración y branding
+│   │   ├── ProductController.php       # CRUD + reorder/import/bulk/duplicate
+│   │   ├── CategoryController.php
+│   │   ├── OrderController.php         # Estados de pedido y ajuste de stock
+│   │   ├── ReviewController.php        # Moderación
+│   │   ├── PageController.php          # Páginas informativas
+│   │   ├── DashboardController.php     # Métricas
+│   │   └── Public/
+│   │       ├── PublicCatalogController.php    # Catálogo, reseñas, pedidos
+│   │       ├── PublicAuthController.php       # Cuentas de cliente
+│   │       ├── PublicFavoritesController.php
+│   │       └── PublicOrdersController.php
+│   └── Middleware/InitializeTenantByHeader.php
+├── Models/            # Tenant, User, Category, Product, ProductImage,
+│                      # Order, OrderItem, Review, Page
+└── Services/ImageService.php   # Subida y optimización a WebP (URL o archivo)
+
+database/migrations/   # tenants, users, categories, products, product_images,
+                       # orders, order_items, reviews, pages, user_favorites, ...
+routes/api.php         # Todas las rutas de la API
+```
+
+## Comandos útiles
+
+```bash
+php artisan test        # Suite de tests (PHPUnit)
+vendor/bin/pint         # Formateo de código (Laravel Pint)
+composer dev            # serve + queue + pail + vite en paralelo
+```
