@@ -54,10 +54,6 @@ export default function LoginPage() {
 
   return (
     <div className="login-container animate-fade-in">
-      {/* Luces de fondo decorativas */}
-      <div className="bg-glow blue-glow"></div>
-      <div className="bg-glow purple-glow"></div>
-
       <div className="login-card glass-card animate-scale-in">
         <div className="login-header">
           <div className="logo-badge">
@@ -131,34 +127,9 @@ export default function LoginPage() {
           justify-content: center;
           min-height: 100vh;
           width: 100vw;
-          background-color: #0b0f19;
+          background-color: var(--bg-app);
           overflow: hidden;
           padding: 1.5rem;
-        }
-
-        .bg-glow {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(100px);
-          opacity: 0.15;
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .blue-glow {
-          width: 400px;
-          height: 400px;
-          background: #2563eb;
-          top: -100px;
-          left: -100px;
-        }
-
-        .purple-glow {
-          width: 500px;
-          height: 500px;
-          background: #8b5cf6;
-          bottom: -150px;
-          right: -150px;
         }
 
         .login-card {
@@ -171,7 +142,6 @@ export default function LoginPage() {
           flex-direction: column;
           gap: 2rem;
           border-radius: 20px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
         .login-header {
@@ -188,19 +158,17 @@ export default function LoginPage() {
           width: 56px;
           height: 56px;
           border-radius: 14px;
-          background: rgba(37, 99, 235, 0.1);
+          background: rgba(37, 99, 235, 0.08);
           border: 1px solid rgba(37, 99, 235, 0.2);
+          color: var(--primary);
           font-size: 1.5rem;
           margin-bottom: 1rem;
-          box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.1);
         }
 
         .login-header h1 {
           font-size: 1.75rem;
           margin-bottom: 0.35rem;
-          background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          color: var(--text-primary);
         }
 
         .login-header p {

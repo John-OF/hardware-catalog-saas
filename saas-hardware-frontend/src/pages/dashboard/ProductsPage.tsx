@@ -640,7 +640,7 @@ export default function ProductsPage() {
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             {product.brand && <span className="product-brand">{product.brand}</span>}
                             {product.sku && (
-                              <span className="sku-tag" style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.04)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                              <span className="sku-tag" style={{ fontSize: '0.7rem', background: 'rgba(var(--overlay-mix),0.04)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                                 SKU: {product.sku}
                               </span>
                             )}
@@ -818,7 +818,7 @@ export default function ProductsPage() {
                   ))}
 
                   {/* Upload button */}
-                  <label className="dropzone-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'var(--transition)', background: 'rgba(255,255,255,0.005)', margin: 0 }}>
+                  <label className="dropzone-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'var(--transition)', background: 'rgba(var(--overlay-mix),0.01)', margin: 0 }}>
                     <Plus size={18} style={{ color: 'var(--text-muted)' }} />
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Agregar</span>
                     <input 
@@ -956,7 +956,7 @@ export default function ProductsPage() {
 
               <div className="form-group">
                 <label htmlFor="prod-desc">Descripción (Soporta HTML)</label>
-                <div className="rich-toolbar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem', border: '1px solid var(--border)', borderBottom: 'none', background: 'rgba(255,255,255,0.02)', padding: '0.4rem', borderRadius: '4px 4px 0 0' }}>
+                <div className="rich-toolbar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem', border: '1px solid var(--border)', borderBottom: 'none', background: 'rgba(var(--overlay-mix),0.02)', padding: '0.4rem', borderRadius: '4px 4px 0 0' }}>
                   <button
                     type="button"
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
@@ -1066,7 +1066,7 @@ export default function ProductsPage() {
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
                   className="premium-input"
-                  style={{ background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', height: '42px', borderRadius: 'var(--radius-md)' }}
+                  style={{ border: '1px solid var(--border)', padding: '0 0.5rem', height: '42px', borderRadius: 'var(--radius-md)' }}
                 >
                   <option value="published">Publicado</option>
                   <option value="draft">Borrador</option>
@@ -1125,7 +1125,7 @@ export default function ProductsPage() {
               <div className="customer-summary-card" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>Formato y Columnas Permitidas</h4>
                 <p>El archivo debe estar codificado en UTF-8 y tener como cabecera (primera fila):</p>
-                <code style={{ background: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.6rem', borderRadius: '4px', fontFamily: 'monospace', color: 'var(--primary)', display: 'block', wordBreak: 'break-all' }}>
+                <code style={{ background: 'rgba(var(--overlay-mix),0.03)', padding: '0.4rem 0.6rem', borderRadius: '4px', fontFamily: 'monospace', color: 'var(--primary)', display: 'block', wordBreak: 'break-all' }}>
                   nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones
                 </code>
                 <ul style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
@@ -1342,12 +1342,12 @@ export default function ProductsPage() {
         }
 
         .premium-table tbody tr:hover {
-          background: rgba(255, 255, 255, 0.015);
+          background: rgba(var(--overlay-mix), 0.015);
         }
 
         .premium-table tbody tr.row-dragging {
           opacity: 0.35;
-          background: rgba(255, 255, 255, 0.02) !important;
+          background: rgba(var(--overlay-mix), 0.03) !important;
         }
 
         .drag-handle-cell {
@@ -1369,7 +1369,7 @@ export default function ProductsPage() {
           width: 44px;
           height: 44px;
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           display: flex;
           align-items: center;
@@ -1404,7 +1404,7 @@ export default function ProductsPage() {
           display: inline-block;
           font-size: 0.75rem;
           font-weight: 500;
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           color: var(--text-secondary);
           padding: 0.25rem 0.6rem;
@@ -1413,7 +1413,7 @@ export default function ProductsPage() {
 
         .price-cell {
           font-weight: 600;
-          color: white;
+          color: var(--text-primary);
         }
 
         .stock-cell {
@@ -1513,8 +1513,7 @@ export default function ProductsPage() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(3, 7, 18, 0.65);
-          backdrop-filter: blur(8px);
+          background: rgba(15, 23, 42, 0.4);
           z-index: 200; /* Ensure overlay is on top of everything */
           display: flex;
           align-items: center;
@@ -1532,9 +1531,8 @@ export default function ProductsPage() {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
-          background: rgba(11, 15, 25, 0.98);
-          backdrop-filter: blur(25px);
-          box-shadow: var(--shadow-2xl);
+          background: var(--bg-card);
+          box-shadow: var(--shadow-xl);
           overflow: hidden; /* Hide overflow so that internal form scrolls */
         }
 
@@ -1572,7 +1570,7 @@ export default function ProductsPage() {
 
         .drawer-close:hover {
           color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-mix), 0.05);
         }
 
         .drawer-form {
@@ -1633,7 +1631,7 @@ export default function ProductsPage() {
           padding: 1rem;
           text-align: center;
           transition: var(--transition);
-          background: rgba(255, 255, 255, 0.01);
+          background: rgba(var(--overlay-mix), 0.015);
         }
 
         .image-dropzone:hover {
@@ -1706,7 +1704,7 @@ export default function ProductsPage() {
 
         /* Specs Editor */
         .specs-editor-group {
-          background: rgba(255, 255, 255, 0.01);
+          background: rgba(var(--overlay-mix), 0.015);
           border: 1px solid var(--border);
           border-radius: var(--radius-lg);
           padding: 1.25rem;
@@ -1875,7 +1873,7 @@ export default function ProductsPage() {
         }
 
         .customer-summary-card {
-          background: rgba(255, 255, 255, 0.015);
+          background: rgba(var(--overlay-mix), 0.02);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           padding: 1.25rem;

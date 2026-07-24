@@ -398,7 +398,7 @@ export default function OverviewPage() {
           height: 40px;
           border-radius: var(--radius-sm);
           overflow: hidden;
-          background: rgba(255, 255, 255, 0.02);
+          background: rgba(var(--overlay-mix), 0.03);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -435,7 +435,7 @@ export default function OverviewPage() {
           width: 40px;
           height: 40px;
           border-radius: var(--radius-sm);
-          background: rgba(255, 255, 255, 0.02);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           display: flex;
           align-items: center;

@@ -542,7 +542,7 @@ export default function OrdersPage() {
         }
 
         .orders-table tbody tr:hover {
-          background: rgba(255, 255, 255, 0.015);
+          background: rgba(var(--overlay-mix), 0.015);
         }
 
         .code-cell {
@@ -699,7 +699,7 @@ export default function OrdersPage() {
         }
 
         .customer-summary-card, .items-summary-card {
-          background: rgba(255, 255, 255, 0.01);
+          background: rgba(var(--overlay-mix), 0.015);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           padding: 1.25rem;
@@ -764,7 +764,7 @@ export default function OrdersPage() {
 
         .note-text {
           font-style: italic;
-          background: rgba(255, 255, 255, 0.015);
+          background: rgba(var(--overlay-mix), 0.02);
           padding: 0.5rem 0.75rem;
           border-radius: var(--radius-sm);
           border-left: 2px solid var(--primary);
@@ -875,7 +875,7 @@ export default function OrdersPage() {
           align-items: center;
           gap: 0.25rem;
           padding: 0.3rem 0.6rem;
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           color: var(--text-secondary);
           font-size: 0.75rem;
@@ -886,7 +886,7 @@ export default function OrdersPage() {
         }
 
         .btn-whatsapp-secondary:hover {
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-mix), 0.06);
           color: var(--text-primary);
         }
 

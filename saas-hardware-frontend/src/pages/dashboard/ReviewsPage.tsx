@@ -96,7 +96,7 @@ export default function ReviewsPage() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Buscar por cliente, comentario o producto..."
-            style={{ width: '100%', padding: '0.6rem 0.6rem 0.6rem 2.25rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'white', fontSize: '0.9rem' }}
+            style={{ width: '100%', padding: '0.6rem 0.6rem 0.6rem 2.25rem', background: 'rgba(var(--overlay-mix),0.03)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
           />
         </div>
 
@@ -104,11 +104,11 @@ export default function ReviewsPage() {
           <select
             value={isApproved}
             onChange={(e) => { setIsApproved(e.target.value); setPage(1); }}
-            style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+            style={{ width: '100%', padding: '0.6rem', background: 'rgba(var(--overlay-mix),0.03)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.9rem', outline: 'none' }}
           >
-            <option value="" style={{ background: '#0b0f19' }}>Todos los estados</option>
-            <option value="true" style={{ background: '#0b0f19' }}>Visibles (Aprobados)</option>
-            <option value="false" style={{ background: '#0b0f19' }}>Ocultos</option>
+            <option value="" style={{ background: 'var(--bg-select-option)' }}>Todos los estados</option>
+            <option value="true" style={{ background: 'var(--bg-select-option)' }}>Visibles (Aprobados)</option>
+            <option value="false" style={{ background: 'var(--bg-select-option)' }}>Ocultos</option>
           </select>
         </div>
 
@@ -116,11 +116,11 @@ export default function ReviewsPage() {
           <select
             value={rating}
             onChange={(e) => { setRating(e.target.value); setPage(1); }}
-            style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+            style={{ width: '100%', padding: '0.6rem', background: 'rgba(var(--overlay-mix),0.03)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.9rem', outline: 'none' }}
           >
-            <option value="" style={{ background: '#0b0f19' }}>Calificaciones</option>
+            <option value="" style={{ background: 'var(--bg-select-option)' }}>Calificaciones</option>
             {[5, 4, 3, 2, 1].map((val) => (
-              <option key={val} value={val} style={{ background: '#0b0f19' }}>
+              <option key={val} value={val} style={{ background: 'var(--bg-select-option)' }}>
                 {val} {val === 1 ? 'estrella' : 'estrellas'}
               </option>
             ))}
@@ -163,10 +163,10 @@ export default function ReviewsPage() {
                           <img
                             src={review.product.image_url}
                             alt={review.product.name}
-                            style={{ width: '40px', height: '40px', objectFit: 'contain', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', border: '1px solid var(--border)' }}
+                            style={{ width: '40px', height: '40px', objectFit: 'contain', background: 'rgba(var(--overlay-mix),0.03)', borderRadius: '4px', border: '1px solid var(--border)' }}
                           />
                         ) : (
-                          <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                          <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(var(--overlay-mix),0.03)', borderRadius: '4px', border: '1px solid var(--border)' }}>
                             <Star size={16} />
                           </div>
                         )}
@@ -227,7 +227,7 @@ export default function ReviewsPage() {
                           onClick={() => handleToggleApproval(review.id, review.is_approved)}
                           className="btn-action"
                           title={review.is_approved ? 'Ocultar reseña' : 'Aprobar reseña'}
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'white', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ background: 'rgba(var(--overlay-mix),0.04)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                           {review.is_approved ? <X size={14} /> : <Check size={14} />}
                         </button>
@@ -259,7 +259,7 @@ export default function ReviewsPage() {
                   type="button"
                   disabled={page === 1}
                   onClick={() => setPage(page - 1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: '4px', color: 'white', fontSize: '0.85rem', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.8rem', background: 'rgba(var(--overlay-mix),0.04)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '0.85rem', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
                 >
                   <ChevronLeft size={16} /> Anterior
                 </button>
@@ -267,7 +267,7 @@ export default function ReviewsPage() {
                   type="button"
                   disabled={page === pagination.last_page}
                   onClick={() => setPage(page + 1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: '4px', color: 'white', fontSize: '0.85rem', cursor: page === pagination.last_page ? 'not-allowed' : 'pointer', opacity: page === pagination.last_page ? 0.5 : 1 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.8rem', background: 'rgba(var(--overlay-mix),0.04)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '0.85rem', cursor: page === pagination.last_page ? 'not-allowed' : 'pointer', opacity: page === pagination.last_page ? 0.5 : 1 }}
                 >
                   Siguiente <ChevronRight size={16} />
                 </button>

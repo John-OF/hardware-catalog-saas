@@ -300,7 +300,7 @@ export default function CategoriesPage() {
                       height: '42px',
                       flexShrink: 0,
                       borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+                      border: '1px solid var(--border)',
                       color: 'var(--primary)',
                     }}
                   >
@@ -447,7 +447,7 @@ export default function CategoriesPage() {
           opacity: 0.4;
           border: 1.5px dashed var(--primary) !important;
           transform: scale(0.98);
-          background: rgba(255, 255, 255, 0.01);
+          background: rgba(var(--overlay-mix), 0.015);
         }
 
         .drag-handle {
@@ -468,12 +468,11 @@ export default function CategoriesPage() {
           width: 44px;
           height: 44px;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05);
           color: var(--primary);
         }
 
@@ -538,8 +537,7 @@ export default function CategoriesPage() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(3, 7, 18, 0.6);
-          backdrop-filter: blur(4px);
+          background: rgba(15, 23, 42, 0.4);
           z-index: 100;
           display: flex;
           justify-content: flex-end; /* Drawer slide-in from right */

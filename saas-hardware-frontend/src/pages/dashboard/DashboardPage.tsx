@@ -15,7 +15,9 @@ import {
   ShoppingCart,
   FileText,
   BarChart3,
-  MessageSquare
+  MessageSquare,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -36,6 +38,15 @@ export default function DashboardPage() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(!user);
+  const [theme, setTheme] = useState<'light' | 'dark'>(
+    () => (localStorage.getItem('admin-theme') as 'light' | 'dark') || 'light'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('admin-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
   useEffect(() => {
     // Si no hay token, redirigir al login
@@ -111,7 +122,7 @@ export default function DashboardPage() {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-color: #0b0f19;
+            background-color: #fafafa;
             color: var(--text-secondary);
             gap: 1rem;
           }
@@ -132,7 +143,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-layout">
+    <div className={`dashboard-layout ${theme === 'dark' ? 'theme-dark' : ''}`}>
       {/* Sidebar Móvil Toggle */}
       <button 
         className="sidebar-toggle-mobile" 
@@ -255,6 +266,15 @@ export default function DashboardPage() {
             <h2>{getSectionTitle()}</h2>
           </div>
           <div className="topbar-right">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              aria-label="Cambiar tema"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             {tenant?.slug && (
               <a 
                 href={`/${tenant.slug}`} 
@@ -279,7 +299,7 @@ export default function DashboardPage() {
         .dashboard-layout {
           display: flex;
           min-height: 100vh;
-          background-color: #0b0f19;
+          background-color: var(--bg-app);
           position: relative;
         }
 
@@ -306,7 +326,7 @@ export default function DashboardPage() {
           width: 44px;
           height: 44px;
           border-radius: 10px;
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
           border: 1px solid var(--border);
           display: flex;
           align-items: center;
@@ -371,7 +391,7 @@ export default function DashboardPage() {
 
         .nav-link:hover {
           color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-mix), 0.03);
         }
 
         .nav-link.active {
@@ -414,7 +434,7 @@ export default function DashboardPage() {
           width: 38px;
           height: 38px;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-mix), 0.04);
           border: 1px solid var(--border);
           display: flex;
           align-items: center;
@@ -480,15 +500,40 @@ export default function DashboardPage() {
         .dashboard-topbar h2 {
           font-size: 1.25rem;
           font-family: var(--font-heading);
-          background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          color: var(--text-primary);
+        }
+
+        .topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
         }
 
         .storefront-btn {
           padding: 0.6rem 1.2rem;
           font-size: 0.85rem;
           border-radius: var(--radius-md);
+        }
+
+        .theme-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          transition: var(--transition);
+          flex-shrink: 0;
+        }
+
+        .theme-toggle-btn:hover {
+          color: var(--text-primary);
+          background: rgba(var(--overlay-mix), 0.04);
+          border-color: var(--text-secondary);
         }
 
         .dashboard-content {

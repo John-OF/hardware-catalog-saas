@@ -215,7 +215,7 @@ export default function SettingsPage() {
               value={layout} 
               onChange={(e) => setLayout(e.target.value as any)} 
               className="premium-input"
-              style={{ height: '42px', background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
+              style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
             >
               <option value="grid">Boutique (Tarjetas Grandes)</option>
               <option value="compact">Mayorista (Grilla Compacta)</option>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
               value={font} 
               onChange={(e) => setFont(e.target.value as any)} 
               className="premium-input"
-              style={{ height: '42px', background: '#0b0f19', border: '1px solid var(--border)', color: '#fff', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
+              style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
             >
               <option value="sans">Interfaz Moderna (Inter / Sans)</option>
               <option value="serif">Editorial / Elegante (Merriweather / Serif)</option>
@@ -290,7 +290,7 @@ export default function SettingsPage() {
 
         <div className="sections-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
           {sections.map((sec, idx) => (
-            <div key={sec.id} className="section-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+            <div key={sec.id} className="section-item-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(var(--overlay-mix),0.015)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <input 
                   type="checkbox" 
@@ -436,7 +436,7 @@ export default function SettingsPage() {
         .settings-actions .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; }
         .spinner { animation: spin 0.8s linear infinite; }
         .helper-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
-        .helper-text code { background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 4px; }
+        .helper-text code { background: rgba(var(--overlay-mix),0.05); padding: 1px 4px; border-radius: 4px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } }
       `}</style>
