@@ -15,7 +15,20 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant' => \App\Http\Middleware\InitializeTenantByHeader::class,
+            'admin'  => \App\Http\Middleware\EnsureAdmin::class,
         ]);
+
+        // El tenant debe resolverse ANTES de SubstituteBindings para que el
+        // global scope de BelongsToTenant filtre el route-model binding y así
+        // un recurso de otro tenant devuelva 404 (cierra el IDOR, SEC-2).
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\InitializeTenantByHeader::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsureAdmin::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -67,7 +67,7 @@ Route::prefix('public/{slug}')->group(function () {
 | Rutas privadas — Requieren autenticación + tenant
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me',      [AuthController::class, 'me']);

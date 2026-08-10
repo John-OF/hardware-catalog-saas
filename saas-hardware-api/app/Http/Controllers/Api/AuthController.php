@@ -58,7 +58,7 @@ class AuthController extends Controller
         $user->tenant_id = $tenant->id;
         $user->save();
 
-        $token = $user->createToken('spa-token', ['*'], now()->addDays(7));
+        $token = $user->createToken('spa-token', ['admin'], now()->addDays(7));
 
         return response()->json([
             'token'  => $token->plainTextToken,
@@ -84,12 +84,22 @@ class AuthController extends Controller
         }
 
         $user = Auth::user();
+
+        // Solo administradores activos pueden usar el panel.
+        // Mismo mensaje genérico para no filtrar la existencia del correo.
+        if ($user->role !== 'admin' || !$user->is_active) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => ['Las credenciales son incorrectas.'],
+            ]);
+        }
+
         $user->update(['last_login_at' => now()]);
 
         // Revocar tokens anteriores (una sesión activa por usuario)
         $user->tokens()->delete();
 
-        $token = $user->createToken('spa-token', ['*'], now()->addDays(7));
+        $token = $user->createToken('spa-token', ['admin'], now()->addDays(7));
 
         return response()->json([
             'token'  => $token->plainTextToken,

@@ -49,7 +49,7 @@ class PublicAuthController extends Controller
         $user->tenant_id = $tenant->id;
         $user->save();
 
-        $token = $user->createToken('customer-token', ['*'], now()->addDays(30));
+        $token = $user->createToken('customer-token', ['customer'], now()->addDays(30));
 
         return response()->json([
             'token' => $token->plainTextToken,
@@ -91,7 +91,7 @@ class PublicAuthController extends Controller
         // Revocar tokens anteriores de cliente
         $user->tokens()->where('name', 'customer-token')->delete();
 
-        $token = $user->createToken('customer-token', ['*'], now()->addDays(30));
+        $token = $user->createToken('customer-token', ['customer'], now()->addDays(30));
 
         return response()->json([
             'token' => $token->plainTextToken,
