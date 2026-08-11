@@ -14,8 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'tenant' => \App\Http\Middleware\InitializeTenantByHeader::class,
-            'admin'  => \App\Http\Middleware\EnsureAdmin::class,
+            'tenant'     => \App\Http\Middleware\InitializeTenantByHeader::class,
+            'admin'      => \App\Http\Middleware\EnsureAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
 
         // El tenant debe resolverse ANTES de SubstituteBindings para que el

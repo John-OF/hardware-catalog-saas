@@ -3,6 +3,8 @@ import PrivateRoute from './PrivateRoute';
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterStorePage from '../pages/auth/RegisterStorePage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import PlatformLoginPage from '../pages/platform/PlatformLoginPage';
+import PlatformPage from '../pages/platform/PlatformPage';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import ProductsPage from '../pages/dashboard/ProductsPage';
@@ -26,6 +28,10 @@ export const router = createBrowserRouter([
   // reservados en el backend, así que ningún catálogo puede ocupar la ruta.
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Panel del operador del SaaS. 'platform' es slug reservado en el backend,
+  // asi que ninguna tienda puede ocupar estas rutas.
+  { path: '/platform/login', element: <PlatformLoginPage /> },
+  { path: '/platform', element: <PlatformPage /> },
   // Rutas públicas (con prefijo de slug para SaaS)
   { path: '/:slug', element: <CatalogPage /> },
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },

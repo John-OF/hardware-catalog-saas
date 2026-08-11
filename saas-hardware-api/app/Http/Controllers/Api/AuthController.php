@@ -30,7 +30,7 @@ class AuthController extends Controller
                 'unique:tenants,slug',
                 'regex:/^[a-z0-9\-]+$/',
                 function ($attribute, $value, $fail) {
-                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password'];
+                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password', 'platform'];
                     if (in_array(strtolower($value), $reserved)) {
                         $fail('El slug elegido está reservado por la plataforma.');
                     }

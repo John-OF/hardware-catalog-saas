@@ -43,4 +43,10 @@ class Tenant extends Model implements IsTenant
     {
         return $this->hasMany(Category::class);
     }
+
+    /** La usa el panel de plataforma para contar pedidos por tienda (SAAS-4). */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 }

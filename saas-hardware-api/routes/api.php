@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PlatformController;
 use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
 use App\Http\Controllers\Api\Public\PublicFavoritesController;
@@ -69,6 +70,26 @@ Route::prefix('public/{slug}')->group(function () {
         Route::get('/favorites', [PublicFavoritesController::class, 'index']);
         Route::post('/favorites/{product}', [PublicFavoritesController::class, 'toggle']);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rutas de plataforma — Operador del SaaS (super-admin)
+|--------------------------------------------------------------------------
+|
+| Deliberadamente SIN el middleware 'tenant': el operador trabaja por encima
+| de todas las tiendas y no pertenece a ninguna.
+*/
+Route::post('/platform/login', [PlatformController::class, 'login'])
+    ->middleware('throttle:5,1');
+
+Route::middleware(['auth:sanctum', 'superadmin'])->prefix('platform')->group(function () {
+    Route::post('/logout', [PlatformController::class, 'logout']);
+    Route::get('/me',      [PlatformController::class, 'me']);
+
+    Route::get('/tenants',            [PlatformController::class, 'tenants']);
+    Route::put('/tenants/{tenant}',   [PlatformController::class, 'updateTenant']);
+    Route::post('/tenants/{tenant}/password-reset', [PlatformController::class, 'sendAdminPasswordReset']);
 });
 
 /*
