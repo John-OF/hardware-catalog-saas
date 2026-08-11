@@ -20,6 +20,8 @@ export const getPublicProducts = async (
     search?: string;
     in_stock?: boolean;
     specs?: Record<string, string>;
+    /** Whitelist del backend: price_asc | price_desc | newest | name. */
+    sort?: string;
     page?: number;
   }
 ): Promise<PaginatedResponse<Product>> => {

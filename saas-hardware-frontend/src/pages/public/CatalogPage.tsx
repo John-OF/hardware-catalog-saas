@@ -42,6 +42,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [inStock, setInStock] = useState(false);
+  const [sort, setSort] = useState('');
   const [page, setPage] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedSpecs, setSelectedSpecs] = useState<Record<string, string>>({});
@@ -144,12 +145,13 @@ export default function CatalogPage() {
 
   // Fetch Public Products
   const { data: paginatedData, isLoading: isLoadingProducts } = useQuery<PaginatedResponse<Product>>({
-    queryKey: ['publicProducts', resolvedSlug, search, selectedCategory, inStock, selectedSpecs, page],
+    queryKey: ['publicProducts', resolvedSlug, search, selectedCategory, inStock, selectedSpecs, sort, page],
     queryFn: () => getPublicProducts(resolvedSlug!, {
       category_id: selectedCategory || undefined,
       search: search || undefined,
       in_stock: inStock || undefined,
       specs: Object.keys(selectedSpecs).length > 0 ? selectedSpecs : undefined,
+      sort: sort || undefined,
       page,
     }),
     enabled: !!resolvedSlug,
@@ -466,6 +468,22 @@ export default function CatalogPage() {
                         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                         className="premium-input"
                       />
+                    </div>
+
+                    <div className="sort-box">
+                      <label htmlFor="catalog-sort" className="sort-label">Ordenar por</label>
+                      <select
+                        id="catalog-sort"
+                        value={sort}
+                        onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                        className="premium-input sort-select"
+                      >
+                        <option value="">Recomendados</option>
+                        <option value="price_asc">Precio: menor a mayor</option>
+                        <option value="price_desc">Precio: mayor a menor</option>
+                        <option value="newest">Más recientes</option>
+                        <option value="name">Nombre (A-Z)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -1026,13 +1044,46 @@ export default function CatalogPage() {
 
         .search-bar-row {
           padding: 0.85rem 1.25rem;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
         }
 
         .search-box {
           position: relative;
           display: flex;
           align-items: center;
-          width: 100%;
+          flex: 1 1 260px;
+        }
+
+        .sort-box {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-shrink: 0;
+        }
+
+        .sort-label {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          white-space: nowrap;
+        }
+
+        .sort-select {
+          padding: 0.5rem 0.75rem;
+          font-size: 0.85rem;
+          cursor: pointer;
+        }
+
+        @media (max-width: 640px) {
+          .sort-box {
+            width: 100%;
+          }
+
+          .sort-select {
+            flex: 1;
+          }
         }
 
         .search-icon {

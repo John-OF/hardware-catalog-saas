@@ -56,7 +56,7 @@ class PublicCatalogController extends Controller
 
         // IMPORTANTE: usar only() para prevenir cache flooding con parámetros arbitrarios
         $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($request->only([
-            'category_id', 'search', 'in_stock', 'specs', 'page'
+            'category_id', 'search', 'in_stock', 'specs', 'page', 'sort'
         ])));
 
         $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request) {
@@ -76,13 +76,45 @@ class PublicCatalogController extends Controller
                         }
                     }
                 })
-                ->orderBy('sort_order')
-                ->orderByDesc('created_at')
+                ->tap(fn ($q) => $this->applyCatalogSort($q, $request->query('sort')))
                 ->paginate(24)
                 ->toArray();
         });
 
         return response()->json($products);
+    }
+
+    /**
+     * Ordena el catálogo público según la preferencia del comprador (PUB-1).
+     *
+     * El valor llega por query string, así que se resuelve contra una whitelist:
+     * nada de lo que escriba el visitante entra en el SQL.
+     *
+     * Sin `sort` (o con uno desconocido) se mantiene el orden manual que el dueño
+     * definió arrastrando productos (`sort_order`), que es el de siempre.
+     */
+    private function applyCatalogSort(\Illuminate\Database\Eloquent\Builder $query, ?string $sort): void
+    {
+        // El precio que ve el comprador es el de oferta cuando existe, así que se
+        // ordena por ese mismo valor y no por `price` a secas.
+        $precioVisible = 'COALESCE(sale_price, price)';
+
+        match ($sort) {
+            'price_asc'  => $query->orderByRaw("{$precioVisible} ASC"),
+            'price_desc' => $query->orderByRaw("{$precioVisible} DESC"),
+            'newest'     => $query->orderByDesc('created_at'),
+            'name'       => $query->orderBy('name'),
+            default      => $query->orderBy('sort_order')->orderByDesc('created_at'),
+        };
+
+        // Desempate estable: sin esto, dos productos al mismo precio pueden
+        // intercambiarse entre páginas y aparecer repetidos o desaparecer al paginar.
+        // Los id son UUID v7 (cronológicos), así que en "más recientes" se desempata
+        // al revés: un lote importado por CSV comparte created_at al segundo y sin
+        // esto saldría del más antiguo al más nuevo.
+        if ($sort !== null && $sort !== '') {
+            $sort === 'newest' ? $query->orderByDesc('id') : $query->orderBy('id');
+        }
     }
 
     public function product(Request $request, string $slug, string $productId): JsonResponse
