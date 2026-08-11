@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    /*
+     * Anti-bot de las resenias publicas (SEC-5).
+     *
+     * Deliberadamente SIN valor por defecto: antes se leia con
+     * env('TURNSTILE_SECRET_KEY', '1x0000...AA') y ese fallback es la clave de
+     * prueba de Cloudflare, que aprueba cualquier token. Con config:cache activo
+     * env() devuelve null en runtime, asi que produccion caia al fallback y se
+     * quedaba sin anti-bot en silencio. Si falta la clave preferimos fallar.
+     */
+    'turnstile' => [
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
 ];

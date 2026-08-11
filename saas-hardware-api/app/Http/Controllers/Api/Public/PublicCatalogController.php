@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PublicCatalogController extends Controller
 {
@@ -234,37 +236,8 @@ class PublicCatalogController extends Controller
         ]);
 
         // Capa 1: Validación de Turnstile
-        $turnstileToken = $data['turnstile_token'];
-        $secretKey = env('TURNSTILE_SECRET_KEY', '1x0000000000000000000000000000000AA');
-
-        try {
-            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
-                ->asForm()
-                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
-                    'secret' => $secretKey,
-                    'response' => $turnstileToken,
-                    'remoteip' => $request->ip(),
-                ]);
-
-            if (!$response->json('success')) {
-                \Illuminate\Support\Facades\Log::warning('Turnstile verification failed', [
-                    'response' => $response->json(),
-                    'token' => $turnstileToken,
-                    'ip' => $request->ip()
-                ]);
-                return response()->json(['message' => 'Validación anti-bot (Turnstile) fallida. Recarga e inténtalo de nuevo.'], 422);
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Turnstile connection exception', [
-                'error' => $e->getMessage()
-            ]);
-            
-            // En desarrollo local, si hay un problema de red externo o cURL, permitimos bypass para no trabar pruebas
-            if (config('app.env') === 'local') {
-                \Illuminate\Support\Facades\Log::info('Bypassing Turnstile in local environment due to connection error.');
-            } else {
-                return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
-            }
+        if ($fallo = $this->verifyTurnstile($data['turnstile_token'], $request->ip())) {
+            return $fallo;
         }
 
         // Capa 2: Control de identidad (evitar dobles reseñas)
@@ -339,6 +312,71 @@ class PublicCatalogController extends Controller
             'message'     => $message,
             'is_approved' => $isApproved
         ], 201);
+    }
+
+    /**
+     * Verifica el token anti-bot de Turnstile contra Cloudflare (SEC-5).
+     *
+     * Devuelve null si la resenia puede continuar, o la respuesta de error a
+     * devolver al cliente. La regla de fondo es no aprobar nunca por defecto:
+     * fuera de local, cualquier duda (sin clave, error de red) se rechaza.
+     */
+    private function verifyTurnstile(string $token, ?string $ip): ?JsonResponse
+    {
+        // config() y no env(): con config:cache activo, env() devuelve null en
+        // runtime y antes se caia a la clave de prueba de Cloudflare, que aprueba
+        // cualquier token; es decir, produccion se quedaba sin anti-bot.
+        $secretKey = config('services.turnstile.secret');
+        $esLocal = app()->isLocal();
+
+        if (blank($secretKey)) {
+            if (!$esLocal) {
+                Log::error('TURNSTILE_SECRET_KEY no configurada; se rechaza la reseña.');
+
+                return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
+            }
+
+            Log::info('Turnstile sin clave configurada: se omite la verificación en local.');
+
+            return null;
+        }
+
+        try {
+            $http = Http::asForm();
+
+            // La verificacion TLS solo se relaja en local, donde Laragon/Windows
+            // suele no traer configurado el bundle de CA. En produccion tiene que
+            // quedar activa o el token viaja interceptable.
+            if ($esLocal) {
+                $http = $http->withoutVerifying();
+            }
+
+            $response = $http->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                'secret'   => $secretKey,
+                'response' => $token,
+                'remoteip' => $ip,
+            ]);
+
+            if (!$response->json('success')) {
+                Log::warning('Turnstile verification failed', [
+                    'response' => $response->json(),
+                    'ip'       => $ip,
+                ]);
+
+                return response()->json(['message' => 'Validación anti-bot (Turnstile) fallida. Recarga e inténtalo de nuevo.'], 422);
+            }
+        } catch (\Exception $e) {
+            Log::error('Turnstile connection exception', ['error' => $e->getMessage()]);
+
+            // En local dejamos pasar ante un fallo de red para no trabar las pruebas.
+            if (!$esLocal) {
+                return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
+            }
+
+            Log::info('Bypassing Turnstile in local environment due to connection error.');
+        }
+
+        return null;
     }
 
     /**
