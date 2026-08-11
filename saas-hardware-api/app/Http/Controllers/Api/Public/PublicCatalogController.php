@@ -67,7 +67,20 @@ class PublicCatalogController extends Controller
                 ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
                 ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
-                ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%"))
+                // El comprador busca tanto por modelo como por marca ("Kingston"),
+                // asi que el termino se prueba contra name, brand y sku.
+                // Los OR van agrupados en su propio closure a proposito: sueltos se
+                // mezclarian con los where de tenant_id/is_active/status y la busqueda
+                // acabaria mostrando productos de otras tiendas o despublicados.
+                ->when($request->search, function ($q) use ($request) {
+                    $termino = '%' . $request->search . '%';
+
+                    $q->where(function ($sub) use ($termino) {
+                        $sub->where('name', 'like', $termino)
+                            ->orWhere('brand', 'like', $termino)
+                            ->orWhere('sku', 'like', $termino);
+                    });
+                })
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
                 ->when($request->specs, function ($q) use ($request) {
                     foreach ($request->specs as $key => $value) {

@@ -39,6 +39,9 @@ export default function CatalogPage() {
   const currentDomain = window.location.hostname;
 
   // States
+  // searchInput es lo que se ve en la caja (responde a cada tecla); search es el
+  // valor que llega a la query, retrasado 300ms para no pedir una vez por letra.
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [inStock, setInStock] = useState(false);
@@ -52,6 +55,19 @@ export default function CatalogPage() {
   useEffect(() => {
     setSelectedSpecs({});
   }, [selectedCategory]);
+
+  // Debounce de la búsqueda: mientras el comprador siga tecleando, el timeout
+  // anterior se cancela y no se lanza la petición.
+  useEffect(() => {
+    if (searchInput === search) return;
+
+    const timeout = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchInput, search]);
 
   // Carrito
   const addItem = useCartStore((s) => s.addItem);
@@ -463,9 +479,9 @@ export default function CatalogPage() {
                       <Search size={18} className="search-icon" />
                       <input
                         type="text"
-                        placeholder="Buscar componente..."
-                        value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        placeholder="Buscar por nombre, marca o código..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="premium-input"
                       />
                     </div>
