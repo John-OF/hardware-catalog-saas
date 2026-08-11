@@ -12,6 +12,7 @@ import { getPublicPageDetail } from '../../api/pages';
 import type { Tenant, Page } from '../../types';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 export default function PageDetailPage() {
   const { slug, pageSlug } = useParams<{ slug: string; pageSlug: string }>();
@@ -110,15 +111,28 @@ export default function PageDetailPage() {
           <h1 style={{ fontSize: '2.2rem', fontWeight: 800, margin: 0 }}>{page.title}</h1>
         </div>
 
-        <div 
-          className="page-html-content"
-          dangerouslySetInnerHTML={{ __html: page.content || '<p class="text-muted">Sin contenido disponible.</p>' }}
-          style={{
-            fontSize: '1.05rem',
-            lineHeight: '1.8',
-            color: 'var(--text-secondary)'
-          }}
-        />
+        {page.content ? (
+          <div
+            className="page-html-content"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }}
+            style={{
+              fontSize: '1.05rem',
+              lineHeight: '1.8',
+              color: 'var(--text-secondary)'
+            }}
+          />
+        ) : (
+          <div
+            className="page-html-content"
+            style={{
+              fontSize: '1.05rem',
+              lineHeight: '1.8',
+              color: 'var(--text-secondary)'
+            }}
+          >
+            <p className="text-muted">Sin contenido disponible.</p>
+          </div>
+        )}
       </main>
 
       <footer className="catalog-footer text-muted" style={{ textAlign: 'center', padding: '2rem 0', fontSize: '0.85rem' }}>

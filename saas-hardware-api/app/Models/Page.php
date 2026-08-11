@@ -18,6 +18,7 @@ class Page extends Model
     protected $fillable = ['title', 'slug', 'content', 'is_active'];
 
     protected $casts = [
+        'content'   => \App\Casts\SanitizedHtml::class,
         'is_active' => 'boolean',
     ];
 }

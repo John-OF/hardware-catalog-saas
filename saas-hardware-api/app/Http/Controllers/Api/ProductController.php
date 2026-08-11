@@ -374,6 +374,10 @@ class ProductController extends Controller
     {
         $newProduct = $product->replicate();
         $newProduct->name = $product->name . ' (Copia)';
+        // replicate() copia los atributos crudos sin pasar por los casts. Reasignamos
+        // la descripcion para que vuelva a cruzar SanitizedHtml (SEC-3): si el original
+        // se guardo antes de ese cast, la copia heredaria el HTML sin limpiar.
+        $newProduct->description = $product->getRawOriginal('description');
         $newProduct->is_active = false;
         $newProduct->save();
 

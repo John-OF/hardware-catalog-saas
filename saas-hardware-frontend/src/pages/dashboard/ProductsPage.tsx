@@ -955,7 +955,7 @@ export default function ProductsPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="prod-desc">Descripción (Soporta HTML)</label>
+                <label htmlFor="prod-desc">Descripción (soporta formato básico)</label>
                 <div className="rich-toolbar" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem', border: '1px solid var(--border)', borderBottom: 'none', background: 'rgba(var(--overlay-mix),0.02)', padding: '0.4rem', borderRadius: '4px 4px 0 0' }}>
                   <button
                     type="button"

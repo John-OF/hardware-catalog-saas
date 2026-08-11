@@ -25,6 +25,7 @@ import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Product } from '../../types';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -643,7 +644,7 @@ export default function ProductDetailPage() {
               <h3>Descripción</h3>
               <div 
                 className="rich-description-html" 
-                dangerouslySetInnerHTML={{ __html: product.description }} 
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
                 style={{ fontSize: '0.95rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}
               />
             </div>

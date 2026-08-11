@@ -24,6 +24,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'description'          => \App\Casts\SanitizedHtml::class,
         'specs'                => 'array',
         'price'                => 'decimal:2',
         'sale_price'           => 'decimal:2',
