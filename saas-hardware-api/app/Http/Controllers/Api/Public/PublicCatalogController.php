@@ -7,12 +7,15 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Notifications\NewOrderNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class PublicCatalogController extends Controller
 {
@@ -557,7 +560,41 @@ class PublicCatalogController extends Controller
             return $order;
         });
 
-        return response()->json($order->load('items'), 201);
+        $order->load('items');
+
+        $this->notifyOwnerOfNewOrder($tenant, $order);
+
+        return response()->json($order, 201);
+    }
+
+    /**
+     * Avisar por correo a los admins de la tienda de que entro un pedido (OWN-2).
+     *
+     * Va fuera de la transaccion y con el fallo tragado a proposito: el pedido
+     * ya esta guardado, asi que un mailer caido no puede devolverle un error al
+     * comprador ni hacerle creer que su pedido no entro. Se registra en el log
+     * para que el operador lo vea.
+     */
+    private function notifyOwnerOfNewOrder(Tenant $tenant, Order $order): void
+    {
+        try {
+            $admins = User::where('tenant_id', $tenant->id)
+                ->where('role', 'admin')
+                ->where('is_active', true)
+                ->get();
+
+            if ($admins->isEmpty()) {
+                return;
+            }
+
+            Notification::send($admins, new NewOrderNotification($order));
+        } catch (\Throwable $e) {
+            Log::error('No se pudo avisar del pedido nuevo', [
+                'order_id'  => $order->id,
+                'tenant_id' => $tenant->id,
+                'error'     => $e->getMessage(),
+            ]);
+        }
     }
 
     public function pages(string $slug): JsonResponse
