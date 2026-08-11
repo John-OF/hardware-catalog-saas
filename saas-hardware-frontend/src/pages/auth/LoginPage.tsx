@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
 import { loginUser } from '../../api/auth';
@@ -116,6 +116,10 @@ export default function LoginPage() {
               'Ingresar al Panel'
             )}
           </button>
+
+          <p className="login-footer">
+            ¿Aún no tienes tienda? <Link to="/register">Créala gratis</Link>
+          </p>
         </form>
       </div>
 
@@ -238,6 +242,17 @@ export default function LoginPage() {
         .btn-block {
           width: 100%;
           padding: 0.85rem;
+        }
+
+        .login-footer {
+          text-align: center;
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+        }
+
+        .login-footer a {
+          color: var(--primary);
+          font-weight: 500;
         }
 
         .spinner {

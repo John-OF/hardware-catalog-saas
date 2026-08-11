@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import PrivateRoute from './PrivateRoute';
 import LoginPage from '../pages/auth/LoginPage';
+import RegisterStorePage from '../pages/auth/RegisterStorePage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import ProductsPage from '../pages/dashboard/ProductsPage';
 import CategoriesPage from '../pages/dashboard/CategoriesPage';
@@ -16,6 +17,9 @@ import OverviewPage from '../pages/dashboard/OverviewPage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  // Alta de tienda self-service. Va antes que '/:slug' y además 'register' es
+  // un slug reservado en el backend, así que no puede chocar con un catálogo.
+  { path: '/register', element: <RegisterStorePage /> },
   // Rutas públicas (con prefijo de slug para SaaS)
   { path: '/:slug', element: <CatalogPage /> },
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },

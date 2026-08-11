@@ -47,6 +47,22 @@ class AuthController extends Controller
                 Rule::unique('users', 'email')->where(fn ($query) => $query->where('role', 'admin')),
             ],
             'password'       => 'required|string|min:8|confirmed',
+        ], [
+            // El locale de la app es 'en' y no hay carpeta lang/, asi que sin esto
+            // el alta self-service muestra "The slug has already been taken." en una
+            // interfaz en español.
+            'store_name.required' => 'Ponle un nombre a tu tienda.',
+            'slug.required'       => 'Elige la dirección de tu catálogo.',
+            'slug.unique'         => 'Esa dirección ya está en uso. Prueba con otra.',
+            'slug.regex'          => 'Usa solo minúsculas, números y guiones.',
+            'whatsapp.required'   => 'Necesitamos un WhatsApp de contacto.',
+            'name.required'       => 'Escribe tu nombre.',
+            'email.required'      => 'Escribe tu correo electrónico.',
+            'email.email'         => 'Ese correo no parece válido.',
+            'email.unique'        => 'Ya hay una tienda registrada con ese correo.',
+            'password.required'   => 'Elige una contraseña.',
+            'password.min'        => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.confirmed'  => 'Las contraseñas no coinciden.',
         ]);
 
         // No pasar 'id' manualmente — HasUuids + newUniqueId() genera UUID v7 automáticamente
@@ -71,8 +87,11 @@ class AuthController extends Controller
 
         return response()->json([
             'token'  => $token->plainTextToken,
-            'user'   => $user,
-            'tenant' => $tenant,
+            // refresh() para que la respuesta incluya los campos con valor por
+            // defecto en la base (tenant.plan, is_active...). Sin esto el modelo
+            // recien creado los omite y el panel recibe un tenant incompleto.
+            'user'   => $user->refresh(),
+            'tenant' => $tenant->refresh(),
         ], 201);
     }
 

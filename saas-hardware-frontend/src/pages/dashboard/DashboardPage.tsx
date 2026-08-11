@@ -164,7 +164,7 @@ export default function DashboardPage() {
           </div>
           <div className="tenant-info">
             <h3>{tenant?.name || 'Cargando...'}</h3>
-            <span className="plan-badge">{tenant?.plan.toUpperCase()}</span>
+            <span className="plan-badge">{(tenant?.plan ?? 'free').toUpperCase()}</span>
           </div>
         </div>
 
