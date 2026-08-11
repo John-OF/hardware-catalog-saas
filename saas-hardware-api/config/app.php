@@ -56,6 +56,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Base del SPA (React/Vite). La API la necesita para construir enlaces que
+    | abre el usuario en el navegador: el link de reset de contrasenia y el
+    | fallback de las rutas de Open Graph en routes/web.php.
+    |
+    | Va aqui y no en env() suelto a proposito: con config:cache activo env()
+    | devuelve null en runtime y los enlaces saldrian rotos (mismo fallo que
+    | destapo SEC-5 con Turnstile).
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

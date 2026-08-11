@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +30,7 @@ class AuthController extends Controller
                 'unique:tenants,slug',
                 'regex:/^[a-z0-9\-]+$/',
                 function ($attribute, $value, $fail) {
-                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main'];
+                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password'];
                     if (in_array(strtolower($value), $reserved)) {
                         $fail('El slug elegido está reservado por la plataforma.');
                     }
@@ -141,6 +142,86 @@ class AuthController extends Controller
             'token'  => $token->plainTextToken,
             'user'   => $user,
             'tenant' => $user->tenant,
+        ]);
+    }
+
+    /**
+     * Solicitar el enlace de recuperación de contraseña (SAAS-2).
+     *
+     * Solo para admins activos: las credenciales que se le pasan al broker
+     * llevan `role`/`is_active`, así que un cliente (o un admin suspendido) con
+     * ese mismo correo no recibe nada. Es la misma restricción que aplica
+     * `login`, y hace falta porque desde SEC-4 el correo es único por tienda:
+     * sin filtrar, el broker podría resolver al cliente de otra tienda.
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ], [
+            'email.required' => 'Escribe tu correo electrónico.',
+            'email.email'    => 'Ese correo no parece válido.',
+        ]);
+
+        Password::sendResetLink([
+            'email'     => $request->input('email'),
+            'role'      => 'admin',
+            'is_active' => true,
+        ]);
+
+        // Respuesta siempre idéntica, se haya enviado o no. Distinguir "no existe"
+        // de "enviado" convertiría este endpoint en un detector de correos
+        // registrados. Ojo: el broker tampoco reenvía si ya se pidió hace menos
+        // de 60s (auth.passwords.users.throttle) y ese caso también cae aquí.
+        return response()->json([
+            'message' => 'Si el correo pertenece a una tienda registrada, te enviamos un enlace para restablecer la contraseña.',
+        ]);
+    }
+
+    /**
+     * Fijar la nueva contraseña con el token recibido por correo (SAAS-2).
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token'    => 'required|string',
+            'email'    => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ], [
+            'email.required'     => 'Escribe tu correo electrónico.',
+            'email.email'        => 'Ese correo no parece válido.',
+            'password.required'  => 'Elige una contraseña.',
+            'password.min'       => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token')
+                + ['role' => 'admin', 'is_active' => true],
+            function (User $user, string $password) {
+                // El cast 'hashed' del modelo se encarga del bcrypt.
+                $user->forceFill([
+                    'password'       => $password,
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                // Quien pide un reset suele hacerlo porque perdió el control de
+                // la cuenta, así que cerramos las sesiones abiertas: los tokens
+                // de Sanctum sobrevivirían al cambio de contraseña.
+                $user->tokens()->delete();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => ['El enlace de recuperación no es válido o ya caducó. Solicita uno nuevo.'],
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Contraseña actualizada. Ya puedes entrar con la nueva.',
         ]);
     }
 

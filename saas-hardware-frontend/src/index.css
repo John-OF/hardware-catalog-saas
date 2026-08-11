@@ -171,8 +171,14 @@
   background: var(--bg-card);
 }
 
-/* --- LOGIN: mismo tema neutro claro --- */
-.login-container {
+/* --- PANTALLAS DE AUTENTICACION: mismo tema neutro claro ---
+   Cubre login, alta de tienda (.register-container) y recuperacion de
+   contrasenia (.auth-container). Sin esto solo el login era claro y el resto
+   caia al :root oscuro, asi que el salto login -> "¿La olvidaste?" cambiaba de
+   tema a media navegacion. */
+.login-container,
+.register-container,
+.auth-container {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-glow: rgba(37, 99, 235, 0.08);
@@ -196,12 +202,16 @@
   --radius-lg: 10px;
 }
 
-.login-container .glass-card {
+.login-container .glass-card,
+.register-container .glass-card,
+.auth-container .glass-card {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
-.login-container .premium-input {
+.login-container .premium-input,
+.register-container .premium-input,
+.auth-container .premium-input {
   background: #ffffff;
 }
 

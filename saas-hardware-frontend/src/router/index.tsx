@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router-dom';
 import PrivateRoute from './PrivateRoute';
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterStorePage from '../pages/auth/RegisterStorePage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import ProductsPage from '../pages/dashboard/ProductsPage';
 import CategoriesPage from '../pages/dashboard/CategoriesPage';
@@ -20,6 +22,10 @@ export const router = createBrowserRouter([
   // Alta de tienda self-service. Va antes que '/:slug' y además 'register' es
   // un slug reservado en el backend, así que no puede chocar con un catálogo.
   { path: '/register', element: <RegisterStorePage /> },
+  // Recuperación de contraseña del panel. Como '/register', ambos son slugs
+  // reservados en el backend, así que ningún catálogo puede ocupar la ruta.
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   // Rutas públicas (con prefijo de slug para SaaS)
   { path: '/:slug', element: <CatalogPage /> },
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },

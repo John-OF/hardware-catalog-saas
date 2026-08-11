@@ -32,7 +32,9 @@ if (!function_exists('isCrawler')) {
 
 if (!function_exists('fallbackToSpa')) {
     function fallbackToSpa() {
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        // config() y no env(): con config:cache activo env() devuelve null en
+        // runtime y el crawler acabaria redirigido al fallback equivocado.
+        $frontendUrl = config('app.frontend_url');
         $frontendUrl = rtrim($frontendUrl, '/');
         $path = request()->getRequestUri();
         return redirect($frontendUrl . $path);

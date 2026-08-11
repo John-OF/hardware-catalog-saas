@@ -32,6 +32,17 @@ class User extends Authenticatable
         'password'          => 'hashed',    // bcrypt automático en Laravel 10+
     ];
 
+    /**
+     * Enviar el correo de recuperacion de contrasenia (SAAS-2).
+     *
+     * Se sobreescribe la nativa de Laravel porque su enlace apunta a una ruta
+     * Blade que aqui no existe: el panel es un SPA aparte.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
+
     public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Order::class);

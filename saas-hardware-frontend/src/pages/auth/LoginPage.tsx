@@ -82,7 +82,12 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
+            <div className="label-row">
+              <label htmlFor="password">Contraseña</label>
+              <Link to="/forgot-password" className="forgot-link">
+                ¿La olvidaste?
+              </Link>
+            </div>
             <div className="input-wrapper">
               <Lock className="input-icon" size={18} />
               <input
@@ -196,6 +201,22 @@ export default function LoginPage() {
           color: var(--text-primary);
           font-size: 0.85rem;
           font-weight: 500;
+        }
+
+        .label-row {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+
+        .forgot-link {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+        }
+
+        .forgot-link:hover {
+          color: var(--primary);
         }
 
         .input-wrapper {
