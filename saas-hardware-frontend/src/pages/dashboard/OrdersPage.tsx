@@ -9,6 +9,7 @@ import {
   Trash2,
   Loader2,
   Phone,
+  Plus,
   ShoppingBag,
   Calendar,
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
   X
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
+import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatMoney } from '../../utils/money';
@@ -28,6 +30,7 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   // Fetch orders
   const { data, isLoading } = useQuery<PaginatedResponse<Order>>({
@@ -122,6 +125,8 @@ export default function OrdersPage() {
   };
 
   const handleWhatsappContact = (order: Order, type: 'status' | 'general' = 'status') => {
+    // Desde 7.5 el telefono es opcional: una venta de mostrador puede no tenerlo.
+    if (!order.customer_phone) return;
     const cleanPhone = order.customer_phone.replace(/[^0-9]/g, '');
     const textMessage = getWhatsappMessageForStatus(order, type);
     const msg = encodeURIComponent(textMessage);
@@ -132,9 +137,24 @@ export default function OrdersPage() {
     <div className="orders-page animate-fade-in">
       <div className="page-header-actions">
         <p className="page-description">
-          Administra las solicitudes de compras que los clientes realizan en tu catálogo público.
+          Administra las solicitudes de tu catálogo público y registra las ventas de mostrador.
         </p>
+        <button type="button" className="btn-primary" onClick={() => setIsNewOrderOpen(true)}>
+          <Plus size={16} /> Nueva venta
+        </button>
       </div>
+
+      {isNewOrderOpen && <NewOrderModal
+        onClose={() => setIsNewOrderOpen(false)}
+        currency={tenant?.currency}
+        onCreated={(order) => {
+          // Refrescamos la lista y el resumen: una venta atendida movió el stock.
+          queryClient.invalidateQueries({ queryKey: ['orders'] });
+          queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+          queryClient.invalidateQueries({ queryKey: ['products'] });
+          setSelectedOrder(order);
+        }}
+      />}
 
       {/* Filters Bar */}
       <div className="filters-bar glass-card">
@@ -200,7 +220,7 @@ export default function OrdersPage() {
                 <tr key={order.id}>
                   <td className="code-cell">#{order.id.slice(-8)}</td>
                   <td className="name-cell">{order.customer_name}</td>
-                  <td className="phone-cell">{order.customer_phone}</td>
+                  <td className="phone-cell">{order.customer_phone || <span className="muted-cell">Mostrador</span>}</td>
                   <td className="date-cell">
                     <div className="date-info">
                       <Calendar size={14} />
@@ -335,13 +355,20 @@ export default function OrdersPage() {
                   <div>
                     <label>Teléfono:</label>
                     <div className="phone-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <p style={{ margin: 0, marginRight: '0.5rem', fontWeight: 600 }}>{selectedOrder.customer_phone}</p>
-                      <button onClick={() => handleWhatsappContact(selectedOrder, 'status')} className="btn-whatsapp" title="Enviar notificación automática de acuerdo al estado actual">
-                        <Phone size={13} /> Notificar Estado
-                      </button>
-                      <button onClick={() => handleWhatsappContact(selectedOrder, 'general')} className="btn-whatsapp-secondary" title="Enviar mensaje de contacto general">
-                        Contacto General
-                      </button>
+                      <p style={{ margin: 0, marginRight: '0.5rem', fontWeight: 600 }}>
+                        {selectedOrder.customer_phone || 'Venta de mostrador (sin teléfono)'}
+                      </p>
+                      {/* Sin numero no hay a quien escribir: los botones sobran. */}
+                      {selectedOrder.customer_phone && (
+                        <>
+                          <button onClick={() => handleWhatsappContact(selectedOrder, 'status')} className="btn-whatsapp" title="Enviar notificación automática de acuerdo al estado actual">
+                            <Phone size={13} /> Notificar Estado
+                          </button>
+                          <button onClick={() => handleWhatsappContact(selectedOrder, 'general')} className="btn-whatsapp-secondary" title="Enviar mensaje de contacto general">
+                            Contacto General
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -434,6 +461,16 @@ export default function OrdersPage() {
 
         .page-header-actions {
           margin-top: -0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .muted-cell {
+          color: var(--text-muted);
+          font-style: italic;
         }
 
         .page-description {

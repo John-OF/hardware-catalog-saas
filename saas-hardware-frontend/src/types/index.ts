@@ -99,7 +99,8 @@ export interface OrderItem {
 export interface Order {
   id: string;
   customer_name: string;
-  customer_phone: string;
+  /** Opcional desde 7.5: una venta de mostrador puede no tener teléfono. */
+  customer_phone: string | null;
   customer_note: string | null;
   status: 'pending' | 'processing' | 'attended' | 'cancelled';
   total: number;

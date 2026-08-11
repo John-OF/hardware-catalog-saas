@@ -13,6 +13,20 @@ export const getOrders = async (params?: GetOrdersParams): Promise<PaginatedResp
   return response.data;
 };
 
+/** Venta de mostrador creada desde el panel (OWN-3). El total lo calcula el servidor. */
+export interface CreateOrderPayload {
+  customer_name: string;
+  customer_phone?: string | null;
+  customer_note?: string | null;
+  status: 'pending' | 'processing' | 'attended';
+  items: { product_id: string; quantity: number }[];
+}
+
+export const createOrder = async (payload: CreateOrderPayload): Promise<Order> => {
+  const response = await api.post<Order>('/orders', payload);
+  return response.data;
+};
+
 export const getOrder = async (id: string): Promise<Order> => {
   const response = await api.get<Order>(`/orders/${id}`);
   return response.data;

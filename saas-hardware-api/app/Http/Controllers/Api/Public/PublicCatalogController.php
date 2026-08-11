@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
+use App\Services\OrderPricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -496,7 +497,7 @@ class PublicCatalogController extends Controller
      * Crea una solicitud de pedido desde el catálogo público.
      * El cierre real se hace por WhatsApp; aquí solo se registra el pedido.
      */
-    public function storeOrder(Request $request, string $slug): JsonResponse
+    public function storeOrder(Request $request, string $slug, OrderPricing $pricing): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
@@ -509,38 +510,10 @@ class PublicCatalogController extends Controller
             'items.*.quantity'   => 'required|integer|min:1|max:999',
         ]);
 
-        // Cargar todos los productos solicitados de una vez, scopeados al tenant
-        // y solo activos. NO confiamos en el precio que envía el cliente.
-        $productIds = collect($data['items'])->pluck('product_id')->unique();
-        $products = Product::where('tenant_id', $tenant->id)
-            ->where('is_active', true)
-            ->whereIn('id', $productIds)
-            ->get()
-            ->keyBy('id');
-
-        $lineItems = [];
-        $total = 0;
-        foreach ($data['items'] as $item) {
-            $product = $products->get($item['product_id']);
-            if (!$product) {
-                // Algún producto ya no existe o fue desactivado.
-                return response()->json([
-                    'message' => 'Uno de los productos ya no está disponible. Actualiza tu carrito.',
-                ], 422);
-            }
-
-            $actualPrice = $product->sale_price !== null ? (float) $product->sale_price : (float) $product->price;
-            $subtotal = round($actualPrice * $item['quantity'], 2);
-            $total += $subtotal;
-
-            $lineItems[] = [
-                'product_id'   => $product->id,
-                'product_name' => $product->name,
-                'unit_price'   => $actualPrice,
-                'quantity'     => $item['quantity'],
-                'subtotal'     => $subtotal,
-            ];
-        }
+        // Precios y total se calculan en el servidor: no se confía en lo que
+        // manda el cliente. `soloVisibles: true` porque desde el catálogo solo
+        // se puede comprar lo que está publicado.
+        ['lines' => $lineItems, 'total' => $total] = $pricing->build($tenant, $data['items'], soloVisibles: true);
 
         $userId = auth('sanctum')->id();
 
