@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
+import { CURRENCIES, DEFAULT_CURRENCY, formatMoney } from '../../utils/money';
 
 export default function SettingsPage() {
   const { tenant, setTenant } = useTenantStore();
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [whatsapp, setWhatsapp] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#2563eb');
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   
   // Estados para el tema (colores, portada, etc.)
   const [accentColor, setAccentColor] = useState('#06b6d4');
@@ -57,6 +59,7 @@ export default function SettingsPage() {
     setLogoUrl(tenant.logo_url ?? '');
     setPrimaryColor(tenant.primary_color ?? '#2563eb');
     setCustomDomain(tenant.custom_domain ?? '');
+    setCurrency(tenant.currency ?? DEFAULT_CURRENCY);
     
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
@@ -97,6 +100,7 @@ export default function SettingsPage() {
       primary_color: primaryColor,
       logo_url: logoUrl || null,
       custom_domain: customDomain || null,
+      currency,
       theme: {
         hero_title: heroTitle || null,
         hero_subtitle: heroSubtitle || null,
@@ -159,6 +163,23 @@ export default function SettingsPage() {
           <div className="form-group">
             <label>WhatsApp (con código de país)</label>
             <input className="premium-input" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+51999888777" maxLength={20} required />
+          </div>
+          <div className="form-group">
+            <label htmlFor="tenant-currency">Moneda</label>
+            <select
+              id="tenant-currency"
+              className="premium-input"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
+              {Object.entries(CURRENCIES).map(([code, { label }]) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
+            <span className="helper-text">
+              Ejemplo: {formatMoney(1234.5, currency)}. Se aplica a todos los precios del catálogo,
+              el carrito y los pedidos.
+            </span>
           </div>
           <div className="form-group full">
             <ImageSourceField

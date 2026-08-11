@@ -7,6 +7,7 @@ use App\Services\ImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 
 class TenantController extends Controller
 {
@@ -28,6 +29,10 @@ class TenantController extends Controller
             'logo_url'        => 'sometimes|nullable|url|max:500',
             'logo'            => 'nullable|image|mimes:jpeg,png,webp|max:2048',
             'custom_domain'   => 'sometimes|nullable|string|max:100|unique:tenants,custom_domain,' . $tenant->id,
+
+            // Moneda de la tienda (OWN-1). La whitelist sale de config/currencies.php,
+            // que es la misma lista que ofrece el selector de Configuración.
+            'currency'        => ['sometimes', 'string', Rule::in(array_keys(config('currencies')))],
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
             'banner'          => 'nullable|image|mimes:jpeg,png,webp|max:5120',

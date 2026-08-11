@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Order;
+use App\Support\Money;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -66,13 +67,13 @@ class NewOrderNotification extends Notification
     }
 
     /**
-     * Formato de importe.
+     * Formato de importe en la moneda de la tienda (OWN-1).
      *
-     * El simbolo va fijo en "$" como en todo el frontend. Cuando se haga OWN-1
-     * (moneda configurable por tienda) hay que cambiarlo aqui tambien.
+     * La moneda se lee del tenant del pedido, no del usuario que recibe el
+     * correo: son el mismo tenant, pero el dato correcto es el de la venta.
      */
     private function money(float|string $amount): string
     {
-        return '$'.number_format((float) $amount, 2);
+        return Money::format($amount, $this->order->tenant?->currency);
     }
 }

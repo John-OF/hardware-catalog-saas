@@ -22,6 +22,8 @@ export interface Tenant {
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;
   custom_domain: string | null;
+  /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
+  currency: string;
 }
 
 export interface User {

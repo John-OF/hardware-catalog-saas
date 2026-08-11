@@ -22,6 +22,7 @@ import api from '../../api/axios';
 import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
+import { formatMoney } from '../../utils/money';
 import { useCartStore } from '../../stores/cartStore';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
@@ -80,6 +81,8 @@ export default function PcBuilderPage() {
 
   useTenantBranding(tenant, 'Armador de PC compatible', 'Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada.');
   useTenantTheme(tenant);
+
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
 
   // Fetch Categories to map step keys
   const { data: categories = [] } = useQuery<Category[]>({
@@ -302,10 +305,10 @@ export default function PcBuilderPage() {
     items.forEach(([key, prod]) => {
       const step = BUILDER_STEPS.find(s => s.key === key);
       const price = prod.sale_price !== null ? prod.sale_price : prod.price;
-      message += `• *${step?.name}:* ${prod.name} ($${parseFloat(price.toString()).toFixed(2)})\n`;
+      message += `• *${step?.name}:* ${prod.name} (${money(price)})\n`;
     });
 
-    message += `\n*Total Estimado:* $${totalPrice.toFixed(2)}\n`;
+    message += `\n*Total Estimado:* ${money(totalPrice)}\n`;
     message += `*Consumo del Sistema:* ${estimatedPower}W (Recomendado: ${recommendedWatts}W)\n`;
     message += `\nPor favor, confírmenme stock y disponibilidad. Gracias!`;
 
@@ -396,7 +399,7 @@ export default function PcBuilderPage() {
                       <div className="prod-info">
                         <h5>{selectedProduct.name}</h5>
                         <span className="prod-price">
-                          ${parseFloat((selectedProduct.sale_price !== null ? selectedProduct.sale_price : selectedProduct.price).toString()).toFixed(2)}
+                          {money(selectedProduct.sale_price !== null ? selectedProduct.sale_price : selectedProduct.price)}
                         </span>
                         {selectedProduct.specs && (
                           <div className="prod-mini-specs">
@@ -445,7 +448,7 @@ export default function PcBuilderPage() {
                 return (
                   <div key={step.id} className="breakdown-row animate-fade-in">
                     <span className="breakdown-label">{step.name.split(' (')[0]}</span>
-                    <span className="breakdown-price">${parseFloat(price.toString()).toFixed(2)}</span>
+                    <span className="breakdown-price">{money(price)}</span>
                   </div>
                 );
               })}
@@ -453,7 +456,7 @@ export default function PcBuilderPage() {
 
             <div className="summary-total-row">
               <span>Total Estimado:</span>
-              <span className="total-price">${totalPrice.toFixed(2)}</span>
+              <span className="total-price">{money(totalPrice)}</span>
             </div>
 
             {/* Estimación TDP */}
@@ -605,7 +608,7 @@ export default function PcBuilderPage() {
                           </div>
                         </div>
                         <div className="dp-action-area">
-                          <span className="dp-price">${parseFloat(price.toString()).toFixed(2)}</span>
+                          <span className="dp-price">{money(price)}</span>
                           <button
                             onClick={() => handleSelectProduct(activeStep!.key, product)}
                             className="btn-select-add"

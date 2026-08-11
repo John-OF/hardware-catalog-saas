@@ -17,14 +17,19 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import type { Product, Order } from '../../types';
+import { formatMoney } from '../../utils/money';
 
 interface CustomerAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   tenantSlug: string;
+  /** Moneda de la tienda (OWN-1). Este modal mostraba "S/" fijo mientras el resto del catálogo mostraba "$". */
+  currency?: string | null;
 }
 
-export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: CustomerAccountModalProps) {
+export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, currency }: CustomerAccountModalProps) {
+  const money = (n: number | string) => formatMoney(n, currency);
+
   const { user, token, isAuthenticated, setCustomerAuth, clearCustomerAuth, setFavoriteIds, toggleFavoriteId } = useCustomerAuthStore();
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'favorites' | 'orders'>('login');
   
@@ -326,7 +331,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                               <div>
                                 <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{fav.name}</h4>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'bold' }}>
-                                  S/ {(fav.sale_price !== null ? fav.sale_price : fav.price)}
+                                  {money(fav.sale_price !== null ? fav.sale_price : fav.price)}
                                 </span>
                               </div>
                             </div>
@@ -405,14 +410,14 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug }: Cu
                               {ord.items?.map((item: any) => (
                                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                   <span>{item.quantity}x {item.product_name}</span>
-                                  <span>S/ {item.subtotal}</span>
+                                  <span>{money(item.subtotal)}</span>
                                 </div>
                               ))}
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
                               <span>Total</span>
-                              <span>S/ {ord.total}</span>
+                              <span>{money(ord.total)}</span>
                             </div>
                           </div>
                         ))}

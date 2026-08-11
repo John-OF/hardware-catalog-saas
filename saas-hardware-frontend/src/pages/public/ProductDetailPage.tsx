@@ -21,6 +21,7 @@ import api from '../../api/axios';
 import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview, subscribeStockNotification } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
+import { formatMoney } from '../../utils/money';
 import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
@@ -223,6 +224,8 @@ export default function ProductDetailPage() {
 
   useTenantTheme(tenant);
 
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+
   // Fetch Product Info
   const { data: product, isLoading, isError } = useQuery<Product>({
     queryKey: ['publicProduct', resolvedSlug, id],
@@ -296,7 +299,7 @@ export default function ProductDetailPage() {
 
     const currentUrl = window.location.href;
     const finalPrice = product.sale_price !== null && product.sale_price !== undefined ? product.sale_price : product.price;
-    const baseMessage = `Hola, estoy interesado en el producto *${product.name}* (Precio: $${parseFloat(finalPrice.toString()).toFixed(2)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
+    const baseMessage = `Hola, estoy interesado en el producto *${product.name}* (Precio: ${money(finalPrice)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
     const encodedMessage = encodeURIComponent(baseMessage);
     
     // Quitar cualquier carácter que no sea numérico del teléfono
@@ -493,12 +496,12 @@ export default function ProductDetailPage() {
                 {product.sale_price !== null && product.sale_price !== undefined ? (
                   <>
                     <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.75rem', opacity: 0.5, fontSize: '0.7em', fontWeight: 'normal' }}>
-                      ${parseFloat(product.price.toString()).toFixed(2)}
+                      {money(product.price)}
                     </span>
-                    <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                    <span>{money(product.sale_price)}</span>
                   </>
                 ) : (
-                  `$${parseFloat(product.price.toString()).toFixed(2)}`
+                  money(product.price)
                 )}
               </span>
             </div>
@@ -747,11 +750,11 @@ export default function ProductDetailPage() {
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {hasSale && (
                         <span style={{ fontSize: '0.75rem', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
-                          ${Number(p.price).toFixed(2)}
+                          {money(p.price)}
                         </span>
                       )}
                       <span style={{ fontSize: '0.98rem', fontWeight: 700, color: 'white' }}>
-                        ${Number(price).toFixed(2)}
+                        {money(price)}
                       </span>
                     </div>
 

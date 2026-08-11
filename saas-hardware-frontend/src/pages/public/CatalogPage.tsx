@@ -29,6 +29,7 @@ import CartDrawer from '../../components/public/CartDrawer';
 import CustomerAccountModal from '../../components/public/CustomerAccountModal';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
+import { formatMoney } from '../../utils/money';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
@@ -124,6 +125,7 @@ export default function CatalogPage() {
   });
 
   const resolvedSlug = tenant?.slug;
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
 
   // Fetch Pages públicas
   const { data: publicPages = [] } = useQuery<Page[]>({
@@ -614,12 +616,12 @@ export default function CatalogPage() {
                                     {product.sale_price !== null && product.sale_price !== undefined ? (
                                       <>
                                         <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
-                                          ${parseFloat(product.price.toString()).toFixed(2)}
+                                          {money(product.price)}
                                         </span>
-                                        <span>${parseFloat(product.sale_price.toString()).toFixed(2)}</span>
+                                        <span>{money(product.sale_price)}</span>
                                       </>
                                     ) : (
-                                      `$${parseFloat(product.price.toString()).toFixed(2)}`
+                                      money(product.price)
                                     )}
                                   </span>
                                   <span className="view-detail-link">
@@ -685,6 +687,7 @@ export default function CatalogPage() {
         isOpen={accountModalOpen} 
         onClose={() => setAccountModalOpen(false)} 
         tenantSlug={resolvedSlug!} 
+        currency={tenant?.currency}
       />
 
         {/* Barra Flotante de Comparación */}
@@ -759,7 +762,7 @@ export default function CatalogPage() {
                             <span className="compare-header-brand">{p.brand || 'Genérico'}</span>
                             <h4 className="compare-header-title">{p.name}</h4>
                             <span className="compare-header-price">
-                              ${parseFloat((p.sale_price !== null ? p.sale_price : p.price).toString()).toFixed(2)}
+                              {money(p.sale_price !== null ? p.sale_price : p.price)}
                             </span>
                             <button
                               type="button"

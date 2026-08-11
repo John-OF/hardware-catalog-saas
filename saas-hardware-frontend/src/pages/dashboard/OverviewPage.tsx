@@ -12,10 +12,13 @@ import {
 import { Link } from 'react-router-dom';
 import { getDashboardStats } from '../../api/dashboard';
 import type { DashboardStats } from '../../api/dashboard';
-
-const money = (n: number) => `$${Number(n).toFixed(2)}`;
+import { useTenantStore } from '../../stores/tenantStore';
+import { formatMoney } from '../../utils/money';
 
 export default function OverviewPage() {
+  const tenant = useTenantStore((s) => s.tenant);
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+
   const { data: stats, isLoading, isError } = useQuery<DashboardStats>({
     queryKey: ['dashboardStats'],
     queryFn: getDashboardStats,

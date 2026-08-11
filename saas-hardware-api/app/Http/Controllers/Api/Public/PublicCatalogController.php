@@ -39,7 +39,7 @@ class PublicCatalogController extends Controller
         $tenant = Cache::remember("tenant:{$slug}", 300, function () use ($slug) {
             return Tenant::where('slug', $slug)
                 ->where('is_active', true)
-                ->select(['id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number'])
+                ->select(['id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency'])
                 ->firstOrFail()
                 ->toArray();
         });

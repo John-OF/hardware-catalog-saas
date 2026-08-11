@@ -21,7 +21,7 @@ class Tenant extends Model implements IsTenant
 
     protected $fillable = [
         'slug', 'name', 'logo_url', 'primary_color', 'theme',
-        'whatsapp_number', 'plan', 'is_active', 'custom_domain',
+        'whatsapp_number', 'plan', 'is_active', 'custom_domain', 'currency',
     ];
 
     protected $casts = [

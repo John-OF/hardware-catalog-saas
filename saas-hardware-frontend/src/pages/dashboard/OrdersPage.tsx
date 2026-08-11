@@ -18,12 +18,12 @@ import {
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
-
-const money = (n: number) => `$${Number(n).toFixed(2)}`;
+import { formatMoney } from '../../utils/money';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
   const tenant = useTenantStore((s) => s.tenant);
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);

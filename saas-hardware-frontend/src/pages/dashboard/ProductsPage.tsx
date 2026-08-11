@@ -25,10 +25,18 @@ import {
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import type { Product, Category, PaginatedResponse } from '../../types';
+import { useTenantStore } from '../../stores/tenantStore';
+import { formatMoney } from '../../utils/money';
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
-  
+
+  // Moneda de la tienda: se usa tanto para pintar precios como para rotular los
+  // campos del formulario, que antes decían "$ USD" fijo.
+  const tenant = useTenantStore((s) => s.tenant);
+  const currencyCode = tenant?.currency ?? 'USD';
+  const money = (n: number | string) => formatMoney(n, currencyCode);
+
   // Page filter states
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -656,14 +664,14 @@ export default function ProductsPage() {
                         {product.sale_price !== null && product.sale_price !== undefined ? (
                           <div className="admin-price-box">
                             <span className="strike-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.85em', marginRight: '0.4rem', fontWeight: 'normal' }}>
-                              ${parseFloat(product.price.toString()).toFixed(2)}
+                              {money(product.price)}
                             </span>
                             <span className="sale-price-active" style={{ color: 'var(--success)', fontWeight: 700 }}>
-                              ${parseFloat(product.sale_price.toString()).toFixed(2)}
+                              {money(product.sale_price)}
                             </span>
                           </div>
                         ) : (
-                          `$${parseFloat(product.price.toString()).toFixed(2)}`
+                          money(product.price)
                         )}
                       </td>
                       <td>
@@ -897,7 +905,7 @@ export default function ProductsPage() {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label htmlFor="prod-price">Precio Regular ($ USD)</label>
+                  <label htmlFor="prod-price">Precio Regular ({currencyCode})</label>
                   <input
                     id="prod-price"
                     type="number"
@@ -912,7 +920,7 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="form-group half">
-                  <label htmlFor="prod-saleprice">Precio de Oferta ($ USD - Opcional)</label>
+                  <label htmlFor="prod-saleprice">Precio de Oferta ({currencyCode} - Opcional)</label>
                   <input
                     id="prod-saleprice"
                     type="number"

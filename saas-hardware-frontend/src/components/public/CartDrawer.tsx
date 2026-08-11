@@ -5,6 +5,7 @@ import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
 import type { Tenant } from '../../types';
+import { formatMoney } from '../../utils/money';
 
 interface CartDrawerProps {
   open: boolean;
@@ -12,8 +13,6 @@ interface CartDrawerProps {
   slug: string;
   tenant: Tenant;
 }
-
-const money = (n: number) => `$${n.toFixed(2)}`;
 
 const parsePhone = (fullPhone: string) => {
   const codes = ['+593', '+51', '+57', '+52', '+34'];
@@ -32,6 +31,8 @@ const parsePhone = (fullPhone: string) => {
 };
 
 export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerProps) {
+  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+
   const items = useCartStore((s) => s.items);
   const setQuantity = useCartStore((s) => s.setQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
