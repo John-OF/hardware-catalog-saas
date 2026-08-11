@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -36,7 +37,15 @@ class AuthController extends Controller
             ],
             'whatsapp'       => 'required|string|max:20',
             'name'           => 'required|string|max:200',
-            'email'          => 'required|email|unique:users,email',
+            // Unico solo frente a OTROS ADMINS, no frente a clientes: desde SEC-4 el
+            // correo es unico por tenant, asi que un dueño puede usar un correo que ya
+            // existe como cliente en otra tienda. Entre admins debe seguir siendo unico
+            // porque el login del panel resuelve por email sin saber la tienda.
+            'email'          => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->where(fn ($query) => $query->where('role', 'admin')),
+            ],
             'password'       => 'required|string|min:8|confirmed',
         ]);
 
@@ -77,7 +86,14 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        // El rol va DENTRO de las credenciales, no solo en el chequeo posterior:
+        // desde SEC-4 el correo es unico por tenant, asi que un mismo correo puede
+        // pertenecer a un admin y a clientes de otras tiendas. Sin filtrar por rol,
+        // Auth::attempt resolveria al primero que coincida y un admin legitimo no
+        // podria entrar si un cliente se registro antes con ese correo.
+        $credentials = $request->only('email', 'password') + ['role' => 'admin'];
+
+        if (!Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales son incorrectas.'],
             ]);
@@ -85,7 +101,8 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        // Solo administradores activos pueden usar el panel.
+        // Defensa en profundidad: si alguien quita el rol de las credenciales de
+        // arriba, esta comprobacion sigue cerrando el panel a no-admins.
         // Mismo mensaje genérico para no filtrar la existencia del correo.
         if ($user->role !== 'admin' || !$user->is_active) {
             Auth::logout();
