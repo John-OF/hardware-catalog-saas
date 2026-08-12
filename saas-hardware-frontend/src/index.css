@@ -12,7 +12,24 @@
   --bg-card-hover: rgba(26, 36, 56, 0.85);
   --bg-sidebar: #0f172a;
   --bg-select-option: #111827;
-  
+
+  /* Fondo de los campos de formulario del catálogo público (PERS-1). Antes iba
+     `rgba(0,0,0,0.2)` incrustado en cada input, que sobre el modo claro daba un
+     recuadro gris con texto blanco encima: ilegible. */
+  --bg-input: rgba(0, 0, 0, 0.2);
+
+  /* Acento del tenant. useTenantTheme lo sobreescribe; aquí vive el valor por
+     defecto para que las vistas puedan usarlo aunque la tienda no lo defina. */
+  --accent: #06b6d4;
+
+  /* Texto que va ENCIMA de un fondo de color sólido (botón primario, badge de
+     oferta). No cambia con el modo claro a propósito: el fondo tampoco. */
+  --text-on-primary: #ffffff;
+
+  /* Degradado de los títulos grandes del catálogo. Con `background-clip: text`
+     hacen falta dos colores, así que no basta con --text-primary. */
+  --gradient-title: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+
   --border: rgba(255, 255, 255, 0.08);
   --border-focus: rgba(37, 99, 235, 0.5);
   
@@ -25,6 +42,7 @@
   --danger: #ef4444;
   --danger-glow: rgba(239, 68, 68, 0.15);
   --warning: #f59e0b;
+  --warning-glow: rgba(245, 158, 11, 0.15);
   --info: #06b6d4;
 
   /* Typography */
@@ -65,6 +83,14 @@
   
   --glass-bg: rgba(255, 255, 255, 0.75);
   --glass-border: rgba(15, 23, 42, 0.06);
+
+  /* Sin esto, los formularios del catálogo (reseñas, "avísame", checkout)
+     quedaban con texto oscuro sobre un recuadro casi negro en modo claro. */
+  --bg-input: #ffffff;
+
+  /* En claro el degradado del título tiene que ir de oscuro a oscuro, o el
+     título desaparece sobre el fondo blanco. */
+  --gradient-title: linear-gradient(135deg, #0f172a 0%, #475569 100%);
 }
 
 /* --- ADMIN PANEL: tema neutro claro (solo dentro del layout del dashboard) --- */
@@ -91,6 +117,7 @@
   --danger: #dc2626;
   --danger-glow: rgba(220, 38, 38, 0.08);
   --warning: #d97706;
+  --warning-glow: rgba(217, 119, 6, 0.10);
   --info: #0891b2;
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
@@ -154,6 +181,7 @@
   --danger: #f87171;
   --danger-glow: rgba(248, 113, 113, 0.12);
   --warning: #fbbf24;
+  --warning-glow: rgba(251, 191, 36, 0.12);
   --info: #22d3ee;
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);

@@ -161,7 +161,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                 <select
                   value={countryCode}
                   onChange={(e) => setCountryCodeOverride(e.target.value)}
-                  style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
+                  style={{ padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem', width: '90px', outline: 'none' }}
                 >
                   {COUNTRY_CODES.map(({ code, label }) => (
                     <option key={code} value={code}>{label}</option>
@@ -216,7 +216,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         .qty-stepper button { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 0.25rem 0.4rem; display: flex; }
         .qty-stepper span { min-width: 24px; text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
         .cart-item-remove { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; }
-        .cart-item-remove:hover { color: #ef4444; }
+        .cart-item-remove:hover { color: var(--danger); }
         .cart-checkout { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.65rem; }
         .cart-total { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
         .cart-total span { color: var(--text-secondary); font-size: 0.9rem; }

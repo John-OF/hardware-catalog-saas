@@ -651,8 +651,8 @@ export default function PcBuilderPage() {
       <style>{`
         .pc-builder-page {
           min-height: 100vh;
-          background: #0b0f19;
-          color: #f8fafc;
+          background: var(--bg-app);
+          color: var(--text-primary);
           padding: 1.5rem 2rem;
           display: flex;
           flex-direction: column;
@@ -808,7 +808,7 @@ export default function PcBuilderPage() {
           width: 42px;
           height: 42px;
           border-radius: 6px;
-          background: rgba(0, 0, 0, 0.2);
+          background: var(--bg-input);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -996,19 +996,19 @@ export default function PcBuilderPage() {
         .status-banner.success {
           background: rgba(16, 185, 129, 0.08);
           border: 1px solid rgba(16, 185, 129, 0.2);
-          color: #34d399;
+          color: var(--success);
         }
 
         .status-banner.warning {
           background: rgba(245, 158, 11, 0.08);
           border: 1px solid rgba(245, 158, 11, 0.2);
-          color: #fbbf24;
+          color: var(--warning);
         }
 
         .status-banner.error {
           background: rgba(239, 68, 68, 0.08);
           border: 1px solid rgba(239, 68, 68, 0.2);
-          color: #f87171;
+          color: var(--danger);
         }
 
         .status-banner p {
@@ -1037,11 +1037,11 @@ export default function PcBuilderPage() {
         }
 
         .issue-item.error {
-          color: #f87171;
+          color: var(--danger);
         }
 
         .issue-item.warning {
-          color: #fbbf24;
+          color: var(--warning);
         }
 
         .summary-actions {
@@ -1084,7 +1084,7 @@ export default function PcBuilderPage() {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
-          background: #0d1220;
+          background: var(--bg-card);
         }
 
         .drawer-category-label {
@@ -1184,7 +1184,7 @@ export default function PcBuilderPage() {
 
         .btn-select-add {
           background: var(--primary);
-          color: white;
+          color: var(--text-on-primary);
           border: none;
           padding: 0.35rem 0.75rem;
           font-size: 0.75rem;

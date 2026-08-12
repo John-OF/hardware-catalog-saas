@@ -233,8 +233,8 @@ export default function CatalogPage() {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #0b0f19;
-            color: #94a3b8;
+            background: var(--bg-app);
+            color: var(--text-secondary);
             gap: 1rem;
           }
           .spinner { animation: spin 1s linear infinite; }
@@ -258,20 +258,20 @@ export default function CatalogPage() {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #0b0f19;
-            color: #f8fafc;
+            background: var(--bg-app);
+            color: var(--text-primary);
             gap: 1.5rem;
             text-align: center;
             padding: 2rem;
           }
-          .error-container p { color: #94a3b8; max-width: 400px; margin-bottom: 0.5rem; }
+          .error-container p { color: var(--text-secondary); max-width: 400px; margin-bottom: 0.5rem; }
         `}</style>
       </div>
     );
   }
 
   return (
-    <div className="public-catalog-container animate-fade-in" style={{ fontFamily: getFontFamily(tenant.theme?.font) }}>
+    <div className="public-catalog-container animate-fade-in">
       {/* Header Store */}
       <header className="catalog-header glass-card">
         <div className="header-logo-area">
@@ -301,7 +301,7 @@ export default function CatalogPage() {
           >
             <User size={20} />
             {isCustomerAuthenticated && (
-              <span className="cart-badge" style={{ backgroundColor: '#22c55e', width: '8px', height: '8px', minWidth: '8px', padding: 0 }} />
+              <span className="cart-badge" style={{ backgroundColor: 'var(--success)', width: '8px', height: '8px', minWidth: '8px', padding: 0 }} />
             )}
           </button>
           <button
@@ -332,7 +332,7 @@ export default function CatalogPage() {
             return (
               <section
                 key={sec.id}
-                className="catalog-hero glass-card animate-fade-in"
+                className={`catalog-hero glass-card animate-fade-in ${tenant.theme?.banner_url ? 'has-banner' : ''}`}
                 style={tenant.theme?.banner_url ? {
                   backgroundImage: `linear-gradient(to right, rgba(11,15,25,0.92), rgba(11,15,25,0.55)), url(${tenant.theme.banner_url})`,
                   backgroundSize: 'cover',
@@ -587,7 +587,7 @@ export default function CatalogPage() {
                                       top: '0.5rem',
                                       right: '0.5rem',
                                       zIndex: 10,
-                                      background: 'rgba(15, 23, 42, 0.75)',
+                                      background: 'var(--glass-bg)',
                                       border: '1px solid var(--border)',
                                       borderRadius: '50%',
                                       width: '30px',
@@ -603,8 +603,8 @@ export default function CatalogPage() {
                                   >
                                     <Heart 
                                       size={14} 
-                                      fill={favoriteIds.includes(product.id) ? '#ef4444' : 'none'} 
-                                      style={{ color: favoriteIds.includes(product.id) ? '#ef4444' : 'var(--text-muted)' }} 
+                                      fill={favoriteIds.includes(product.id) ? 'var(--danger)' : 'none'} 
+                                      style={{ color: favoriteIds.includes(product.id) ? 'var(--danger)' : 'var(--text-muted)' }} 
                                     />
                                   </button>
                                 )}
@@ -640,8 +640,8 @@ export default function CatalogPage() {
                                 <div className="card-brand-rating-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span className="card-brand">{product.brand || 'Genérico'}</span>
                                   {product.reviews_count && product.reviews_count > 0 ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 600 }}>
-                                      <Star size={11} fill="#fbbf24" style={{ display: 'inline' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--warning)', fontSize: '0.78rem', fontWeight: 600 }}>
+                                      <Star size={11} fill="currentColor" style={{ display: 'inline' }} />
                                       <span>{parseFloat(product.reviews_avg_rating!.toString()).toFixed(1)}</span>
                                       <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: '0.72rem' }}>({product.reviews_count})</span>
                                     </div>
@@ -941,13 +941,14 @@ export default function CatalogPage() {
         .whatsapp-header-btn {
           padding: 0.5rem 1.25rem;
           font-size: 0.85rem;
-          background: #10b981;
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+          background: var(--success);
+          box-shadow: 0 4px 12px var(--success-glow);
         }
 
         .whatsapp-header-btn:hover {
-          background: #059669;
-          box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+          background: var(--success);
+          filter: brightness(0.92);
+          box-shadow: 0 6px 16px var(--success-glow);
         }
 
         /* Hero */
@@ -956,7 +957,17 @@ export default function CatalogPage() {
           padding: 3.5rem 2.5rem;
           border-radius: var(--radius-lg);
           overflow: hidden;
-          background: linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%);
+          background: var(--bg-card);
+        }
+
+        /* Con banner, el hero es una foto con un velo oscuro encima: su contenido
+           va siempre sobre fondo oscuro, aunque la tienda esté en modo claro. Se
+           redefinen los tokens SOLO dentro del hero en vez de hardcodear los
+           colores, para que el resto siga respondiendo al tema. */
+        .catalog-hero.has-banner {
+          --text-primary: #f8fafc;
+          --text-secondary: #cbd5e1;
+          --gradient-title: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
         }
 
         .hero-content {
@@ -981,7 +992,7 @@ export default function CatalogPage() {
           font-size: 2.25rem;
           margin-bottom: 1rem;
           line-height: 1.2;
-          background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+          background: var(--gradient-title);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
@@ -1327,20 +1338,20 @@ export default function CatalogPage() {
         }
 
         .card-badge.sold-out {
-          background: rgba(239, 68, 68, 0.85);
-          color: white;
+          background: var(--danger);
+          color: var(--text-on-primary);
           backdrop-filter: blur(4px);
         }
 
         .card-badge.low-stock {
-          background: rgba(245, 158, 11, 0.85);
-          color: white;
+          background: var(--warning);
+          color: var(--text-on-primary);
           backdrop-filter: blur(4px);
         }
 
         .card-badge.sale {
           background: var(--success);
-          color: white;
+          color: var(--text-on-primary);
           backdrop-filter: blur(4px);
         }
 
@@ -1403,10 +1414,10 @@ export default function CatalogPage() {
           cursor: pointer;
           transition: var(--transition);
         }
-        .card-add-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
+        .card-add-btn:hover:not(:disabled) { background: var(--primary); color: var(--text-on-primary); }
         .card-add-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--border); color: var(--text-muted); background: transparent; }
-        .card-add-btn.added { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.05); }
-        .card-add-btn.added:hover:not(:disabled) { background: #10b981; color: #fff; }
+        .card-add-btn.added { border-color: var(--success); color: var(--success); background: var(--success-glow); }
+        .card-add-btn.added:hover:not(:disabled) { background: var(--success); color: var(--text-on-primary); }
 
         .header-contact {
           display: flex;
@@ -1438,7 +1449,7 @@ export default function CatalogPage() {
           padding: 0 5px;
           border-radius: 10px;
           background: var(--primary);
-          color: #fff;
+          color: var(--text-on-primary);
           font-size: 0.7rem;
           font-weight: 700;
           display: flex;
@@ -1488,7 +1499,7 @@ export default function CatalogPage() {
           position: absolute;
           top: 0.75rem;
           right: 0.75rem;
-          background: rgba(11, 15, 25, 0.7);
+          background: var(--glass-bg);
           backdrop-filter: blur(4px);
           border: 1px solid var(--border);
           color: var(--text-secondary);
@@ -1502,7 +1513,7 @@ export default function CatalogPage() {
         }
         .compare-toggle-badge:hover {
           background: var(--primary);
-          color: white;
+          color: var(--text-on-primary);
           border-color: var(--primary);
         }
         .compare-toggle-badge.active {
@@ -1541,7 +1552,7 @@ export default function CatalogPage() {
           width: 48px;
           height: 48px;
           border-radius: 6px;
-          background: rgba(0,0,0,0.2);
+          background: var(--bg-input);
           border: 1px solid var(--border);
           overflow: hidden;
         }
@@ -1555,7 +1566,7 @@ export default function CatalogPage() {
           top: -2px;
           right: -2px;
           background: var(--danger);
-          color: white;
+          color: var(--text-on-primary);
           border: none;
           border-radius: 50%;
           width: 14px;
@@ -1613,7 +1624,7 @@ export default function CatalogPage() {
           overflow-y: auto;
           border-radius: var(--radius-lg);
           padding: 2rem;
-          background: #0d1220;
+          background: var(--bg-app);
         }
         .compare-table-wrapper {
           overflow-x: auto;
@@ -1674,8 +1685,8 @@ export default function CatalogPage() {
           width: 100%;
           justify-content: center;
         }
-        .text-success { color: #34d399; }
-        .text-danger { color: #f87171; }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
 
         /* Categorías destacadas (PUB-7) */
         .featured-categories {
@@ -1806,7 +1817,7 @@ export default function CatalogPage() {
             padding: 0 0.3rem;
             border-radius: 9px;
             background: var(--primary);
-            color: #fff;
+            color: var(--text-on-primary);
             font-size: 0.7rem;
             font-weight: 700;
           }
@@ -1816,12 +1827,4 @@ export default function CatalogPage() {
   );
 }
 
-const getFontFamily = (fontName?: string | null) => {
-  switch (fontName) {
-    case 'serif': return "'Merriweather', Georgia, serif";
-    case 'mono': return "Consolas, 'Fira Code', Monaco, monospace";
-    case 'heading': return "'Outfit', 'Montserrat', sans-serif";
-    default: return "'Inter', system-ui, sans-serif";
-  }
-};
 

@@ -323,8 +323,8 @@ export default function ProductDetailPage() {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #0b0f19;
-            color: #94a3b8;
+            background: var(--bg-app);
+            color: var(--text-secondary);
             gap: 1rem;
           }
           .spinner { animation: spin 1s linear infinite; }
@@ -348,13 +348,13 @@ export default function ProductDetailPage() {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #0b0f19;
-            color: #f8fafc;
+            background: var(--bg-app);
+            color: var(--text-primary);
             gap: 1.5rem;
             text-align: center;
             padding: 2rem;
           }
-          .error-container p { color: #94a3b8; max-width: 400px; margin-bottom: 0.5rem; }
+          .error-container p { color: var(--text-secondary); max-width: 400px; margin-bottom: 0.5rem; }
         `}</style>
       </div>
     );
@@ -471,12 +471,12 @@ export default function ProductDetailPage() {
           <h1 className="detail-title">{product.name}</h1>
           {product.reviews_count && product.reviews_count > 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '-0.75rem', marginBottom: '0.25rem' }}>
-              <div style={{ display: 'flex', color: '#fbbf24' }}>
+              <div style={{ display: 'flex', color: 'var(--warning)' }}>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
                     size={14}
-                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? '#fbbf24' : 'none'}
+                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? 'currentColor' : 'none'}
                   />
                 ))}
               </div>
@@ -547,7 +547,7 @@ export default function ProductDetailPage() {
                 </>
               ) : mainQtyInCart > 0 ? (
                 <>
-                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  <CheckCircle size={18} style={{ color: 'var(--success)' }} />
                   <span>En el carrito ({mainQtyInCart})</span>
                 </>
               ) : (
@@ -599,8 +599,8 @@ export default function ProductDetailPage() {
             >
               <Heart 
                 size={20} 
-                fill={favoriteIds.includes(product.id) ? '#ef4444' : 'none'} 
-                style={{ color: favoriteIds.includes(product.id) ? '#ef4444' : 'var(--text-muted)' }} 
+                fill={favoriteIds.includes(product.id) ? 'var(--danger)' : 'none'} 
+                style={{ color: favoriteIds.includes(product.id) ? 'var(--danger)' : 'var(--text-muted)' }} 
               />
             </button>
           </div>
@@ -610,7 +610,7 @@ export default function ProductDetailPage() {
             <div className="notify-stock-box">
               {notifySubmitted ? (
                 <div className="notify-success">
-                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  <CheckCircle size={18} style={{ color: 'var(--success)' }} />
                   <span>Te avisaremos apenas este producto vuelva a estar disponible.</span>
                 </div>
               ) : (
@@ -731,12 +731,12 @@ export default function ProductDetailPage() {
                       <ShoppingBag size={32} style={{ color: 'var(--text-muted)' }} />
                     )}
                     {p.stock === 0 && (
-                      <span className="card-badge sold-out" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--danger)', color: 'white', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                      <span className="card-badge sold-out" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--danger)', color: 'var(--text-on-primary)', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
                         Agotado
                       </span>
                     )}
                     {hasSale && p.stock > 0 && (
-                      <span className="card-badge sale" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--primary)', color: 'white', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                      <span className="card-badge sale" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--primary)', color: 'var(--text-on-primary)', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
                         Oferta
                       </span>
                     )}
@@ -758,7 +758,7 @@ export default function ProductDetailPage() {
                           {money(p.price)}
                         </span>
                       )}
-                      <span style={{ fontSize: '0.98rem', fontWeight: 700, color: 'white' }}>
+                      <span style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {money(price)}
                       </span>
                     </div>
@@ -776,7 +776,7 @@ export default function ProductDetailPage() {
                             padding: '0.35rem 0.6rem', 
                             borderRadius: '20px', 
                             background: relQty > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)', 
-                            color: p.stock === 0 ? 'var(--text-muted)' : relQty > 0 ? '#10b981' : 'var(--primary)',
+                            color: p.stock === 0 ? 'var(--text-muted)' : relQty > 0 ? 'var(--success)' : 'var(--primary)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.2rem',
@@ -826,12 +826,12 @@ export default function ProductDetailPage() {
               Calificaciones y Reseñas
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <div style={{ display: 'flex', color: '#fbbf24' }}>
+              <div style={{ display: 'flex', color: 'var(--warning)' }}>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
                     size={16}
-                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? '#fbbf24' : 'none'}
+                    fill={i < Math.round(Number(product.reviews_avg_rating || 0)) ? 'currentColor' : 'none'}
                   />
                 ))}
               </div>
@@ -864,13 +864,13 @@ export default function ProductDetailPage() {
           <div style={{ background: 'rgba(255,255,255,0.015)', padding: '1.25rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Tu Calificación</span>
-              <span className={`badge ${(product as any).user_review.is_approved ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: (product as any).user_review.is_approved ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: (product as any).user_review.is_approved ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+              <span className={`badge ${(product as any).user_review.is_approved ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: (product as any).user_review.is_approved ? 'var(--success-glow)' : 'var(--warning-glow)', color: (product as any).user_review.is_approved ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
                 {(product as any).user_review.is_approved ? 'Publicada' : 'Pendiente de aprobación'}
               </span>
             </div>
-            <div style={{ display: 'flex', color: '#fbbf24', gap: '0.1rem' }}>
+            <div style={{ display: 'flex', color: 'var(--warning)', gap: '0.1rem' }}>
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={12} fill={i < (product as any).user_review.rating ? '#fbbf24' : 'none'} />
+                <Star key={i} size={12} fill={i < (product as any).user_review.rating ? 'currentColor' : 'none'} />
               ))}
             </div>
             {(product as any).user_review.comment && (
@@ -895,7 +895,7 @@ export default function ProductDetailPage() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Tu nombre"
-                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                  style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                 />
               </div>
 
@@ -908,7 +908,7 @@ export default function ProductDetailPage() {
                     <select
                       value={countryCode}
                       onChange={(e) => setCountryCodeOverride(e.target.value)}
-                      style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
+                      style={{ padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem', width: '90px', outline: 'none' }}
                     >
                       {COUNTRY_CODES.map(({ code, label }) => (
                         <option key={code} value={code}>{label}</option>
@@ -920,7 +920,7 @@ export default function ProductDetailPage() {
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value.replace(/[^0-9]/g, ''))}
                       placeholder="Ej. 999888777"
-                      style={{ flex: 1, padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                      style={{ flex: 1, padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                     />
                   </div>
                   <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', lineHeight: '1.25' }}>
@@ -938,7 +938,7 @@ export default function ProductDetailPage() {
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
                   placeholder="tu@correo.com"
-                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem' }}
+                  style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                 />
               </div>
             </div>
@@ -953,11 +953,11 @@ export default function ProductDetailPage() {
                     key={star}
                     type="button"
                     onClick={() => setFormRating(star)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#fbbf24' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: 'var(--warning)' }}
                   >
                     <Star
                       size={24}
-                      fill={star <= formRating ? '#fbbf24' : 'none'}
+                      fill={star <= formRating ? 'currentColor' : 'none'}
                     />
                   </button>
                 ))}
@@ -973,7 +973,7 @@ export default function ProductDetailPage() {
                 onChange={(e) => setFormComment(e.target.value)}
                 placeholder="Escribe tu opinión sobre el producto..."
                 rows={3}
-                style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', resize: 'vertical' }}
+                style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.9rem', resize: 'vertical' }}
               />
             </div>
 
@@ -1017,17 +1017,17 @@ export default function ProductDetailPage() {
                         {review.customer_name}
                       </h4>
                       {review.verified_purchase && (
-                        <span style={{ fontSize: '0.68rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.2)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--warning)', background: 'var(--warning-glow)', border: '1px solid var(--border)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
                           Compra Verificada
                         </span>
                       )}
                     </div>
-                    <div style={{ display: 'flex', color: '#fbbf24', marginTop: '0.2rem' }}>
+                    <div style={{ display: 'flex', color: 'var(--warning)', marginTop: '0.2rem' }}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star
                           key={i}
                           size={14}
-                          fill={i < review.rating ? '#fbbf24' : 'none'}
+                          fill={i < review.rating ? 'currentColor' : 'none'}
                         />
                       ))}
                     </div>
@@ -1058,6 +1058,9 @@ export default function ProductDetailPage() {
           style={{
             position: 'fixed',
             inset: 0,
+            // El visor a pantalla completa va oscuro en los dos modos a
+            // proposito: es el fondo que mejor deja ver una foto. Por eso los
+            // controles de dentro conservan `color: white` y no usan tokens.
             background: 'rgba(0, 0, 0, 0.9)',
             zIndex: 1000,
             display: 'flex',
@@ -1246,7 +1249,7 @@ export default function ProductDetailPage() {
           font-size: 2rem;
           line-height: 1.2;
           font-family: var(--font-heading);
-          background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+          background: var(--gradient-title);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
@@ -1389,15 +1392,15 @@ export default function ProductDetailPage() {
           gap: 0.5rem;
         }
         .add-cart-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .add-cart-btn.added { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.05); }
-        .add-cart-btn.added:hover:not(:disabled) { background: #10b981; color: #fff; }
+        .add-cart-btn.added { border-color: var(--success); color: var(--success); background: var(--success-glow); }
+        .add-cart-btn.added:hover:not(:disabled) { background: var(--success); color: var(--text-on-primary); }
 
         .whatsapp-buy-btn {
           flex: 1;
           padding: 1rem;
           font-size: 1.05rem;
           font-weight: 600;
-          background: #10b981;
+          background: var(--success);
           box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
           display: flex;
           align-items: center;
@@ -1406,7 +1409,8 @@ export default function ProductDetailPage() {
         }
 
         .whatsapp-buy-btn:hover {
-          background: #059669;
+          background: var(--success);
+          filter: brightness(0.92);
           box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
         }
 

@@ -182,7 +182,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
       padding: '1rem'
     }}>
       <div className="glass-card animate-scale-in" style={{
-        background: 'rgba(15, 23, 42, 0.95)',
+        background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         width: '100%',
         maxWidth: isAuthenticated ? '750px' : '450px',
@@ -294,7 +294,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                     background: 'rgba(239, 68, 68, 0.1)',
                     border: 'none',
                     borderRadius: 'var(--radius-md)',
-                    color: '#ef4444',
+                    color: 'var(--danger)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%'
@@ -345,7 +345,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                               style={{
                                 background: 'rgba(239, 68, 68, 0.1)',
                                 border: 'none',
-                                color: '#ef4444',
+                                color: 'var(--danger)',
                                 borderRadius: '50%',
                                 width: '32px',
                                 height: '32px',
@@ -355,7 +355,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                                 cursor: 'pointer'
                               }}
                             >
-                              <Heart size={14} fill="#ef4444" />
+                              <Heart size={14} fill="currentColor" />
                             </button>
                           </div>
                         ))}
@@ -402,9 +402,9 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                                   ord.status === 'cancelled' ? 'rgba(239, 68, 68, 0.15)' :
                                   'rgba(234, 179, 8, 0.15)',
                                 color:
-                                  ord.status === 'attended' ? '#22c55e' :
-                                  ord.status === 'cancelled' ? '#ef4444' :
-                                  '#eab308'
+                                  ord.status === 'attended' ? 'var(--success)' :
+                                  ord.status === 'cancelled' ? 'var(--danger)' :
+                                  'var(--warning)'
                               }}>
                                 {ord.status === 'attended' ? 'Atendido' : ord.status === 'cancelled' ? 'Cancelado' : 'Pendiente'}
                               </span>
@@ -484,10 +484,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 0.75rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -506,10 +506,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 2.5rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -568,10 +568,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 0.75rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -590,10 +590,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 0.75rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -609,10 +609,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         onChange={(e) => setCountryCodeOverride(e.target.value)}
                         style={{
                           padding: '0.6rem 0.5rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem',
                           width: '115px',
                           outline: 'none',
@@ -620,9 +620,9 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         }}
                       >
                         {COUNTRY_CODES.map(({ code, label }) => (
-                          <option key={code} value={code} style={{ background: '#1e293b' }}>{label}</option>
+                          <option key={code} value={code} style={{ background: 'var(--bg-select-option)' }}>{label}</option>
                         ))}
-                        <option value="" style={{ background: '#1e293b' }}>Otro</option>
+                        <option value="" style={{ background: 'var(--bg-select-option)' }}>Otro</option>
                       </select>
                       <input
                         type="text"
@@ -632,10 +632,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           flex: 1,
                           padding: '0.6rem 0.75rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -657,10 +657,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 2.5rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
@@ -698,10 +698,10 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                         style={{
                           width: '100%',
                           padding: '0.6rem 2.5rem 0.6rem 2.25rem',
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--bg-input)',
                           border: '1px solid var(--border)',
                           borderRadius: 'var(--radius-md)',
-                          color: '#fff',
+                          color: 'var(--text-primary)',
                           fontSize: '0.9rem'
                         }}
                       />
