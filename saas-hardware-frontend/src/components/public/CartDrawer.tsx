@@ -6,6 +6,7 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
 import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
 
 interface CartDrawerProps {
   open: boolean;
@@ -14,24 +15,8 @@ interface CartDrawerProps {
   tenant: Tenant;
 }
 
-const parsePhone = (fullPhone: string) => {
-  const codes = ['+593', '+51', '+57', '+52', '+34'];
-  for (const code of codes) {
-    if (fullPhone.startsWith(code)) {
-      return {
-        code,
-        number: fullPhone.substring(code.length)
-      };
-    }
-  }
-  return {
-    code: '',
-    number: fullPhone
-  };
-};
-
 export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerProps) {
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   const items = useCartStore((s) => s.items);
   const setQuantity = useCartStore((s) => s.setQuantity);
@@ -41,7 +26,11 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+593');
+  // El prefijo por defecto sale del WhatsApp de la tienda (PUB-4): en una tienda
+  // peruana el checkout aparece con +51. Se guarda solo la elección manual y se
+  // resuelve al leer, para no depender de un efecto que espere al tenant.
+  const [countryCodeOverride, setCountryCodeOverride] = useState<string | null>(null);
+  const countryCode = countryCodeOverride ?? deriveCountryCode(tenant?.whatsapp_number);
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -51,8 +40,8 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
     if (open && isCustomerAuthenticated && user) {
       if (user.name) setName(user.name);
       if (user.phone) {
-        const parsed = parsePhone(user.phone);
-        setCountryCode(parsed.code);
+        const parsed = splitPhone(user.phone);
+        setCountryCodeOverride(parsed.code);
         setPhone(parsed.number);
       }
     }
@@ -171,14 +160,12 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 <select
                   value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
+                  onChange={(e) => setCountryCodeOverride(e.target.value)}
                   style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
                 >
-                  <option value="+593">EC +593</option>
-                  <option value="+51">PE +51</option>
-                  <option value="+57">CO +57</option>
-                  <option value="+52">MX +52</option>
-                  <option value="+34">ES +34</option>
+                  {COUNTRY_CODES.map(({ code, label }) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
                   <option value="">Otro</option>
                 </select>
                 <input 

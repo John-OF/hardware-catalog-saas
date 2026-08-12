@@ -25,7 +25,7 @@ const priceOf = (product: Product): number =>
   Number(product.sale_price !== null && product.sale_price !== undefined ? product.sale_price : product.price);
 
 export default function NewOrderModal({ onClose, onCreated, currency }: NewOrderModalProps) {
-  const money = (n: number | string) => formatMoney(n, currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, currency);
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');

@@ -29,6 +29,20 @@ export const getPublicProducts = async (
   return response.data;
 };
 
+/**
+ * Valores de specs de TODO el catálogo, para los filtros (PUB-2).
+ *
+ * Van en una petición aparte de los productos a propósito: no deben cambiar al
+ * paginar ni al filtrar por specs, solo al cambiar de categoría.
+ */
+export const getPublicFacets = async (
+  slug: string,
+  params?: { category_id?: string },
+): Promise<{ specs: Record<string, string[]> }> => {
+  const response = await api.get<{ specs: Record<string, string[]> }>(`/public/${slug}/facets`, { params });
+  return response.data;
+};
+
 export const getPublicProduct = async (slug: string, productId: string): Promise<Product> => {
   const response = await api.get<Product>(`/public/${slug}/products/${productId}`);
   return response.data;

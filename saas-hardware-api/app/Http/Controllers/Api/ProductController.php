@@ -157,8 +157,14 @@ class ProductController extends Controller
             return response()->json(['message' => 'El archivo CSV está vacío o es inválido.'], 422);
         }
 
-        // Normalizar cabecera (minúsculas, sin espacios)
-        $header = array_map(fn($col) => trim(strtolower($col)), $header);
+        // Normalizar cabecera (minúsculas, sin espacios).
+        // El str_replace quita el BOM de UTF-8: Excel lo escribe al guardar y sin
+        // esto la primera columna no casa con 'nombre' y el mapeo cae a los
+        // fallbacks por posición (OWN-5).
+        $header = array_map(
+            fn ($col) => trim(strtolower(str_replace("\xEF\xBB\xBF", '', $col))),
+            $header
+        );
 
         $successCount = 0;
         $errors = [];
@@ -251,7 +257,12 @@ class ProductController extends Controller
                 $specs = null;
                 if (!empty($rowSpecs)) {
                     $specs = [];
-                    $parts = explode(';', $rowSpecs);
+                    // Se aceptan '|' y ';' como separador de specs (OWN-5). La
+                    // plantilla usa '|' porque ';' es tambien el delimitador de
+                    // columnas; el ';' se mantiene para no romper los archivos
+                    // que ya usaba la gente (que funcionan si la columna va
+                    // entrecomillada).
+                    $parts = preg_split('/[|;]/', $rowSpecs);
                     foreach ($parts as $part) {
                         $pair = explode(':', $part, 2);
                         if (count($pair) === 2) {

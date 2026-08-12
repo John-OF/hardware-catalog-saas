@@ -18,6 +18,7 @@ import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import type { Product, Order } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { COUNTRY_CODES, deriveCountryCode } from '../../utils/phone';
 
 interface CustomerAccountModalProps {
   isOpen: boolean;
@@ -25,10 +26,12 @@ interface CustomerAccountModalProps {
   tenantSlug: string;
   /** Moneda de la tienda (OWN-1). Este modal mostraba "S/" fijo mientras el resto del catálogo mostraba "$". */
   currency?: string | null;
+  /** WhatsApp de la tienda, del que se deduce el prefijo por defecto (PUB-4). */
+  whatsappNumber?: string | null;
 }
 
-export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, currency }: CustomerAccountModalProps) {
-  const money = (n: number | string) => formatMoney(n, currency);
+export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, currency, whatsappNumber }: CustomerAccountModalProps) {
+  const money = (n: number | string | null | undefined) => formatMoney(n, currency);
 
   const { user, token, isAuthenticated, setCustomerAuth, clearCustomerAuth, setFavoriteIds, toggleFavoriteId } = useCustomerAuthStore();
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'favorites' | 'orders'>('login');
@@ -41,7 +44,9 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+593');
+  // Prefijo por defecto derivado del WhatsApp de la tienda (PUB-4).
+  const [countryCodeOverride, setCountryCodeOverride] = useState<string | null>(null);
+  const countryCode = countryCodeOverride ?? deriveCountryCode(whatsappNumber);
   
   // Data states
   const [loading, setLoading] = useState(false);
@@ -601,7 +606,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                       <Phone size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', zIndex: 5 }} />
                       <select
                         value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
+                        onChange={(e) => setCountryCodeOverride(e.target.value)}
                         style={{
                           padding: '0.6rem 0.5rem 0.6rem 2.25rem',
                           background: 'rgba(0,0,0,0.2)',
@@ -614,11 +619,9 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="+593" style={{ background: '#1e293b' }}>EC +593</option>
-                        <option value="+51" style={{ background: '#1e293b' }}>PE +51</option>
-                        <option value="+57" style={{ background: '#1e293b' }}>CO +57</option>
-                        <option value="+52" style={{ background: '#1e293b' }}>MX +52</option>
-                        <option value="+34" style={{ background: '#1e293b' }}>ES +34</option>
+                        {COUNTRY_CODES.map(({ code, label }) => (
+                          <option key={code} value={code} style={{ background: '#1e293b' }}>{label}</option>
+                        ))}
                         <option value="" style={{ background: '#1e293b' }}>Otro</option>
                       </select>
                       <input

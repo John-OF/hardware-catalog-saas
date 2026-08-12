@@ -17,7 +17,7 @@ import { formatMoney } from '../../utils/money';
 
 export default function OverviewPage() {
   const tenant = useTenantStore((s) => s.tenant);
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   const { data: stats, isLoading, isError } = useQuery<DashboardStats>({
     queryKey: ['dashboardStats'],

@@ -1,0 +1,89 @@
+# Integracion continua (TEC-2)
+#
+# Antes no habia nada que corriera los tests salvo la buena voluntad de quien
+# tocaba el codigo. Los guards de la Fase 6 (aislamiento entre tiendas, panel
+# cerrado a clientes) solo valen si alguien los ejecuta en cada cambio.
+#
+# Los tests usan SQLite en memoria (ver phpunit.xml), asi que el job de API no
+# necesita levantar MySQL.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API (PHPUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas-hardware-api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          # sqlite3/pdo_sqlite para los tests; intl no hace falta (App\Support\Money
+          # formatea a mano justo para no depender de ella).
+          extensions: mbstring, pdo_sqlite, sqlite3, gd, zip, bcmath
+          coverage: none
+
+      - name: Cachear dependencias de Composer
+        uses: actions/cache@v4
+        with:
+          path: saas-hardware-api/vendor
+          key: composer-${{ hashFiles('saas-hardware-api/composer.lock') }}
+
+      - name: Instalar dependencias
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Preparar entorno
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Tests
+        run: php artisan test
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas-hardware-frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: saas-hardware-frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # El build tambien typechequea (`tsc -b`), pero ademas detecta imports rotos
+      # y assets que faltan, que tsc solo no ve.
+      - name: Build
+        run: npm run build
+
+      # ATENCION: lint NO bloquea todavia. El repo arrastra ~80 errores previos,
+      # casi todos `no-explicit-any` en bloques catch. Dejarlo bloqueante hoy
+      # significaria un CI rojo permanente, que es peor que no tenerlo. El paso
+      # queda visible para poder ir bajando la cuenta; cuando llegue a cero, se
+      # quita el continue-on-error.
+      - name: Lint (informativo, no bloquea)
+        run: npm run lint
+        continue-on-error: true

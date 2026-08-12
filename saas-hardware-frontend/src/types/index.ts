@@ -26,13 +26,16 @@ export interface Tenant {
   currency: string;
 }
 
+/**
+ * Lo que devuelve `UserResource` en el backend (TEC-4). `tenant_id` y los
+ * timestamps ya no viajan al navegador: nadie los usaba.
+ */
 export interface User {
   id: string;
-  tenant_id: string;
   name: string;
   email: string;
   phone?: string;
-  role: 'admin' | 'staff' | 'customer';
+  role: 'admin' | 'staff' | 'customer' | 'superadmin';
   is_active: boolean;
 }
 

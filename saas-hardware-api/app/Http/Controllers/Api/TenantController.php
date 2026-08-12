@@ -36,7 +36,11 @@ class TenantController extends Controller
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
             'banner'          => 'nullable|image|mimes:jpeg,png,webp|max:5120',
-            'favicon'         => 'nullable|file|mimes:png,ico,svg,jpg,jpeg,webp|max:512',
+            // Sin SVG (TEC-7): un .svg puede llevar <script> dentro y se sirve
+            // desde el mismo origen que la tienda, así que aceptarlo es aceptar
+            // que un dueño suba JS ejecutable. Los formatos de favicon de verdad
+            // son png e ico.
+            'favicon'         => 'nullable|file|mimes:png,ico|max:512',
 
             // Personalización visual de la tienda (theme JSON)
             'theme'               => 'sometimes|nullable|array',

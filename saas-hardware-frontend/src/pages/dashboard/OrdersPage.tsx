@@ -25,7 +25,7 @@ import { formatMoney } from '../../utils/money';
 export default function OrdersPage() {
   const queryClient = useQueryClient();
   const tenant = useTenantStore((s) => s.tenant);
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);

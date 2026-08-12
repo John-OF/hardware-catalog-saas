@@ -35,7 +35,7 @@ export default function ProductsPage() {
   // campos del formulario, que antes decían "$ USD" fijo.
   const tenant = useTenantStore((s) => s.tenant);
   const currencyCode = tenant?.currency ?? 'USD';
-  const money = (n: number | string) => formatMoney(n, currencyCode);
+  const money = (n: number | string | null | undefined) => formatMoney(n, currencyCode);
 
   // Page filter states
   const [search, setSearch] = useState('');
@@ -400,9 +400,19 @@ export default function ProductsPage() {
   };
 
   const handleDownloadTemplate = () => {
+    // OWN-5: la plantilla usaba ';' a la vez como separador de columnas y de
+    // specs, y sin comillas, así que al reimportarla "Núcleos:20" se leía como
+    // una columna extra y las specs se perdían. Ahora la columna va entrecomillada
+    // y las specs separadas por '|'.
+    //
+    // El delimitador de columnas sigue siendo ';' a propósito: Excel en español
+    // usa ';' como separador de lista, y con ',' abriría todo en una sola columna.
     const headers = "nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
-    const row = "Intel Core i7-14700K;Intel;409.99;389.99;15;Procesadores;Procesador de alto rendimiento para socket LGA1700;Frecuencia:3.4 GHz;Núcleos:20\n";
-    const blob = new Blob([headers + row], { type: 'text/csv;charset=utf-8;' });
+    const row = 'Intel Core i7-14700K;Intel;409.99;389.99;15;Procesadores;"Procesador de alto rendimiento para socket LGA1700";"Frecuencia:3.4 GHz|Núcleos:20"\n';
+
+    // BOM para que Excel lo abra como UTF-8; sin él "Núcleos" se ve como
+    // "NÃºcleos" y el dueño acaba reimportando esa basura.
+    const blob = new Blob(['﻿' + headers + row], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);

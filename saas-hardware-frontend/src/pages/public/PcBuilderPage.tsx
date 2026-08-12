@@ -82,7 +82,7 @@ export default function PcBuilderPage() {
   useTenantBranding(tenant, 'Armador de PC compatible', 'Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada.');
   useTenantTheme(tenant);
 
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   // Fetch Categories to map step keys
   const { data: categories = [] } = useQuery<Category[]>({

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,7 +54,7 @@ class PublicAuthController extends Controller
 
         return response()->json([
             'token' => $token->plainTextToken,
-            'user'  => $user,
+            'user'  => new UserResource($user),
         ], 201);
     }
 
@@ -95,7 +96,7 @@ class PublicAuthController extends Controller
 
         return response()->json([
             'token' => $token->plainTextToken,
-            'user'  => $user,
+            'user'  => new UserResource($user),
         ]);
     }
 
@@ -115,7 +116,7 @@ class PublicAuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => $request->user(),
+            'user' => new UserResource($request->user()),
         ]);
     }
 }

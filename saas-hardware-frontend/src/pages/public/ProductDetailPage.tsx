@@ -22,6 +22,7 @@ import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicRev
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
+import { COUNTRY_CODES, deriveCountryCode } from '../../utils/phone';
 import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
@@ -50,7 +51,8 @@ export default function ProductDetailPage() {
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+593');
+  // Prefijo por defecto derivado del WhatsApp de la tienda (PUB-4).
+  const [countryCodeOverride, setCountryCodeOverride] = useState<string | null>(null);
   const [formRating, setFormRating] = useState(5);
   const [formComment, setFormComment] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -224,7 +226,8 @@ export default function ProductDetailPage() {
 
   useTenantTheme(tenant);
 
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
+  const countryCode = countryCodeOverride ?? deriveCountryCode(tenant?.whatsapp_number);
 
   // Fetch Product Info
   const { data: product, isLoading, isError } = useQuery<Product>({
@@ -490,7 +493,9 @@ export default function ProductDetailPage() {
           <div className="pricing-stock-card">
             <div className="detail-price-box">
               <span className="price-label">
-                {product.sale_price !== null && product.sale_price !== undefined ? 'Precio de Oferta' : 'Precio Sugerido'}
+                {/* PUB-7: decía "Precio Sugerido", que en una tienda suena a
+                    precio de lista orientativo y no al precio que se cobra. */}
+                {product.sale_price !== null && product.sale_price !== undefined ? 'Precio de Oferta' : 'Precio'}
               </span>
               <span className="detail-price">
                 {product.sale_price !== null && product.sale_price !== undefined ? (
@@ -902,14 +907,12 @@ export default function ProductDetailPage() {
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
                     <select
                       value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
+                      onChange={(e) => setCountryCodeOverride(e.target.value)}
                       style={{ padding: '0.6rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontSize: '0.9rem', width: '90px', outline: 'none' }}
                     >
-                      <option value="+593">EC +593</option>
-                      <option value="+51">PE +51</option>
-                      <option value="+57">CO +57</option>
-                      <option value="+52">MX +52</option>
-                      <option value="+34">ES +34</option>
+                      {COUNTRY_CODES.map(({ code, label }) => (
+                        <option key={code} value={code}>{label}</option>
+                      ))}
                       <option value="">Otro</option>
                     </select>
                     <input

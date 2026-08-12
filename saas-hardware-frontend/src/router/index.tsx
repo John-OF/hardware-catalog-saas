@@ -1,4 +1,5 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Outlet } from 'react-router-dom';
+import RouteErrorFallback from '../components/ui/RouteErrorFallback';
 import PrivateRoute from './PrivateRoute';
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterStorePage from '../pages/auth/RegisterStorePage';
@@ -18,8 +19,17 @@ import ProductDetailPage from '../pages/public/ProductDetailPage';
 import PcBuilderPage from '../pages/public/PcBuilderPage';
 import PageDetailPage from '../pages/public/PageDetailPage';
 import OverviewPage from '../pages/dashboard/OverviewPage';
+import NotFoundPage from '../pages/NotFoundPage';
 
 export const router = createBrowserRouter([
+  {
+    // Ruta contenedora sin path: solo existe para colgarle un errorElement que
+    // cubra TODAS las rutas hijas. React Router intercepta los errores de una
+    // ruta antes de que lleguen a un boundary de React, asi que sin esto el
+    // usuario veria la pantalla de desarrollo del router con el stack trace.
+    element: <Outlet />,
+    errorElement: <RouteErrorFallback />,
+    children: [
   { path: '/login', element: <LoginPage /> },
   // Alta de tienda self-service. Va antes que '/:slug' y además 'register' es
   // un slug reservado en el backend, así que no puede chocar con un catálogo.
@@ -60,4 +70,10 @@ export const router = createBrowserRouter([
 
   // Redirigir raíz al catálogo (resolución dinámica de dominios)
   { path: '/', element: <CatalogPage /> },
+
+  // Cualquier otra cosa: 404 explícito en vez de pantalla en blanco (PUB-5).
+  // Va al final a propósito, después de las rutas con prefijo de slug.
+  { path: '*', element: <NotFoundPage /> },
+    ],
+  },
 ]);

@@ -45,12 +45,20 @@ class ImageService
 
     /**
      * Sube un favicon SIN pasar por el pipeline de WebP/escalado: un favicon
-     * debe conservar su formato original (.ico/.png/.svg) y ser pequeño.
+     * debe conservar su formato original (.ico/.png) y ser pequeño.
      * Devuelve la URL pública del archivo.
      */
     public function uploadFavicon(UploadedFile $file, string $tenantSlug): string
     {
-        $ext  = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+
+        // Segunda barrera además de la validación del controlador (TEC-7): la
+        // extensión decide con qué Content-Type se sirve el archivo, y un .svg
+        // servido desde el dominio de la tienda puede ejecutar JavaScript.
+        if (! in_array($ext, ['png', 'ico'], true)) {
+            $ext = 'png';
+        }
+
         $path = "branding/{$tenantSlug}/favicon-" . Str::uuid()->toString() . ".{$ext}";
 
         $disk = config('filesystems.default') === 'r2' ? 'r2' : 'public';

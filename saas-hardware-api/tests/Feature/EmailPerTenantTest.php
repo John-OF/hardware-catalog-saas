@@ -155,7 +155,14 @@ class EmailPerTenantTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertSame('admin', $response->json('user.role'));
-        $this->assertSame($this->tenantA->id, $response->json('user.tenant_id'));
+        // Se comprueba por id de usuario y no por tenant_id porque desde TEC-4 la
+        // respuesta ya no publica columnas internas. El id identifica igual de
+        // bien a QUE usuario resolvio el login, que es lo que este caso vigila.
+        $this->assertSame(
+            User::where('email', 'mismo@correo.com')->where('role', 'admin')->value('id'),
+            $response->json('user.id')
+        );
+        $this->assertSame($this->tenantA->id, User::find($response->json('user.id'))->tenant_id);
     }
 
     public function test_el_login_de_cliente_resuelve_el_usuario_de_su_propia_tienda(): void
@@ -170,7 +177,7 @@ class EmailPerTenantTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertSame('Cliente de B', $response->json('user.name'));
-        $this->assertSame($this->tenantB->id, $response->json('user.tenant_id'));
+        $this->assertSame($this->tenantB->id, User::find($response->json('user.id'))->tenant_id);
     }
 
     /**

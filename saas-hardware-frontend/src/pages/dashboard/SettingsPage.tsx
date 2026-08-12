@@ -416,12 +416,12 @@ export default function SettingsPage() {
           <div className="form-group full">
             <ImageSourceField
               label="Favicon (opcional)"
-              hint="Recomendado: imagen cuadrada pequeña (.png, .ico o .svg). Máx 512 KB."
+              hint="Imagen cuadrada pequeña en .png o .ico. Máx 512 KB."
               url={faviconUrl}
               onUrlChange={setFaviconUrl}
               file={faviconFile}
               onFileChange={setFaviconFile}
-              accept="image/png,image/x-icon,image/svg+xml,image/jpeg,image/webp"
+              accept="image/png,image/x-icon"
             />
           </div>
         </div>

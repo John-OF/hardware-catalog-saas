@@ -102,6 +102,81 @@ class PublicCatalogController extends Controller
     }
 
     /**
+     * Valores de especificación disponibles en todo el catálogo (PUB-2).
+     *
+     * El frontend armaba los filtros con los 24 productos de la página visible,
+     * así que las opciones cambiaban al paginar y no representaban el
+     * inventario: justo el filtro estrella de una tienda de componentes.
+     *
+     * La agregación se hace en PHP y no en SQL a propósito: `specs` es una
+     * columna JSON y sacar sus claves con SQL portable entre MySQL y SQLite
+     * (los tests) obliga a funciones distintas en cada motor. Se trae una sola
+     * columna y el resultado va cacheado con la misma versión que el catálogo,
+     * que ya se incrementa al guardar cualquier producto.
+     */
+    public function facets(Request $request, string $slug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn () => 1);
+        $categoryId = $request->query('category_id');
+        $cacheKey = "facets:{$slug}:v{$version}:".md5((string) $categoryId);
+
+        $facets = Cache::remember($cacheKey, 300, function () use ($tenant, $categoryId) {
+            $listas = Product::where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->where('status', 'published')
+                ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
+                ->whereNotNull('specs')
+                ->pluck('specs');
+
+            $agrupadas = [];
+
+            foreach ($listas as $specs) {
+                if (! is_array($specs)) {
+                    continue;
+                }
+
+                foreach ($specs as $clave => $valor) {
+                    $clave = trim((string) $clave);
+                    $valor = trim((string) $valor);
+
+                    if ($clave === '' || $valor === '') {
+                        continue;
+                    }
+
+                    // Se acumula como VALOR y no como clave: PHP convierte las
+                    // claves numéricas a int, así que una spec como
+                    // "Cores: 24" volvería como número y dejaría de casar con
+                    // el filtro, que compara contra texto.
+                    $agrupadas[$clave][] = $valor;
+                }
+            }
+
+            $resultado = [];
+
+            foreach ($agrupadas as $clave => $valores) {
+                $valores = array_unique($valores);
+
+                // Orden natural para que "8GB, 16GB, 32GB" no salga como
+                // "16GB, 32GB, 8GB", que es lo que hace un sort alfabético.
+                natcasesort($valores);
+
+                // Tope defensivo: una spec de texto libre (una descripción
+                // metida como spec) podría traer miles de valores distintos y
+                // reventar la respuesta.
+                $resultado[$clave] = array_slice(array_values($valores), 0, 60);
+            }
+
+            ksort($resultado);
+
+            return $resultado;
+        });
+
+        return response()->json(['specs' => $facets]);
+    }
+
+    /**
      * Ordena el catálogo público según la preferencia del comprador (PUB-1).
      *
      * El valor llega por query string, así que se resuelve contra una whitelist:

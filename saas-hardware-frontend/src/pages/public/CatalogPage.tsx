@@ -15,6 +15,7 @@ import {
   Plus,
   Cpu,
   X,
+  SlidersHorizontal,
   Star,
   CheckCircle,
   User,
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
-import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
+import { getPublicFacets, getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
 import { getPublicPages } from '../../api/pages';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import CartDrawer from '../../components/public/CartDrawer';
@@ -50,7 +51,9 @@ export default function CatalogPage() {
   const [page, setPage] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [selectedSpecs, setSelectedSpecs] = useState<Record<string, string>>({});
-  const [availableSpecs, setAvailableSpecs] = useState<Record<string, Set<string>>>({});
+  // Drawer de filtros en móvil (PUB-6). En escritorio la sidebar es fija y este
+  // estado no pinta nada.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Reset filter when changing category
   useEffect(() => {
@@ -125,7 +128,7 @@ export default function CatalogPage() {
   });
 
   const resolvedSlug = tenant?.slug;
-  const money = (n: number | string) => formatMoney(n, tenant?.currency);
+  const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   // Fetch Pages públicas
   const { data: publicPages = [] } = useQuery<Page[]>({
@@ -138,20 +141,7 @@ export default function CatalogPage() {
   useTenantBranding(tenant);
   useTenantTheme(tenant);
 
-  // Fetch active categories (since it's a shared db, we can fetch all, but the API filters by active tenant context based on headers? 
-  // Wait, for public endpoints, does the API filter categories? 
-  // Oh! CategoryController's index gets categories, but CategoryController is authenticated!
-  // Wait, let's check: does PublicCatalogController have a categories endpoint?
-  // Let's look at PublicCatalogController.php: it does NOT have a categories endpoint!
-  // Wait, then how does the frontend display categories on the public catalog page?
-  // Ah! PublicCatalogController@products returns the products with `with('category')` so we can collect unique categories from the products list, 
-  // OR we can fetch them. Let's see: in `routes/api.php`:
-  // Route::prefix('public/{slug}')->group(function () {
-  //     Route::get('/',          [PublicCatalogController::class, 'tenant']);
-  //     Route::get('/products',  [PublicCatalogController::class, 'products']);
-  //     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
-  // });
-  // Indeed, there is no public categories list endpoint.
+  // Categorías activas de la tienda para el filtro lateral.
   const { data: publicCategories = [] } = useQuery<Category[]>({
     queryKey: ['publicCategories', resolvedSlug],
     queryFn: async () => {
@@ -190,6 +180,23 @@ export default function CatalogPage() {
     ];
   }
 
+  // Facetas de specs de TODO el catálogo (PUB-2). Antes se derivaban de los 24
+  // productos de la página visible, así que las opciones cambiaban al paginar.
+  // La queryKey NO incluye specs ni página a propósito: las opciones solo deben
+  // cambiar al cambiar de categoría, o el filtro se movería bajo el cursor.
+  const { data: facetsData } = useQuery<{ specs: Record<string, string[]> }>({
+    queryKey: ['publicFacets', resolvedSlug, selectedCategory],
+    queryFn: () => getPublicFacets(resolvedSlug!, { category_id: selectedCategory || undefined }),
+    enabled: !!resolvedSlug,
+  });
+
+  const availableSpecs = facetsData?.specs ?? {};
+
+  // Se muestra en el botón "Filtrar" de móvil: con la sidebar escondida, el
+  // comprador no tiene otra forma de saber que hay filtros puestos.
+  const activeFiltersCount =
+    Object.keys(selectedSpecs).length + (selectedCategory ? 1 : 0) + (inStock ? 1 : 0);
+
   const products = paginatedData?.data || [];
   const totalPages = paginatedData?.last_page || 1;
 
@@ -200,28 +207,6 @@ export default function CatalogPage() {
     return `/${resolvedSlug}${path}`;
   };
 
-  // Extract unique spec values from products list
-  useEffect(() => {
-    if (Object.keys(selectedSpecs).length === 0 && paginatedData?.data) {
-      const specsMap: Record<string, Set<string>> = {};
-      paginatedData.data.forEach((prod) => {
-        if (prod.specs) {
-          Object.entries(prod.specs).forEach(([key, val]) => {
-            if (key && val) {
-              const valStr = val.toString().trim();
-              if (valStr !== '') {
-                if (!specsMap[key]) {
-                  specsMap[key] = new Set<string>();
-                }
-                specsMap[key].add(valStr);
-              }
-            }
-          });
-        }
-      });
-      setAvailableSpecs(specsMap);
-    }
-  }, [paginatedData, selectedSpecs]);
 
   // Fetch customer favorites on load if logged in
   useEffect(() => {
@@ -369,11 +354,52 @@ export default function CatalogPage() {
             );
           }
 
+          if (sec.type === 'categories') {
+            // PUB-7: esta sección existía en Configuración pero no se renderizaba
+            // en ningún sitio, así que activarla no hacía absolutamente nada.
+            if (publicCategories.length === 0) return null;
+
+            return (
+              <section key={sec.id} className="featured-categories animate-fade-in">
+                <h2 className="featured-categories-title">Categorías destacadas</h2>
+                <div className="featured-categories-grid">
+                  {publicCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={`featured-category-card glass-card ${selectedCategory === cat.id ? 'active' : ''}`}
+                      onClick={() => {
+                        // Filtra la grilla de abajo, que es justo lo que espera
+                        // quien pulsa una categoría destacada.
+                        setSelectedCategory(selectedCategory === cat.id ? '' : cat.id);
+                        setPage(1);
+                      }}
+                    >
+                      <CategoryIcon slug={cat.icon} size={22} />
+                      <span>{cat.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
           if (sec.type === 'featured') {
             return (
               <div key={sec.id} className="catalog-content-layout animate-fade-in">
+                {/* Fondo oscuro del drawer en móvil: cierra al tocar fuera. */}
+                {filtersOpen && (
+                  <div className="filters-backdrop" onClick={() => setFiltersOpen(false)} />
+                )}
+
                 {/* Filters Sidebar */}
-                <aside className="catalog-sidebar glass-card">
+                <aside className={`catalog-sidebar glass-card ${filtersOpen ? 'is-open' : ''}`}>
+                  <div className="filters-drawer-head">
+                    <span>Filtros</span>
+                    <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">
+                      <X size={18} />
+                    </button>
+                  </div>
                   <div className="sidebar-section">
                     <h3>Categorías</h3>
                     <div className="category-filters-list">
@@ -477,6 +503,17 @@ export default function CatalogPage() {
                 <div className="catalog-main-area">
                   {/* Topbar Search */}
                   <div className="search-bar-row glass-card">
+                    {/* Solo visible en móvil: ahí la sidebar vive en un drawer. */}
+                    <button
+                      type="button"
+                      className="mobile-filters-btn"
+                      onClick={() => setFiltersOpen(true)}
+                    >
+                      <SlidersHorizontal size={16} />
+                      Filtrar
+                      {activeFiltersCount > 0 && <span className="filters-count">{activeFiltersCount}</span>}
+                    </button>
+
                     <div className="search-box">
                       <Search size={18} className="search-icon" />
                       <input
@@ -688,6 +725,7 @@ export default function CatalogPage() {
         onClose={() => setAccountModalOpen(false)} 
         tenantSlug={resolvedSlug!} 
         currency={tenant?.currency}
+        whatsappNumber={tenant?.whatsapp_number}
       />
 
         {/* Barra Flotante de Comparación */}
@@ -1639,13 +1677,138 @@ export default function CatalogPage() {
         .text-success { color: #34d399; }
         .text-danger { color: #f87171; }
 
+        /* Categorías destacadas (PUB-7) */
+        .featured-categories {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .featured-categories-title {
+          font-size: 1.15rem;
+          color: var(--text-primary);
+        }
+
+        .featured-categories-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 0.75rem;
+        }
+
+        .featured-category-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 1.1rem 0.75rem;
+          border-radius: var(--radius-lg);
+          color: var(--text-primary);
+          font-size: 0.88rem;
+          font-weight: 500;
+          text-align: center;
+          cursor: pointer;
+          transition: var(--transition);
+        }
+
+        .featured-category-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--primary);
+        }
+
+        .featured-category-card.active {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
+        /* Botón y cabecera del drawer: solo existen en móvil. */
+        .mobile-filters-btn,
+        .filters-drawer-head,
+        .filters-backdrop {
+          display: none;
+        }
+
         /* Responsive */
         @media (max-width: 960px) {
+          /* PUB-6: el tráfico llega sobre todo desde WhatsApp, o sea móvil. Antes
+             la columna apilaba la sidebar ARRIBA y el comprador tenía que pasar
+             categorías, stock y todas las specs para ver el primer producto. */
           .catalog-content-layout {
             flex-direction: column;
           }
+
           .catalog-sidebar {
-            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 120;
+            width: min(320px, 85vw);
+            max-height: 100vh;
+            overflow-y: auto;
+            border-radius: 0;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+          }
+
+          .catalog-sidebar.is-open {
+            transform: translateX(0);
+          }
+
+          .filters-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            z-index: 110;
+            background: rgba(0, 0, 0, 0.5);
+          }
+
+          .filters-drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: 600;
+            color: var(--text-primary);
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+          }
+
+          .filters-drawer-head button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            padding: 0.25rem;
+          }
+
+          .mobile-filters-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.55rem 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            flex-shrink: 0;
+          }
+
+          .filters-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 0.3rem;
+            border-radius: 9px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 700;
           }
         }
       `}</style>

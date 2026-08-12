@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -91,7 +92,7 @@ class AuthController extends Controller
             // refresh() para que la respuesta incluya los campos con valor por
             // defecto en la base (tenant.plan, is_active...). Sin esto el modelo
             // recien creado los omite y el panel recibe un tenant incompleto.
-            'user'   => $user->refresh(),
+            'user'   => new UserResource($user->refresh()),
             'tenant' => $tenant->refresh(),
         ], 201);
     }
@@ -140,7 +141,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token'  => $token->plainTextToken,
-            'user'   => $user,
+            'user'   => new UserResource($user),
             'tenant' => $user->tenant,
         ]);
     }
@@ -241,7 +242,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user'   => $request->user(),
+            'user'   => new UserResource($request->user()),
             'tenant' => $request->user()->tenant,
         ]);
     }
