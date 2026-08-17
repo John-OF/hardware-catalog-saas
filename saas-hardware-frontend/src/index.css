@@ -6,17 +6,8 @@
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-glow: rgba(37, 99, 235, 0.15);
-  
-  --bg-app: #0b0f19;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-card-hover: rgba(26, 36, 56, 0.85);
-  --bg-sidebar: #0f172a;
-  --bg-select-option: #111827;
 
-  /* Fondo de los campos de formulario del catálogo público (PERS-1). Antes iba
-     `rgba(0,0,0,0.2)` incrustado en cada input, que sobre el modo claro daba un
-     recuadro gris con texto blanco encima: ilegible. */
-  --bg-input: rgba(0, 0, 0, 0.2);
+  --bg-sidebar: #0f172a;
 
   /* Acento del tenant. useTenantTheme lo sobreescribe; aquí vive el valor por
      defecto para que las vistas puedan usarlo aunque la tienda no lo defina. */
@@ -26,17 +17,8 @@
      oferta). No cambia con el modo claro a propósito: el fondo tampoco. */
   --text-on-primary: #ffffff;
 
-  /* Degradado de los títulos grandes del catálogo. Con `background-clip: text`
-     hacen falta dos colores, así que no basta con --text-primary. */
-  --gradient-title: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
-
-  --border: rgba(255, 255, 255, 0.08);
   --border-focus: rgba(37, 99, 235, 0.5);
-  
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
+
   --success: #10b981;
   --success-glow: rgba(16, 185, 129, 0.15);
   --danger: #ef4444;
@@ -54,8 +36,6 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
-  --glass-bg: rgba(15, 23, 42, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.05);
   --glass-blur: blur(12px);
 
   /* Radius & Transitions */
@@ -66,31 +46,254 @@
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Light Mode Override (Optional / Tenant Specific) */
+/* ==========================================================================
+   TONO NEUTRAL DE LA TIENDA (PERS-2 / 9.2)
+   ==========================================================================
+   `theme.neutral` elige la base neutral de la tienda. Lo que cambia es la
+   paleta ESTRUCTURAL (fondos, bordes, texto, tarjetas); el primario y el
+   acento los sigue eligiendo el dueño aparte, así que dos tiendas con el mismo
+   primario pueden verse distintas.
+
+   useTenantTheme pone la clase `neutral-<tono>` en el <body>, junto a
+   `light-mode` si la tienda está en modo claro. `slate` es el tono histórico:
+   comparte declaraciones con `:root` / `.light-mode` en vez de duplicarlas,
+   para que no puedan desincronizarse.
+
+   OJO al añadir un tono: las variantes oscuras van en este bloque y las claras
+   MÁS ABAJO, después de `.light-mode`. Es a propósito. Si una variante clara se
+   deja incompleta, el token que falte cae a `.light-mode` (slate claro, misma
+   especificidad pero posterior en el archivo) en vez de quedarse con el valor
+   oscuro: el fallo se ve como "el tono no es el elegido" y no como texto claro
+   sobre fondo claro, que es ilegible.
+
+   Cada tono define exactamente estos 13 tokens.
+   -------------------------------------------------------------------------- */
+
+/* Pizarra — azulado. El tono histórico de la plataforma. */
+:root,
+.neutral-slate {
+  --bg-app: #0b0f19;
+  --bg-card: rgba(17, 24, 39, 0.7);
+  --bg-card-hover: rgba(26, 36, 56, 0.85);
+  --bg-select-option: #111827;
+
+  /* Fondo de los campos de formulario del catálogo público (PERS-1). Antes iba
+     `rgba(0,0,0,0.2)` incrustado en cada input, que sobre el modo claro daba un
+     recuadro gris con texto blanco encima: ilegible. */
+  --bg-input: rgba(0, 0, 0, 0.2);
+
+  --border: rgba(255, 255, 255, 0.08);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --glass-bg: rgba(15, 23, 42, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
+
+  /* Degradado de los títulos grandes del catálogo. Con `background-clip: text`
+     hacen falta dos colores, así que no basta con --text-primary. */
+  --gradient-title: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+}
+
+/* Grafito — gris puro, sin tinte de color. */
+.neutral-zinc {
+  --bg-app: #09090b;
+  --bg-card: rgba(24, 24, 27, 0.7);
+  --bg-card-hover: rgba(39, 39, 42, 0.85);
+  --bg-select-option: #18181b;
+  --bg-input: rgba(0, 0, 0, 0.28);
+
+  --border: rgba(255, 255, 255, 0.09);
+
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  --glass-bg: rgba(24, 24, 27, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
+
+  --gradient-title: linear-gradient(135deg, #fafafa 0%, #d4d4d8 100%);
+}
+
+/* Arena — gris cálido, tirando a marrón. */
+.neutral-stone {
+  --bg-app: #0f0d0c;
+  --bg-card: rgba(28, 25, 23, 0.72);
+  --bg-card-hover: rgba(41, 37, 36, 0.85);
+  --bg-select-option: #1c1917;
+  --bg-input: rgba(0, 0, 0, 0.24);
+
+  --border: rgba(250, 240, 230, 0.1);
+
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-muted: #78716c;
+
+  --glass-bg: rgba(28, 25, 23, 0.72);
+  --glass-border: rgba(250, 240, 230, 0.07);
+  --glass-border-hover: rgba(250, 240, 230, 0.16);
+
+  --gradient-title: linear-gradient(135deg, #fafaf9 0%, #d6d3d1 100%);
+}
+
+/* Marino — azul profundo y saturado. */
+.neutral-navy {
+  --bg-app: #071129;
+  --bg-card: rgba(12, 26, 54, 0.72);
+  --bg-card-hover: rgba(19, 38, 74, 0.85);
+  --bg-select-option: #0c1a36;
+  --bg-input: rgba(0, 0, 0, 0.26);
+
+  --border: rgba(148, 190, 255, 0.12);
+
+  --text-primary: #eff6ff;
+  --text-secondary: #9db6d8;
+  --text-muted: #6b83a8;
+
+  --glass-bg: rgba(9, 20, 44, 0.72);
+  --glass-border: rgba(148, 190, 255, 0.09);
+  --glass-border-hover: rgba(148, 190, 255, 0.2);
+
+  --gradient-title: linear-gradient(135deg, #eff6ff 0%, #bfdbfe 100%);
+}
+
+/* Ciruela — neutro violáceo. */
+.neutral-plum {
+  --bg-app: #14101d;
+  --bg-card: rgba(30, 23, 44, 0.72);
+  --bg-card-hover: rgba(44, 33, 64, 0.85);
+  --bg-select-option: #1e172c;
+  --bg-input: rgba(0, 0, 0, 0.26);
+
+  --border: rgba(216, 180, 254, 0.12);
+
+  --text-primary: #faf5ff;
+  --text-secondary: #b0a2c4;
+  --text-muted: #7f7191;
+
+  --glass-bg: rgba(26, 20, 38, 0.72);
+  --glass-border: rgba(216, 180, 254, 0.09);
+  --glass-border-hover: rgba(216, 180, 254, 0.2);
+
+  --gradient-title: linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%);
+}
+
+/* --- MODO CLARO: ajustes que no dependen del tono neutral --- */
 .light-mode {
+  --bg-sidebar: #0f172a; /* Mantiene barra oscura */
+  --border-focus: rgba(37, 99, 235, 0.6);
+}
+
+/* --- MODO CLARO: variante clara de cada tono neutral ---
+   Van después de los bloques oscuros a propósito; ver la nota de arriba. */
+
+.light-mode,
+.neutral-slate.light-mode {
   --bg-app: #f8fafc;
   --bg-card: rgba(255, 255, 255, 0.85);
   --bg-card-hover: rgba(255, 255, 255, 0.95);
-  --bg-sidebar: #0f172a; /* Mantiene barra oscura */
   --bg-select-option: #ffffff;
-  
-  --border: rgba(15, 23, 42, 0.08);
-  --border-focus: rgba(37, 99, 235, 0.6);
-  
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(15, 23, 42, 0.06);
 
   /* Sin esto, los formularios del catálogo (reseñas, "avísame", checkout)
      quedaban con texto oscuro sobre un recuadro casi negro en modo claro. */
   --bg-input: #ffffff;
 
+  --border: rgba(15, 23, 42, 0.08);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(15, 23, 42, 0.06);
+  --glass-border-hover: rgba(15, 23, 42, 0.14);
+
   /* En claro el degradado del título tiene que ir de oscuro a oscuro, o el
      título desaparece sobre el fondo blanco. */
   --gradient-title: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+}
+
+.neutral-zinc.light-mode {
+  --bg-app: #fafafa;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: #ffffff;
+  --bg-select-option: #ffffff;
+  --bg-input: #ffffff;
+
+  --border: rgba(9, 9, 11, 0.1);
+
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(9, 9, 11, 0.07);
+  --glass-border-hover: rgba(9, 9, 11, 0.16);
+
+  --gradient-title: linear-gradient(135deg, #18181b 0%, #52525b 100%);
+}
+
+.neutral-stone.light-mode {
+  --bg-app: #f7f5f2;
+  --bg-card: rgba(255, 253, 250, 0.9);
+  --bg-card-hover: #fffdfa;
+  --bg-select-option: #fffdfa;
+  --bg-input: #fffdfa;
+
+  --border: rgba(28, 25, 23, 0.1);
+
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #a8a29e;
+
+  --glass-bg: rgba(255, 253, 250, 0.82);
+  --glass-border: rgba(28, 25, 23, 0.07);
+  --glass-border-hover: rgba(28, 25, 23, 0.16);
+
+  --gradient-title: linear-gradient(135deg, #1c1917 0%, #57534e 100%);
+}
+
+.neutral-navy.light-mode {
+  --bg-app: #eef3fa;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: #ffffff;
+  --bg-select-option: #ffffff;
+  --bg-input: #ffffff;
+
+  --border: rgba(12, 26, 54, 0.11);
+
+  --text-primary: #0c1a36;
+  --text-secondary: #445b7d;
+  --text-muted: #8aa0bd;
+
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(12, 26, 54, 0.07);
+  --glass-border-hover: rgba(12, 26, 54, 0.16);
+
+  --gradient-title: linear-gradient(135deg, #0c1a36 0%, #445b7d 100%);
+}
+
+.neutral-plum.light-mode {
+  --bg-app: #f8f5fc;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: #ffffff;
+  --bg-select-option: #ffffff;
+  --bg-input: #ffffff;
+
+  --border: rgba(30, 23, 44, 0.11);
+
+  --text-primary: #1e172c;
+  --text-secondary: #57496b;
+  --text-muted: #9c8fae;
+
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(30, 23, 44, 0.07);
+  --glass-border-hover: rgba(30, 23, 44, 0.16);
+
+  --gradient-title: linear-gradient(135deg, #1e172c 0%, #57496b 100%);
 }
 
 /* --- ADMIN PANEL: tema neutro claro (solo dentro del layout del dashboard) --- */
@@ -126,6 +329,7 @@
   --shadow-xl: 0 8px 20px -6px rgba(0, 0, 0, 0.10);
   --glass-bg: #ffffff;
   --glass-border: #e4e4e7;
+  --glass-border-hover: #d4d4d8;
   --glass-blur: none;
 
   --radius-sm: 6px;
@@ -190,6 +394,7 @@
   --shadow-xl: 0 8px 20px -6px rgba(0, 0, 0, 0.45);
   --glass-bg: #1c1c1f;
   --glass-border: #2b2b30;
+  --glass-border-hover: #3f3f46;
 
   --overlay-mix: 255, 255, 255;
 }
@@ -225,6 +430,7 @@
   --shadow-xl: 0 8px 20px -6px rgba(0, 0, 0, 0.10);
   --glass-bg: #ffffff;
   --glass-border: #e4e4e7;
+  --glass-border-hover: #d4d4d8;
   --glass-blur: none;
 
   --radius-lg: 10px;
@@ -340,7 +546,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--glass-border-hover);
   transform: translateY(-2px);
 }
 

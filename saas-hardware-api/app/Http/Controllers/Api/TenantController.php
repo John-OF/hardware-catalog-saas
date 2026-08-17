@@ -49,6 +49,13 @@ class TenantController extends Controller
             'theme.banner_url'    => 'nullable|url|max:500',
             'theme.accent_color'  => 'nullable|regex:/^#[0-9A-Fa-f]{6}$/',
             'theme.color_mode'    => 'nullable|in:dark,light',
+
+            // Tono neutral de la tienda (PERS-2). La paleta vive en el frontend
+            // (index.css + src/utils/neutrals.ts); aquí solo se valida la clave
+            // para no guardar en el JSON un valor que ninguna hoja de estilos
+            // sepa pintar. Al añadir un tono hay que ampliar esta lista también.
+            'theme.neutral'       => 'nullable|in:slate,zinc,stone,navy,plum',
+
             'theme.layout'        => 'nullable|in:grid,compact,list',
             'theme.font'          => 'nullable|in:sans,serif,mono,heading',
             'theme.sections'      => 'nullable|string',

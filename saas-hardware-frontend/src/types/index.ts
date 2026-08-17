@@ -1,13 +1,25 @@
+/** Base neutral de la tienda (PERS-2). Ver src/utils/neutrals.ts. */
+export type TenantNeutral = 'slate' | 'zinc' | 'stone' | 'navy' | 'plum';
+
+/** Familia tipografica de la tienda (PERS-6). Ver src/utils/fonts.ts. */
+export type TenantFont = 'sans' | 'serif' | 'mono' | 'heading';
+
+/** Plantilla de la grilla del catalogo (4.4). */
+export type TenantLayout = 'grid' | 'compact' | 'list';
+
+export type TenantColorMode = 'dark' | 'light';
+
 export interface TenantTheme {
   hero_title?: string | null;
   hero_subtitle?: string | null;
   banner_url?: string | null;
   accent_color?: string | null;
-  color_mode?: 'dark' | 'light' | null;
+  color_mode?: TenantColorMode | null;
+  neutral?: TenantNeutral | null;
   page_title?: string | null;
   favicon_url?: string | null;
-  layout?: 'grid' | 'compact' | 'list' | null;
-  font?: 'sans' | 'serif' | 'mono' | 'heading' | null;
+  layout?: TenantLayout | null;
+  font?: TenantFont | null;
   sections?: any;
 }
 

@@ -13,11 +13,26 @@ import {
   Sun,
   Layout,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  WandSparkles,
+  Check
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
 import { CURRENCIES, DEFAULT_CURRENCY, formatMoney } from '../../utils/money';
+import { DEFAULT_NEUTRAL, NEUTRALS, neutralClass } from '../../utils/neutrals';
+import { fontOf } from '../../utils/fonts';
+import { THEME_PRESETS, matchingPreset } from '../../utils/themePresets';
+import type { ThemePreset } from '../../utils/themePresets';
+import type { TenantColorMode, TenantFont, TenantLayout, TenantNeutral } from '../../types';
+
+/** Nombre corto de cada plantilla para la ficha de preset. El selector de abajo
+ *  usa textos largos ("Boutique (Tarjetas Grandes)"), que aquí no caben. */
+const LAYOUT_LABELS: Record<TenantLayout, string> = {
+  grid: 'Tarjetas',
+  compact: 'Compacta',
+  list: 'Lista',
+};
 
 export default function SettingsPage() {
   const { tenant, setTenant } = useTenantStore();
@@ -31,7 +46,8 @@ export default function SettingsPage() {
   
   // Estados para el tema (colores, portada, etc.)
   const [accentColor, setAccentColor] = useState('#06b6d4');
-  const [colorMode, setColorMode] = useState<'dark' | 'light'>('dark');
+  const [colorMode, setColorMode] = useState<TenantColorMode>('dark');
+  const [neutral, setNeutral] = useState<TenantNeutral>(DEFAULT_NEUTRAL);
   const [heroTitle, setHeroTitle] = useState('');
   const [heroSubtitle, setHeroSubtitle] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
@@ -40,8 +56,8 @@ export default function SettingsPage() {
   
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
-  const [layout, setLayout] = useState<'grid' | 'compact' | 'list'>('grid');
-  const [font, setFont] = useState<'sans' | 'serif' | 'mono' | 'heading'>('sans');
+  const [layout, setLayout] = useState<TenantLayout>('grid');
+  const [font, setFont] = useState<TenantFont>('sans');
   const [sections, setSections] = useState<{ id: string; type: string; title: string; enabled: boolean }[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +80,7 @@ export default function SettingsPage() {
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
     setColorMode(th.color_mode ?? 'dark');
+    setNeutral(th.neutral ?? DEFAULT_NEUTRAL);
     setHeroTitle(th.hero_title ?? '');
     setHeroSubtitle(th.hero_subtitle ?? '');
     setBannerUrl(th.banner_url ?? '');
@@ -90,6 +107,40 @@ export default function SettingsPage() {
     setSections(parsedSections);
   }, [tenant]);
 
+  /**
+   * Preset aplicado ahora mismo, o null si el dueño retocó algo después.
+   *
+   * Se recalcula en cada render en vez de guardarse en estado: si fuera estado
+   * habría que acordarse de limpiarlo en los seis `setX` que puede tocar el
+   * dueño a mano, y el primero que se olvide deja la ficha marcada mintiendo.
+   */
+  const activePreset = matchingPreset({
+    primary_color: primaryColor,
+    accent_color: accentColor,
+    neutral,
+    color_mode: colorMode,
+    font,
+    layout,
+  });
+
+  /**
+   * Vuelca el preset en el formulario. NO guarda: el dueño puede seguir
+   * ajustando y pulsa "Guardar cambios" cuando le convence.
+   *
+   * Solo toca las seis perillas de estilo. El nombre, el WhatsApp, el hero, las
+   * páginas y las secciones de portada son contenido de la tienda, no aspecto:
+   * un preset que los pisara borraría trabajo del dueño.
+   */
+  const applyPreset = (preset: ThemePreset) => {
+    setPrimaryColor(preset.primary_color);
+    setAccentColor(preset.accent_color);
+    setNeutral(preset.neutral);
+    setColorMode(preset.color_mode);
+    setFont(preset.font);
+    setLayout(preset.layout);
+    toast.success(`Tema "${preset.name}" aplicado. Guarda para publicarlo.`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -107,6 +158,7 @@ export default function SettingsPage() {
         banner_url: bannerUrl || null,
         accent_color: accentColor || null,
         color_mode: colorMode,
+        neutral,
         page_title: pageTitle || null,
         favicon_url: faviconUrl || null,
         layout,
@@ -220,6 +272,79 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Temas prediseñados (9.3) */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <WandSparkles size={18} />
+          <div>
+            <h3>Temas prediseñados</h3>
+            <p>
+              Aplica un estilo completo de un clic y ajusta después lo que quieras.
+              No se publica hasta que pulses «Guardar cambios».
+            </p>
+          </div>
+        </div>
+
+        <div className="preset-gallery">
+          {THEME_PRESETS.map((preset) => {
+            const isActive = activePreset?.id === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                className={`preset-card${isActive ? ' active' : ''}`}
+                onClick={() => applyPreset(preset)}
+                aria-pressed={isActive}
+              >
+                {/* La miniatura usa la clase de paleta real del tono y le mete
+                    encima el primario/acento del preset como variables inline,
+                    así que muestra los colores de verdad y no una copia. */}
+                <span
+                  className={`preset-preview ${neutralClass(preset.neutral)}${preset.color_mode === 'light' ? ' light-mode' : ''}`}
+                  style={{
+                    '--primary': preset.primary_color,
+                    '--accent': preset.accent_color,
+                    fontFamily: fontOf(preset.font).heading,
+                  } as React.CSSProperties}
+                >
+                  <span className="pp-hero">
+                    <span className="pp-chip" />
+                    <span className="pp-title">Aa</span>
+                  </span>
+                  <span className="pp-grid">
+                    <span className="pp-item">
+                      <span className="pp-img" />
+                      <span className="pp-price" />
+                    </span>
+                    <span className="pp-item">
+                      <span className="pp-img" />
+                      <span className="pp-price" />
+                    </span>
+                  </span>
+                </span>
+
+                <span className="preset-name">
+                  {preset.name}
+                  {isActive && <Check size={13} />}
+                </span>
+                <span className="preset-hint">{preset.hint}</span>
+                <span className="preset-meta">
+                  {preset.color_mode === 'light' ? 'Claro' : 'Oscuro'}
+                  {' · '}{fontOf(preset.font).label}
+                  {' · '}{LAYOUT_LABELS[preset.layout]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <span className="helper-text preset-foot">
+          {activePreset
+            ? `Estás usando «${activePreset.name}». Cualquier cambio que hagas abajo lo deja como tema propio.`
+            : 'Tu tienda usa una combinación propia. Aplicar un tema reemplaza colores, tono, modo, fuente y plantilla.'}
+        </span>
+      </section>
+
       {/* Estructura y Estilos */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
@@ -234,7 +359,7 @@ export default function SettingsPage() {
             <label>Plantilla del Catálogo (Layout)</label>
             <select 
               value={layout} 
-              onChange={(e) => setLayout(e.target.value as any)} 
+              onChange={(e) => setLayout(e.target.value as TenantLayout)}
               className="premium-input"
               style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
             >
@@ -248,7 +373,7 @@ export default function SettingsPage() {
             <label>Fuente Tipográfica</label>
             <select 
               value={font} 
-              onChange={(e) => setFont(e.target.value as any)} 
+              onChange={(e) => setFont(e.target.value as TenantFont)}
               className="premium-input"
               style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
             >
@@ -295,6 +420,38 @@ export default function SettingsPage() {
                 <Sun size={16} /> Claro
               </button>
             </div>
+          </div>
+
+          <div className="form-group full">
+            <label>Tono neutral</label>
+            <div className="neutral-picker">
+              {NEUTRALS.map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`neutral-option${neutral === value ? ' active' : ''}`}
+                  onClick={() => setNeutral(value)}
+                  aria-pressed={neutral === value}
+                  title={`${label} — ${hint}`}
+                >
+                  {/* La miniatura lleva las MISMAS clases de paleta que el body
+                      del catálogo público, así que se pinta sola con los colores
+                      reales de index.css y no puede quedar desfasada. */}
+                  <span className={`neutral-preview ${neutralClass(value)}${colorMode === 'light' ? ' light-mode' : ''}`}>
+                    <span className="np-card">
+                      <span className="np-line" />
+                      <span className="np-line short" />
+                    </span>
+                  </span>
+                  <span className="neutral-name">{label}</span>
+                  <span className="neutral-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+            <span className="helper-text">
+              Es la base de fondos, bordes y textos del catálogo. El color principal y el de
+              acento no cambian: dos tiendas con el mismo color se ven distintas según el tono.
+            </span>
           </div>
         </div>
       </section>
@@ -453,6 +610,35 @@ export default function SettingsPage() {
         .segment { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; width: fit-content; }
         .segment button { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 1.1rem; background: transparent; border: none; color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: var(--transition); }
         .segment button.active { background: var(--primary); color: #fff; }
+        .preset-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 0.85rem; }
+        .preset-card { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.6rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
+        .preset-card:hover { border-color: var(--text-muted); transform: translateY(-1px); }
+        .preset-card.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+        /* Miniatura: hereda del preset las variables de paleta (por la clase de
+           tono) y el primario/acento (inline), asi que se pinta sola. */
+        .preset-preview { display: flex; flex-direction: column; gap: 5px; height: 84px; padding: 6px; margin-bottom: 0.55rem; border-radius: var(--radius-sm); background: var(--bg-app); overflow: hidden; }
+        .pp-hero { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
+        .pp-chip { width: 14px; height: 6px; border-radius: 3px; background: var(--accent); flex: none; }
+        .pp-title { font-size: 11px; font-weight: 700; line-height: 1; color: var(--text-primary); }
+        .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; flex: 1; }
+        .pp-item { display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
+        .pp-img { flex: 1; border-radius: 2px; background: var(--bg-card-hover); }
+        .pp-price { height: 5px; width: 62%; border-radius: 3px; background: var(--primary); }
+        .preset-name { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+        .preset-name svg { color: var(--primary); }
+        .preset-hint { font-size: 0.72rem; line-height: 1.35; color: var(--text-secondary); }
+        .preset-meta { margin-top: 0.2rem; font-size: 0.68rem; color: var(--text-muted); }
+        .preset-foot { display: block; margin-top: 1rem; }
+        .neutral-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 0.6rem; }
+        .neutral-option { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.5rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
+        .neutral-option:hover { border-color: var(--text-muted); }
+        .neutral-option.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+        .neutral-preview { display: block; height: 52px; padding: 0.45rem; margin-bottom: 0.4rem; border-radius: var(--radius-sm); background: var(--bg-app); overflow: hidden; }
+        .np-card { display: block; height: 100%; padding: 0.4rem; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
+        .np-line { display: block; height: 5px; border-radius: 3px; background: var(--text-primary); }
+        .np-line.short { width: 55%; margin-top: 6px; background: var(--text-secondary); }
+        .neutral-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+        .neutral-hint { font-size: 0.7rem; color: var(--text-muted); }
         .settings-actions { display: flex; justify-content: flex-end; }
         .settings-actions .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; }
         .spinner { animation: spin 0.8s linear infinite; }
