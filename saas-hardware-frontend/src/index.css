@@ -38,12 +38,95 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
   --glass-blur: blur(12px);
 
-  /* Radius & Transitions */
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   FORMA DE LA TIENDA (PERS-4 / 10.1)
+   ==========================================================================
+   Tres perillas independientes del color: radio de bordes, estilo de tarjeta y
+   densidad. useTenantTheme pone las tres clases en el <body>.
+
+   Los valores por defecto (`soft`, `glass`, `normal`) son los que la plataforma
+   ya tenía, y los bloques comparten declaraciones con `:root` en vez de
+   duplicarlas: una tienda sin elegir nada se ve exactamente igual que antes.
+   -------------------------------------------------------------------------- */
+
+/* --- Radio de bordes --- */
+:root,
+.radius-soft {
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 24px;
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.radius-sharp {
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+}
+
+.radius-round {
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 26px;
+  --radius-xl: 36px;
+}
+
+/* --- Densidad ---
+   Es un multiplicador, no un juego de medidas. Las tres plantillas de catálogo
+   ya traen sus propios espaciados (la compacta aprieta más que la de tarjetas),
+   así que fijar valores absolutos aquí habría obligado a una regla por cada
+   combinación plantilla × densidad. Con un factor, cada plantilla conserva su
+   proporción y la densidad la escala.
+
+   `--density` se define también en `:root` porque los `calc()` que lo usan se
+   invalidan enteros si la variable no existe (p. ej. antes de que cargue el
+   tenant, o en el panel, donde no hay clase de forma). */
+:root,
+.density-normal {
+  --density: 1;
+}
+
+.density-compact {
+  --density: 0.65;
+}
+
+.density-comfortable {
+  --density: 1.35;
+}
+
+/* --- Estilo de tarjeta ---
+   El fondo opaco se compone pintando el color de cristal (que es translúcido)
+   sobre el fondo de la página, en vez de añadir un token opaco por cada tono
+   neutral. Así el resultado es exactamente el mismo color que ya se veía, pero
+   sin transparencia, y no hay una segunda paleta que mantener.
+
+   No hay bloque .cards-glass: cristal es lo que hace .glass-card por si misma,
+   asi que la clase existe solo para que el body diga en que estilo esta y para
+   que las miniaturas del selector puedan pedirlo. */
+.cards-solid,
+.cards-flat {
+  --glass-blur: none;
+}
+
+.cards-solid .glass-card,
+.cards-flat .glass-card {
+  background: linear-gradient(var(--glass-bg), var(--glass-bg)), var(--bg-app);
+}
+
+.cards-flat .glass-card {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* Sin sombra, levantar la tarjeta al pasar por encima no se lee como
+   profundidad sino como un salto. La plana responde con el borde. */
+.cards-flat .glass-card:hover {
+  transform: none;
+  border-color: var(--text-muted);
 }
 
 /* ==========================================================================

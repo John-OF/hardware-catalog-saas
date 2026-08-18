@@ -31,6 +31,7 @@ import CustomerAccountModal from '../../components/public/CustomerAccountModal';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
+import { heroStyleOf } from '../../utils/hero';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
@@ -329,27 +330,47 @@ export default function CatalogPage() {
         .filter((sec: any) => sec.enabled)
         .map((sec: any) => {
           if (sec.type === 'hero') {
+            // PERS-5: el estilo elegido decide la disposición y, sobre todo, qué
+            // se hace con el banner. `has-banner` sigue queriendo decir "el
+            // texto va ENCIMA de la foto", que es lo que justifica forzarle los
+            // colores claros; en «partido» la foto va en su propia columna y el
+            // texto se queda sobre la tarjeta, así que ahí no se fuerza nada.
+            const hero = heroStyleOf(tenant.theme?.hero_style);
+            const banner = tenant.theme?.banner_url || null;
+            const bannerDeFondo = Boolean(banner) && hero.banner === 'background';
+            const bannerAlLado = Boolean(banner) && hero.banner === 'side';
+
             return (
               <section
                 key={sec.id}
-                className={`catalog-hero glass-card animate-fade-in ${tenant.theme?.banner_url ? 'has-banner' : ''}`}
-                style={tenant.theme?.banner_url ? {
-                  backgroundImage: `linear-gradient(to right, rgba(11,15,25,0.92), rgba(11,15,25,0.55)), url(${tenant.theme.banner_url})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                } : undefined}
+                className={[
+                  'catalog-hero',
+                  `hero-${hero.value}`,
+                  // El mínimo no es una tarjeta: sin `glass-card` no hay fondo,
+                  // borde ni sombra que luego haya que apagar a base de reglas.
+                  hero.value === 'minimal' ? '' : 'glass-card',
+                  'animate-fade-in',
+                  bannerDeFondo ? 'has-banner' : '',
+                  bannerAlLado ? 'has-figure' : '',
+                ].filter(Boolean).join(' ')}
+                style={bannerDeFondo ? { backgroundImage: `url(${banner})` } : undefined}
               >
                 <div className="hero-content">
-                  <span
-                    className="hero-badge"
-                    style={tenant.theme?.accent_color ? { color: tenant.theme.accent_color, borderColor: tenant.theme.accent_color } : undefined}
-                  >
-                    CATÁLOGO VIRTUAL
-                  </span>
+                  {hero.value !== 'minimal' && (
+                    <span
+                      className="hero-badge"
+                      style={tenant.theme?.accent_color ? { color: tenant.theme.accent_color, borderColor: tenant.theme.accent_color } : undefined}
+                    >
+                      CATÁLOGO VIRTUAL
+                    </span>
+                  )}
                   <h1>{tenant.theme?.hero_title || 'Encuentra las mejores piezas de hardware'}</h1>
                   <p>{tenant.theme?.hero_subtitle || 'Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.'}</p>
                 </div>
-                <div className="hero-glow"></div>
+                {bannerAlLado && (
+                  <div className="hero-figure" style={{ backgroundImage: `url(${banner})` }} />
+                )}
+                {hero.value !== 'minimal' && <div className="hero-glow"></div>}
               </section>
             );
           }
@@ -960,14 +981,33 @@ export default function CatalogPage() {
           background: var(--bg-card);
         }
 
-        /* Con banner, el hero es una foto con un velo oscuro encima: su contenido
-           va siempre sobre fondo oscuro, aunque la tienda esté en modo claro. Se
-           redefinen los tokens SOLO dentro del hero en vez de hardcodear los
-           colores, para que el resto siga respondiendo al tema. */
+        /* Con la foto de fondo, el hero es una imagen con un velo oscuro encima:
+           su contenido va siempre sobre fondo oscuro, aunque la tienda esté en
+           modo claro. Se redefinen los tokens SOLO dentro del hero en vez de
+           hardcodear los colores, para que el resto siga respondiendo al tema.
+
+           La clase la llevan solo los estilos que usan el banner DE FONDO
+           (clásico y centrado). En «partido» la foto va en su propia columna y
+           el texto se queda sobre la tarjeta: forzarle estos colores lo dejaría
+           blanco sobre blanco en una tienda en modo claro. */
         .catalog-hero.has-banner {
           --text-primary: #f8fafc;
           --text-secondary: #cbd5e1;
           --gradient-title: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+          background-size: cover;
+          background-position: center;
+        }
+
+        /* El velo es un pseudo-elemento y no parte del "background-image" en
+           línea porque cada estilo lo quiere distinto: el clásico lo carga a la
+           izquierda, que es donde va el texto, y el centrado lo reparte parejo.
+           Así el componente solo pone la URL y las medidas siguen viviendo aquí. */
+        .catalog-hero.has-banner::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          background: linear-gradient(to right, rgba(11, 15, 25, 0.92), rgba(11, 15, 25, 0.55));
         }
 
         .hero-content {
@@ -1003,6 +1043,8 @@ export default function CatalogPage() {
           line-height: 1.5;
         }
 
+        /* El z-index lo pone por encima del velo del banner, que es donde
+           estaba antes de que el velo fuera un pseudo-elemento. */
         .hero-glow {
           position: absolute;
           width: 300px;
@@ -1013,7 +1055,100 @@ export default function CatalogPage() {
           opacity: 0.15;
           top: -50px;
           right: -50px;
+          z-index: 2;
           pointer-events: none;
+        }
+
+        /* --- Estilos de portada (PERS-5) ---
+           "classic" es todo lo de arriba tal cual: es el hero que ya tenían
+           todas las tiendas, así que no necesita ni una regla propia. Cada
+           bloque de aquí abajo solo dice en qué se aparta de él. */
+
+        /* Centrado: el texto manda y la foto es ambiente, así que el velo va
+           parejo — uno lateral dejaría legible la mitad derecha y la izquierda
+           no — y el resplandor se muda al centro para no descuadrarlo. */
+        .catalog-hero.hero-centered {
+          padding: 4.5rem 2rem;
+          text-align: center;
+        }
+
+        .hero-centered .hero-content {
+          max-width: 700px;
+          margin: 0 auto;
+        }
+
+        .hero-centered.has-banner::before {
+          background: linear-gradient(rgba(11, 15, 25, 0.84), rgba(11, 15, 25, 0.72));
+        }
+
+        .hero-centered .hero-glow {
+          top: -120px;
+          right: auto;
+          left: 50%;
+          margin-left: -150px;
+        }
+
+        /* Partido: dos columnas de verdad. El padding se muda al contenido para
+           que la foto llegue hasta el borde de la tarjeta. Sin banner no hay
+           segunda columna que repartir, así que el estilo se queda en una sola
+           y se comporta igual que el clásico: por eso las reglas piden
+           ".has-figure" y no solo ".hero-split". */
+        .catalog-hero.hero-split.has-figure {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+          align-items: center;
+          gap: 2rem;
+          padding: 0 0 0 2.5rem;
+        }
+
+        .hero-split.has-figure .hero-content {
+          max-width: none;
+          padding: 3rem 0;
+        }
+
+        .hero-figure {
+          position: relative;
+          z-index: 5;
+          align-self: stretch;
+          min-height: 260px;
+          background-size: cover;
+          background-position: center;
+        }
+
+        /* Mínimo: ni tarjeta, ni insignia, ni resplandor, ni banner. Un título,
+           un subtítulo y una línea que lo separa del catálogo. */
+        .catalog-hero.hero-minimal {
+          padding: 0.25rem 0 1.75rem;
+          background: transparent;
+          border-bottom: 1px solid var(--border);
+          border-radius: 0;
+        }
+
+        .hero-minimal h1 {
+          font-size: 1.85rem;
+          margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+          /* En móvil la portada partida se apila: la foto pasa debajo del texto
+             y baja de altura para no comerse la pantalla antes del catálogo. */
+          .catalog-hero.hero-split.has-figure {
+            grid-template-columns: 1fr;
+            gap: 0;
+            padding: 0;
+          }
+
+          .hero-split.has-figure .hero-content {
+            padding: 2rem 1.5rem;
+          }
+
+          .hero-figure {
+            min-height: 170px;
+          }
+
+          .catalog-hero.hero-centered {
+            padding: 3rem 1.25rem;
+          }
         }
 
         /* Layout */
@@ -1194,23 +1329,27 @@ export default function CatalogPage() {
           color: var(--text-primary);
         }
 
-        /* Grid Cards */
+        /* Grid Cards
+           Los espaciados van multiplicados por --density (PERS-4): cada
+           plantilla conserva su proporcion y la densidad elegida por el dueno
+           la escala. El valor por defecto (1) esta en index.css, asi que sin
+           clase de forma se ve exactamente igual que antes. */
         .catalog-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 1.5rem;
+          gap: calc(1.5rem * var(--density));
         }
 
         /* Compact Layout Variations */
         .catalog-grid.layout-compact {
           grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-          gap: 0.75rem;
+          gap: calc(0.75rem * var(--density));
         }
         .catalog-grid.layout-compact .product-catalog-card {
-          padding: 0.5rem;
+          padding: calc(0.5rem * var(--density));
         }
         .catalog-grid.layout-compact .card-details {
-          padding: 0.5rem;
+          padding: calc(0.5rem * var(--density));
           gap: 0.35rem;
         }
 
@@ -1218,14 +1357,14 @@ export default function CatalogPage() {
         .catalog-grid.layout-list {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: calc(1rem * var(--density));
         }
         .catalog-grid.layout-list .product-catalog-card {
           flex-direction: row;
           align-items: center;
           height: 120px;
           gap: 1.5rem;
-          padding: 0.75rem 1.5rem;
+          padding: calc(0.75rem * var(--density)) 1.5rem;
         }
         .catalog-grid.layout-list .card-image-wrapper {
           width: 90px;
@@ -1356,7 +1495,7 @@ export default function CatalogPage() {
         }
 
         .card-details {
-          padding: 1.25rem;
+          padding: calc(1.25rem * var(--density));
           display: flex;
           flex-direction: column;
           gap: 0.35rem;

@@ -47,6 +47,14 @@ class TenantController extends Controller
             'theme.hero_title'    => 'nullable|string|max:120',
             'theme.hero_subtitle' => 'nullable|string|max:240',
             'theme.banner_url'    => 'nullable|url|max:500',
+
+            // Estilo de portada (PERS-5). Cada valor es una disposicion distinta
+            // del mismo contenido; las medidas estan en el frontend
+            // (CatalogPage + src/utils/hero.ts). Ojo: no todos los estilos usan
+            // `banner_url` igual, y `minimal` no lo pinta — pero se guarda
+            // siempre, para que cambiar de estilo no borre la imagen.
+            'theme.hero_style'    => 'nullable|in:classic,centered,split,minimal',
+
             'theme.accent_color'  => 'nullable|regex:/^#[0-9A-Fa-f]{6}$/',
             'theme.color_mode'    => 'nullable|in:dark,light',
 
@@ -55,6 +63,13 @@ class TenantController extends Controller
             // para no guardar en el JSON un valor que ninguna hoja de estilos
             // sepa pintar. Al añadir un tono hay que ampliar esta lista también.
             'theme.neutral'       => 'nullable|in:slate,zinc,stone,navy,plum',
+
+            // Forma de la tienda (PERS-4). Igual que el tono: las medidas viven
+            // en el frontend (index.css + src/utils/shape.ts) y aquí solo se
+            // valida la clave.
+            'theme.radius'        => 'nullable|in:sharp,soft,round',
+            'theme.card_style'    => 'nullable|in:glass,solid,flat',
+            'theme.density'       => 'nullable|in:compact,normal,comfortable',
 
             'theme.layout'        => 'nullable|in:grid,compact,list',
             'theme.font'          => 'nullable|in:sans,serif,mono,heading',

@@ -9,13 +9,25 @@ export type TenantLayout = 'grid' | 'compact' | 'list';
 
 export type TenantColorMode = 'dark' | 'light';
 
+/** Forma de la tienda (PERS-4). Ver src/utils/shape.ts. */
+export type TenantRadius = 'sharp' | 'soft' | 'round';
+export type TenantCardStyle = 'glass' | 'solid' | 'flat';
+export type TenantDensity = 'compact' | 'normal' | 'comfortable';
+
+/** Estilo de portada (PERS-5). Ver src/utils/hero.ts. */
+export type TenantHeroStyle = 'classic' | 'centered' | 'split' | 'minimal';
+
 export interface TenantTheme {
   hero_title?: string | null;
   hero_subtitle?: string | null;
+  hero_style?: TenantHeroStyle | null;
   banner_url?: string | null;
   accent_color?: string | null;
   color_mode?: TenantColorMode | null;
   neutral?: TenantNeutral | null;
+  radius?: TenantRadius | null;
+  card_style?: TenantCardStyle | null;
+  density?: TenantDensity | null;
   page_title?: string | null;
   favicon_url?: string | null;
   layout?: TenantLayout | null;

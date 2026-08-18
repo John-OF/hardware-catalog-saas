@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { Tenant } from '../types';
 import { NEUTRAL_CLASSES, neutralClass } from '../utils/neutrals';
+import { SHAPE_CLASSES, shapeClasses } from '../utils/shape';
 import { fontOf } from '../utils/fonts';
 
 const FONT_LINK_ID = 'tenant-font';
@@ -78,9 +79,16 @@ export function useTenantTheme(tenant?: Tenant | null) {
     const isLight = tenant.theme?.color_mode === 'light';
     document.body.classList.toggle('light-mode', isLight);
 
+    // Forma (PERS-4): radio de bordes, estilo de tarjeta y densidad. Van por el
+    // mismo camino que el tono y por el mismo motivo, y son independientes
+    // entre si: cualquier combinacion de las tres es valida.
+    document.body.classList.remove(...SHAPE_CLASSES);
+    document.body.classList.add(...shapeClasses(tenant.theme));
+
     return () => {
       document.body.classList.remove('light-mode');
       document.body.classList.remove(...NEUTRAL_CLASSES);
+      document.body.classList.remove(...SHAPE_CLASSES);
       // Se devuelven las variables a los valores de index.css: si no, al pasar
       // del catálogo público al panel el dashboard heredaría la fuente y el
       // color de la última tienda visitada.

@@ -11,9 +11,9 @@ use Tests\TestCase;
 /**
  * Temas prediseñados (PERS-3 / 9.3).
  *
- * Un preset no es un campo nuevo: es una combinacion de las seis perillas que ya
- * existian (primario, acento, tono, modo, fuente y plantilla) aplicadas de una
- * vez. Por eso el backend no cambio para esto y lo que hay que probar es que esa
+ * Un preset no es un campo nuevo: es una combinacion de perillas que ya existian
+ * (primario, acento, tono, modo, fuente, plantilla y, desde 10.1 y 10.2, forma
+ * de tarjeta, radio y estilo de portada) aplicadas de una vez. Por eso el backend no cambio para esto y lo que hay que probar es que esa
  * combinacion entra entera en un solo PUT y no se lleva por delante el contenido
  * de la tienda.
  *
@@ -76,6 +76,9 @@ class ThemePresetTest extends TestCase
                 'color_mode'   => $preset['color_mode'],
                 'font'         => $preset['font'],
                 'layout'       => $preset['layout'],
+                'radius'       => $preset['radius'],
+                'card_style'   => $preset['card_style'],
+                'hero_style'   => $preset['hero_style'],
             ],
         ];
     }
@@ -89,6 +92,9 @@ class ThemePresetTest extends TestCase
             'color_mode'    => 'dark',
             'font'          => 'heading',
             'layout'        => 'grid',
+            'radius'        => 'round',
+            'card_style'    => 'glass',
+            'hero_style'    => 'centered',
         ];
 
         $this->asAdmin()
@@ -103,6 +109,32 @@ class ThemePresetTest extends TestCase
         $this->assertSame('dark', $fresh->theme['color_mode']);
         $this->assertSame('heading', $fresh->theme['font']);
         $this->assertSame('grid', $fresh->theme['layout']);
+        $this->assertSame('round', $fresh->theme['radius']);
+        $this->assertSame('glass', $fresh->theme['card_style']);
+        $this->assertSame('centered', $fresh->theme['hero_style']);
+    }
+
+    public function test_aplicar_un_preset_respeta_la_densidad_del_dueno(): void
+    {
+        // La densidad es preferencia de uso, no identidad de marca: el payload
+        // del preset ni la menciona, asi que la que hubiera puesta sobrevive.
+        $this->tenant->update(['theme' => ['density' => 'compact']]);
+
+        $this->asAdmin()
+            ->putJson('/api/tenant', $this->payload([
+                'primary_color' => '#8b5cf6',
+                'accent_color'  => '#22d3ee',
+                'neutral'       => 'plum',
+                'color_mode'    => 'dark',
+                'font'          => 'heading',
+                'layout'        => 'grid',
+                'radius'        => 'round',
+                'card_style'    => 'glass',
+                'hero_style'    => 'centered',
+            ]))
+            ->assertOk();
+
+        $this->assertSame('compact', $this->tenant->fresh()->theme['density']);
     }
 
     public function test_aplicar_un_preset_no_toca_el_contenido_de_la_tienda(): void
@@ -125,6 +157,9 @@ class ThemePresetTest extends TestCase
                 'color_mode'    => 'light',
                 'font'          => 'serif',
                 'layout'        => 'grid',
+                'radius'        => 'round',
+                'card_style'    => 'solid',
+                'hero_style'    => 'minimal',
             ]))
             ->assertOk();
 
@@ -174,7 +209,13 @@ class ThemePresetTest extends TestCase
         // Fuera los comentarios de linea, que tambien mencionan nombres de campo.
         $cuerpo = preg_replace('#^\s*//.*$#m', '', $cuerpo);
 
-        $campos  = ['id', 'primary_color', 'accent_color', 'neutral', 'color_mode', 'font', 'layout'];
+        // Al aniadir una perilla a los presets hay que aniadirla tambien aqui, o
+        // el guard deja de cubrirla en silencio. `radius` y `card_style`
+        // entraron con 10.1; `hero_style`, con 10.2.
+        $campos = [
+            'id', 'primary_color', 'accent_color', 'neutral',
+            'color_mode', 'font', 'layout', 'radius', 'card_style', 'hero_style',
+        ];
         $trozos  = preg_split("/(?=\bid:\s*')/", $cuerpo);
         $presets = [];
 

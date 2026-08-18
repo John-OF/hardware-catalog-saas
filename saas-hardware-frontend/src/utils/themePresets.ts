@@ -1,4 +1,12 @@
-import type { TenantColorMode, TenantFont, TenantLayout, TenantNeutral } from '../types';
+import type {
+  TenantCardStyle,
+  TenantColorMode,
+  TenantFont,
+  TenantLayout,
+  TenantNeutral,
+  TenantHeroStyle,
+  TenantRadius,
+} from '../types';
 
 /**
  * Temas prediseñados (PERS-3 / 9.3).
@@ -14,9 +22,15 @@ import type { TenantColorMode, TenantFont, TenantLayout, TenantNeutral } from '.
  * Lo que el tipo NO puede comprobar es el formato del hex; el backend exige
  * `#rrggbb` de seis dígitos.
  *
- * `radius` y `hero_style` que menciona el reporte NO están: son campos de 10.1 y
- * 10.2, que todavía no existen. Cuando se implementen, se añaden aquí y cada
- * preset gana una perilla más sin tocar nada del resto.
+ * Con `hero_style` (10.2) ya están dentro las tres perillas que el reporte pedía
+ * para los presets: entró igual que `radius` y `card_style` al cerrarse 10.1 —
+ * un campo más en la interfaz, uno en cada preset y nada que tocar del resto.
+ *
+ * **`density` queda fuera a propósito**: el radio y el estilo de tarjeta son
+ * identidad (hacen que la tienda parezca de otra marca), pero cuántos productos
+ * caben en pantalla es preferencia de quien la lleva y no tiene por qué cambiar
+ * porque le guste una combinación de colores. Aplicar un preset respeta la
+ * densidad que el dueño tuviera puesta.
  */
 export interface ThemePreset {
   id: string;
@@ -29,6 +43,9 @@ export interface ThemePreset {
   color_mode: TenantColorMode;
   font: TenantFont;
   layout: TenantLayout;
+  radius: TenantRadius;
+  card_style: TenantCardStyle;
+  hero_style: TenantHeroStyle;
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -42,6 +59,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'dark',
     font: 'heading',
     layout: 'grid',
+    radius: 'round',
+    card_style: 'glass',
+    hero_style: 'centered',
   },
   {
     id: 'neon',
@@ -53,6 +73,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'dark',
     font: 'mono',
     layout: 'compact',
+    radius: 'sharp',
+    card_style: 'flat',
+    hero_style: 'split',
   },
   {
     id: 'medianoche',
@@ -64,6 +87,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'dark',
     font: 'sans',
     layout: 'grid',
+    radius: 'soft',
+    card_style: 'glass',
+    hero_style: 'classic',
   },
   {
     id: 'taller',
@@ -75,6 +101,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'dark',
     font: 'sans',
     layout: 'compact',
+    radius: 'sharp',
+    card_style: 'solid',
+    hero_style: 'classic',
   },
   {
     // Ojo con los nombres: el selector de plantilla ya llama "Mayorista" al
@@ -90,6 +119,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'light',
     font: 'sans',
     layout: 'list',
+    radius: 'sharp',
+    card_style: 'flat',
+    hero_style: 'minimal',
   },
   {
     id: 'corporativo',
@@ -101,6 +133,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'light',
     font: 'sans',
     layout: 'grid',
+    radius: 'soft',
+    card_style: 'solid',
+    hero_style: 'split',
   },
   {
     id: 'boutique',
@@ -112,6 +147,9 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'light',
     font: 'serif',
     layout: 'grid',
+    radius: 'round',
+    card_style: 'solid',
+    hero_style: 'centered',
   },
   {
     id: 'minimal',
@@ -123,13 +161,17 @@ export const THEME_PRESETS: ThemePreset[] = [
     color_mode: 'light',
     font: 'sans',
     layout: 'compact',
+    radius: 'soft',
+    card_style: 'flat',
+    hero_style: 'minimal',
   },
 ];
 
 /** Los campos que un preset escribe. Lo que no esté aquí, no lo toca. */
 export type PresetValues = Pick<
   ThemePreset,
-  'primary_color' | 'accent_color' | 'neutral' | 'color_mode' | 'font' | 'layout'
+  | 'primary_color' | 'accent_color' | 'neutral' | 'color_mode'
+  | 'font' | 'layout' | 'radius' | 'card_style' | 'hero_style'
 >;
 
 /**
@@ -147,5 +189,8 @@ export function matchingPreset(values: PresetValues): ThemePreset | null {
     && p.color_mode === values.color_mode
     && p.font === values.font
     && p.layout === values.layout
+    && p.radius === values.radius
+    && p.card_style === values.card_style
+    && p.hero_style === values.hero_style
   ) ?? null;
 }

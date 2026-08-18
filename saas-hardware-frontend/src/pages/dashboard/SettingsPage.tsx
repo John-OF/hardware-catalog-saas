@@ -15,16 +15,40 @@ import {
   ArrowUp,
   ArrowDown,
   WandSparkles,
-  Check
+  Check,
+  Frame
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
 import { CURRENCIES, DEFAULT_CURRENCY, formatMoney } from '../../utils/money';
 import { DEFAULT_NEUTRAL, NEUTRALS, neutralClass } from '../../utils/neutrals';
+import {
+  DEFAULT_HERO_STYLE,
+  HERO_STYLES,
+} from '../../utils/hero';
+import {
+  CARD_STYLES,
+  DEFAULT_CARD_STYLE,
+  DEFAULT_DENSITY,
+  DEFAULT_RADIUS,
+  DENSITIES,
+  RADII,
+  cardStyleClass,
+  radiusClass,
+} from '../../utils/shape';
 import { fontOf } from '../../utils/fonts';
 import { THEME_PRESETS, matchingPreset } from '../../utils/themePresets';
 import type { ThemePreset } from '../../utils/themePresets';
-import type { TenantColorMode, TenantFont, TenantLayout, TenantNeutral } from '../../types';
+import type {
+  TenantCardStyle,
+  TenantColorMode,
+  TenantDensity,
+  TenantFont,
+  TenantHeroStyle,
+  TenantLayout,
+  TenantNeutral,
+  TenantRadius,
+} from '../../types';
 
 /** Nombre corto de cada plantilla para la ficha de preset. El selector de abajo
  *  usa textos largos ("Boutique (Tarjetas Grandes)"), que aquí no caben. */
@@ -48,6 +72,10 @@ export default function SettingsPage() {
   const [accentColor, setAccentColor] = useState('#06b6d4');
   const [colorMode, setColorMode] = useState<TenantColorMode>('dark');
   const [neutral, setNeutral] = useState<TenantNeutral>(DEFAULT_NEUTRAL);
+  const [radius, setRadius] = useState<TenantRadius>(DEFAULT_RADIUS);
+  const [cardStyle, setCardStyle] = useState<TenantCardStyle>(DEFAULT_CARD_STYLE);
+  const [density, setDensity] = useState<TenantDensity>(DEFAULT_DENSITY);
+  const [heroStyle, setHeroStyle] = useState<TenantHeroStyle>(DEFAULT_HERO_STYLE);
   const [heroTitle, setHeroTitle] = useState('');
   const [heroSubtitle, setHeroSubtitle] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
@@ -81,6 +109,10 @@ export default function SettingsPage() {
     setAccentColor(th.accent_color ?? '#06b6d4');
     setColorMode(th.color_mode ?? 'dark');
     setNeutral(th.neutral ?? DEFAULT_NEUTRAL);
+    setRadius(th.radius ?? DEFAULT_RADIUS);
+    setCardStyle(th.card_style ?? DEFAULT_CARD_STYLE);
+    setDensity(th.density ?? DEFAULT_DENSITY);
+    setHeroStyle(th.hero_style ?? DEFAULT_HERO_STYLE);
     setHeroTitle(th.hero_title ?? '');
     setHeroSubtitle(th.hero_subtitle ?? '');
     setBannerUrl(th.banner_url ?? '');
@@ -121,16 +153,37 @@ export default function SettingsPage() {
     color_mode: colorMode,
     font,
     layout,
+    radius,
+    card_style: cardStyle,
+    hero_style: heroStyle,
   });
 
   /**
    * Vuelca el preset en el formulario. NO guarda: el dueño puede seguir
    * ajustando y pulsa "Guardar cambios" cuando le convence.
    *
-   * Solo toca las seis perillas de estilo. El nombre, el WhatsApp, el hero, las
+   * Solo toca las perillas de estilo. El nombre, el WhatsApp, el hero, las
    * páginas y las secciones de portada son contenido de la tienda, no aspecto:
-   * un preset que los pisara borraría trabajo del dueño.
+   * un preset que los pisara borraría trabajo del dueño. La densidad tampoco se
+   * toca: es preferencia de uso, no identidad (ver themePresets.ts).
    */
+  /**
+   * Piel de una miniatura de estilo.
+   *
+   * Lleva la paleta y los colores de ESTA tienda, no los del panel: dentro del
+   * dashboard `--glass-bg` es blanco opaco, asi que "cristal" y "solida" se
+   * verian identicas y el selector no diria nada. Con el tono de la tienda
+   * detras (y los dos manchones de color del CSS) la diferencia se ve.
+   */
+  const previewSkin = (extra: string) => ({
+    className: `shape-preview ${neutralClass(neutral)}${colorMode === 'light' ? ' light-mode' : ''} ${extra}`,
+    style: { '--primary': primaryColor, '--accent': accentColor } as React.CSSProperties,
+  });
+
+  /** Miniatura de forma: el radio y el estilo de tarjeta que se previsualizan. */
+  const shapePreviewProps = (r: TenantRadius, c: TenantCardStyle) =>
+    previewSkin(`${radiusClass(r)} ${cardStyleClass(c)}`);
+
   const applyPreset = (preset: ThemePreset) => {
     setPrimaryColor(preset.primary_color);
     setAccentColor(preset.accent_color);
@@ -138,6 +191,9 @@ export default function SettingsPage() {
     setColorMode(preset.color_mode);
     setFont(preset.font);
     setLayout(preset.layout);
+    setRadius(preset.radius);
+    setCardStyle(preset.card_style);
+    setHeroStyle(preset.hero_style);
     toast.success(`Tema "${preset.name}" aplicado. Guarda para publicarlo.`);
   };
 
@@ -153,12 +209,16 @@ export default function SettingsPage() {
       custom_domain: customDomain || null,
       currency,
       theme: {
+        hero_style: heroStyle,
         hero_title: heroTitle || null,
         hero_subtitle: heroSubtitle || null,
         banner_url: bannerUrl || null,
         accent_color: accentColor || null,
         color_mode: colorMode,
         neutral,
+        radius,
+        card_style: cardStyle,
+        density,
         page_title: pageTitle || null,
         favicon_url: faviconUrl || null,
         layout,
@@ -341,7 +401,7 @@ export default function SettingsPage() {
         <span className="helper-text preset-foot">
           {activePreset
             ? `Estás usando «${activePreset.name}». Cualquier cambio que hagas abajo lo deja como tema propio.`
-            : 'Tu tienda usa una combinación propia. Aplicar un tema reemplaza colores, tono, modo, fuente y plantilla.'}
+            : 'Tu tienda usa una combinación propia. Aplicar un tema reemplaza colores, tono, modo, fuente, plantilla, forma y estilo de portada; no toca la densidad ni tus textos.'}
         </span>
       </section>
 
@@ -456,6 +516,83 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Forma y densidad (10.1) */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Frame size={18} />
+          <div>
+            <h3>Forma y densidad</h3>
+            <p>La personalidad de la tienda más allá del color: esquinas, tarjetas y aire.</p>
+          </div>
+        </div>
+        <div className="settings-grid">
+          <div className="form-group full">
+            <label>Bordes</label>
+            <div className="shape-picker">
+              {RADII.map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`shape-option${radius === value ? ' active' : ''}`}
+                  onClick={() => setRadius(value)}
+                  aria-pressed={radius === value}
+                >
+                  {/* La miniatura es un .glass-card de verdad bajo las mismas
+                      clases de forma que lleva el catálogo, así que muestra el
+                      radio y el estilo exactos, no una imitación. */}
+                  <span {...shapePreviewProps(value, cardStyle)}>
+                    <span className="glass-card sp-card" />
+                  </span>
+                  <span className="shape-name">{label}</span>
+                  <span className="shape-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group full">
+            <label>Tarjetas de producto</label>
+            <div className="shape-picker">
+              {CARD_STYLES.map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`shape-option${cardStyle === value ? ' active' : ''}`}
+                  onClick={() => setCardStyle(value)}
+                  aria-pressed={cardStyle === value}
+                >
+                  <span {...shapePreviewProps(radius, value)}>
+                    <span className="glass-card sp-card" />
+                  </span>
+                  <span className="shape-name">{label}</span>
+                  <span className="shape-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group full">
+            <label>Densidad del catálogo</label>
+            <div className="segment">
+              {DENSITIES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={density === value ? 'active' : ''}
+                  onClick={() => setDensity(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="helper-text">
+              Escala los espacios de la grilla sin cambiar de plantilla: «Compacta» mete más
+              productos en pantalla, «Amplia» les da aire. Los temas prediseñados no la tocan.
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* Secciones de la Portada */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
@@ -535,6 +672,42 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="settings-grid">
+          {/* Estilo de portada (10.2). Va lo primero de la tarjeta porque decide
+              cómo se muestran los campos que vienen debajo. */}
+          <div className="form-group full">
+            <label>Estilo de portada</label>
+            <div className="hero-picker">
+              {HERO_STYLES.map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`shape-option${heroStyle === value ? ' active' : ''}`}
+                  onClick={() => setHeroStyle(value)}
+                  aria-pressed={heroStyle === value}
+                >
+                  {/* La miniatura hereda el radio y el estilo de tarjeta de
+                      arriba, así que enseña la portada con la forma real de la
+                      tienda y no con una genérica. */}
+                  <span {...previewSkin(`${radiusClass(radius)} ${cardStyleClass(cardStyle)} hp-${value}`)}>
+                    <span className="glass-card hp-hero">
+                      <span className="hp-text">
+                        <span className="hp-line" />
+                        <span className="hp-line short" />
+                      </span>
+                      {value === 'split' && <span className="hp-img" />}
+                    </span>
+                  </span>
+                  <span className="shape-name">{label}</span>
+                  <span className="shape-hint">{hint}</span>
+                </button>
+              ))}
+            </div>
+            <span className="helper-text">
+              Cada estilo usa la imagen de portada a su manera: «Clásico» y «Centrado» la ponen
+              de fondo con un velo oscuro, «Partido» la deja al lado del texto y «Mínimo» no la
+              muestra. La imagen se guarda igual, así que puedes volver a otro estilo y sigue ahí.
+            </span>
+          </div>
           <div className="form-group full">
             <label>Título del hero</label>
             <input className="premium-input" value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} placeholder="Encuentra las mejores piezas de hardware" maxLength={120} />
@@ -639,13 +812,65 @@ export default function SettingsPage() {
         .np-line.short { width: 55%; margin-top: 6px; background: var(--text-secondary); }
         .neutral-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
         .neutral-hint { font-size: 0.7rem; color: var(--text-muted); }
+        .shape-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+        .shape-option { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
+        .shape-option:hover { border-color: var(--text-muted); }
+        .shape-option.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+        /* El radio del marco va en literal a proposito: la miniatura lleva la
+           clase .radius-* que se esta previsualizando, asi que cualquier token
+           lo secuestraria y el propio marco cambiaria de forma. Los dos
+           manchones de color son lo que hace visible si la tarjeta deja pasar
+           el fondo o no. */
+        .shape-preview { display: block; padding: 10px; margin-bottom: 0.4rem; border-radius: 8px; overflow: hidden;
+          background:
+            radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--primary) 45%, transparent) 0%, transparent 38%),
+            radial-gradient(circle at 86% 84%, color-mix(in srgb, var(--accent) 35%, transparent) 0%, transparent 38%),
+            var(--bg-app); }
+        .sp-card { display: block; height: 52px; }
+        /* Sin esto la miniatura de "Cristal" sale translucida pero sin
+           desenfoque, que es la mitad de lo que promete su etiqueta. No basta
+           con reponer --glass-blur: el panel apaga la propiedad directamente
+           en ".dashboard-layout .glass-card", asi que hay que ganarle en
+           especificidad y volver a pedirla. */
+        .shape-preview.cards-glass .glass-card {
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        /* La miniatura es estatica: el hover del .glass-card real la levantaria
+           dentro del boton, que ya se mueve solo. */
+        .shape-preview .glass-card:hover { transform: none; }
+        /* Portada (10.2): mismo chrome de opcion que la forma (.shape-option) y
+           el mismo marco de miniatura (.shape-preview), que ya trae la paleta de
+           la tienda; lo unico propio es el esquema de dentro. */
+        .hero-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; }
+        .hp-hero { display: flex; align-items: center; gap: 6px; height: 52px; padding: 8px; }
+        .hp-text { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+        .hp-line { display: block; width: 72%; height: 6px; border-radius: 3px; background: var(--text-primary); }
+        .hp-line.short { width: 45%; height: 4px; background: var(--text-secondary); }
+        .hp-centered .hp-text { align-items: center; }
+        .hp-centered .hp-line { width: 80%; }
+        .hp-centered .hp-line.short { width: 52%; }
+        .hp-split .hp-line { width: 100%; }
+        .hp-split .hp-line.short { width: 62%; }
+        /* El degradado de marca hace que se lea como una foto y no como otro
+           bloque de texto. */
+        .hp-img { flex: none; width: 38%; align-self: stretch; border-radius: 4px;
+          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 55%, transparent), color-mix(in srgb, var(--accent) 45%, transparent)); }
+        /* Igual que en el catalogo: el minimo no es una tarjeta. Va con el
+           marco delante (tres clases) porque ".cards-solid .glass-card" de
+           index.css tambien pinta fondo y con dos empatarian. */
+        .shape-preview.hp-minimal .hp-hero { background: transparent; border: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--border); padding: 8px 0; }
+        .hp-minimal .hp-line { width: 58%; }
+        .hp-minimal .hp-line.short { width: 34%; }
+        .shape-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+        .shape-hint { font-size: 0.68rem; line-height: 1.3; color: var(--text-muted); }
         .settings-actions { display: flex; justify-content: flex-end; }
         .settings-actions .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; }
         .spinner { animation: spin 0.8s linear infinite; }
         .helper-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
         .helper-text code { background: rgba(var(--overlay-mix),0.05); padding: 1px 4px; border-radius: 4px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } .hero-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
       `}</style>
     </form>
   );
