@@ -1,3 +1,5 @@
+import './SettingsPage.css';
+
 import { useEffect, useState } from 'react';
 import { useTenantStore } from '../../stores/tenantStore';
 import { updateTenant } from '../../api/tenant';
@@ -343,7 +345,7 @@ export default function SettingsPage() {
 
   if (!tenant) {
     return (
-      <div className="settings-loading">
+      <div className="settings-loading page-settings">
         <Loader2 className="spinner" size={28} />
         <p>Cargando configuración...</p>
       </div>
@@ -351,7 +353,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <form className="settings-page" onSubmit={handleSubmit}>
+    <form className="settings-page page-settings" onSubmit={handleSubmit}>
       {/* Identidad de la tienda */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
@@ -1026,134 +1028,6 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <style>{`
-        .settings-page { max-width: 820px; display: flex; flex-direction: column; gap: 1.5rem; }
-        .settings-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 4rem; color: var(--text-secondary); }
-        .settings-card { padding: 1.75rem; border-radius: var(--radius-lg); }
-        .settings-card-head { display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 1.5rem; color: var(--primary); }
-        .settings-card-head h3 { font-family: var(--font-heading); font-size: 1.05rem; color: var(--text-primary); }
-        .settings-card-head p { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.15rem; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
-        .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
-        .form-group.full { grid-column: 1 / -1; }
-        .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
-        .form-group .optional { font-weight: 400; color: var(--text-muted); }
-        textarea.premium-input { resize: vertical; font-family: var(--font-sans); }
-        .color-row { display: flex; align-items: center; gap: 0.75rem; }
-        .color-row input[type="color"] { width: 48px; height: 40px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; cursor: pointer; padding: 2px; }
-        .color-row span { font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); }
-        .segment { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; width: fit-content; }
-        .segment button { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 1.1rem; background: transparent; border: none; color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: var(--transition); }
-        .segment button.active { background: var(--primary); color: #fff; }
-        .preset-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 0.85rem; }
-        .preset-card { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.6rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
-        .preset-card:hover { border-color: var(--text-muted); transform: translateY(-1px); }
-        .preset-card.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
-        /* Miniatura: hereda del preset las variables de paleta (por la clase de
-           tono) y el primario/acento (inline), asi que se pinta sola. */
-        .preset-preview { display: flex; flex-direction: column; gap: 5px; height: 84px; padding: 6px; margin-bottom: 0.55rem; border-radius: var(--radius-sm); background: var(--bg-app); overflow: hidden; }
-        .pp-hero { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
-        .pp-chip { width: 14px; height: 6px; border-radius: 3px; background: var(--accent); flex: none; }
-        .pp-title { font-size: 11px; font-weight: 700; line-height: 1; color: var(--text-primary); }
-        .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; flex: 1; }
-        .pp-item { display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
-        .pp-img { flex: 1; border-radius: 2px; background: var(--bg-card-hover); }
-        .pp-price { height: 5px; width: 62%; border-radius: 3px; background: var(--primary); }
-        .preset-name { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
-        .preset-name svg { color: var(--primary); }
-        .preset-hint { font-size: 0.72rem; line-height: 1.35; color: var(--text-secondary); }
-        .preset-meta { margin-top: 0.2rem; font-size: 0.68rem; color: var(--text-muted); }
-        .preset-foot { display: block; margin-top: 1rem; }
-        .neutral-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 0.6rem; }
-        .neutral-option { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.5rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
-        .neutral-option:hover { border-color: var(--text-muted); }
-        .neutral-option.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
-        .neutral-preview { display: block; height: 52px; padding: 0.45rem; margin-bottom: 0.4rem; border-radius: var(--radius-sm); background: var(--bg-app); overflow: hidden; }
-        .np-card { display: block; height: 100%; padding: 0.4rem; border-radius: 4px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
-        .np-line { display: block; height: 5px; border-radius: 3px; background: var(--text-primary); }
-        .np-line.short { width: 55%; margin-top: 6px; background: var(--text-secondary); }
-        .neutral-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
-        .neutral-hint { font-size: 0.7rem; color: var(--text-muted); }
-        .shape-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
-        .shape-option { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: var(--transition); }
-        .shape-option:hover { border-color: var(--text-muted); }
-        .shape-option.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
-        /* El radio del marco va en literal a proposito: la miniatura lleva la
-           clase .radius-* que se esta previsualizando, asi que cualquier token
-           lo secuestraria y el propio marco cambiaria de forma. Los dos
-           manchones de color son lo que hace visible si la tarjeta deja pasar
-           el fondo o no. */
-        .shape-preview { display: block; padding: 10px; margin-bottom: 0.4rem; border-radius: 8px; overflow: hidden;
-          background:
-            radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--primary) 45%, transparent) 0%, transparent 38%),
-            radial-gradient(circle at 86% 84%, color-mix(in srgb, var(--accent) 35%, transparent) 0%, transparent 38%),
-            var(--bg-app); }
-        .sp-card { display: block; height: 52px; }
-        /* Sin esto la miniatura de "Cristal" sale translucida pero sin
-           desenfoque, que es la mitad de lo que promete su etiqueta. No basta
-           con reponer --glass-blur: el panel apaga la propiedad directamente
-           en ".dashboard-layout .glass-card", asi que hay que ganarle en
-           especificidad y volver a pedirla. */
-        .shape-preview.cards-glass .glass-card {
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-        }
-        /* La miniatura es estatica: el hover del .glass-card real la levantaria
-           dentro del boton, que ya se mueve solo. */
-        .shape-preview .glass-card:hover { transform: none; }
-        /* Tipografia (10.3): la muestra reutiliza el marco de miniatura, que ya
-           trae la paleta y la forma de la tienda, pero con texto de verdad. Dos
-           familias solo se juzgan viendolas juntas y a su tamanio real: en una
-           lista de nombres, "Lora" y "Merriweather" son la misma palabra.
-           --font-heading y --font-sans las inyecta el componente en el span. */
-        .font-sample .fs-card { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.9rem 1rem; }
-        .fs-title { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; line-height: 1.25; color: var(--text-primary); }
-        .fs-body { font-family: var(--font-sans); font-size: 0.83rem; line-height: 1.5; color: var(--text-secondary); }
-        .fs-price { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; color: var(--primary); }
-        /* Marca (10.4): la muestra de la franja. El marco es el de siempre
-           (.shape-preview, que ya trae la paleta de la tienda) y la banda de
-           dentro copia las medidas de .announcement-bar; los colores vienen de
-           branding.ts en linea, que es lo unico que no puede divergir. */
-        .ab-preview { display: flex; align-items: center; min-height: 46px; }
-        .ab-sample {
-          display: block; width: 100%; padding: 0.45rem 0.6rem;
-          border: 1px solid transparent; border-radius: var(--radius-md);
-          font-size: 0.68rem; font-weight: 600; line-height: 1.3; text-align: center;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        /* Portada (10.2): mismo chrome de opcion que la forma (.shape-option) y
-           el mismo marco de miniatura (.shape-preview), que ya trae la paleta de
-           la tienda; lo unico propio es el esquema de dentro. */
-        .hero-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; }
-        .hp-hero { display: flex; align-items: center; gap: 6px; height: 52px; padding: 8px; }
-        .hp-text { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-        .hp-line { display: block; width: 72%; height: 6px; border-radius: 3px; background: var(--text-primary); }
-        .hp-line.short { width: 45%; height: 4px; background: var(--text-secondary); }
-        .hp-centered .hp-text { align-items: center; }
-        .hp-centered .hp-line { width: 80%; }
-        .hp-centered .hp-line.short { width: 52%; }
-        .hp-split .hp-line { width: 100%; }
-        .hp-split .hp-line.short { width: 62%; }
-        /* El degradado de marca hace que se lea como una foto y no como otro
-           bloque de texto. */
-        .hp-img { flex: none; width: 38%; align-self: stretch; border-radius: 4px;
-          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 55%, transparent), color-mix(in srgb, var(--accent) 45%, transparent)); }
-        /* Igual que en el catalogo: el minimo no es una tarjeta. Va con el
-           marco delante (tres clases) porque ".cards-solid .glass-card" de
-           index.css tambien pinta fondo y con dos empatarian. */
-        .shape-preview.hp-minimal .hp-hero { background: transparent; border: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--border); padding: 8px 0; }
-        .hp-minimal .hp-line { width: 58%; }
-        .hp-minimal .hp-line.short { width: 34%; }
-        .shape-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
-        .shape-hint { font-size: 0.68rem; line-height: 1.3; color: var(--text-muted); }
-        .settings-actions { display: flex; justify-content: flex-end; }
-        .settings-actions .btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; }
-        .spinner { animation: spin 0.8s linear infinite; }
-        .helper-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
-        .helper-text code { background: rgba(var(--overlay-mix),0.05); padding: 1px 4px; border-radius: 4px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } .hero-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      `}</style>
     </form>
   );
 }

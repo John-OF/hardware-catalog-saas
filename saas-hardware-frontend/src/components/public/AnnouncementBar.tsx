@@ -1,3 +1,5 @@
+import './AnnouncementBar.css';
+
 import type { TenantTheme } from '../../types';
 import { announcementStyleOf, announcementText } from '../../utils/branding';
 
@@ -32,17 +34,6 @@ export default function AnnouncementBar({ theme }: { theme?: TenantTheme | null 
         {texto}
       </div>
 
-      <style>{`
-        .announcement-bar {
-          display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          padding: 0.6rem 1.25rem; margin-bottom: 1rem;
-          border: 1px solid transparent; border-radius: var(--radius-md);
-          font-size: 0.85rem; font-weight: 600; line-height: 1.35; text-align: center;
-        }
-        @media (max-width: 768px) {
-          .announcement-bar { padding: 0.55rem 1rem; font-size: 0.8rem; }
-        }
-      `}</style>
     </>
   );
 }

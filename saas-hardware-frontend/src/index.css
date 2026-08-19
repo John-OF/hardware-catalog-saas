@@ -588,6 +588,14 @@ h1, h2, h3, h4, h5, h6 {
   to { opacity: 1; }
 }
 
+/* La usa el spinner de carga de casi todas las pantallas. Estaba repetida
+   —identica— en 13 bloques <style> embebidos; al sacarlos a ficheros .css
+   (TEC-6) tenia que quedarse una sola, y los @keyframes son globales de todas
+   formas, asi que su sitio es este. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }

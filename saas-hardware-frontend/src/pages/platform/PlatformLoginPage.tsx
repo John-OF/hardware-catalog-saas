@@ -1,3 +1,5 @@
+import './PlatformLoginPage.css';
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -41,7 +43,7 @@ export default function PlatformLoginPage() {
   };
 
   return (
-    <div className="auth-container animate-fade-in">
+    <div className="auth-container animate-fade-in page-platform-login">
       <div className="auth-card glass-card animate-scale-in">
         <div className="auth-header">
           <div className="logo-badge">
@@ -106,120 +108,6 @@ export default function PlatformLoginPage() {
         </form>
       </div>
 
-      <style>{`
-        .auth-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          width: 100vw;
-          background-color: var(--bg-app);
-          padding: 1.5rem;
-        }
-
-        .auth-card {
-          width: 100%;
-          max-width: 440px;
-          padding: 2.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-          border-radius: 20px;
-        }
-
-        .auth-header {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .logo-badge {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          background: rgba(37, 99, 235, 0.08);
-          border: 1px solid rgba(37, 99, 235, 0.2);
-          color: var(--primary);
-          margin-bottom: 1rem;
-        }
-
-        .auth-header h1 {
-          font-size: 1.5rem;
-          margin-bottom: 0.35rem;
-          color: var(--text-primary);
-        }
-
-        .auth-header p {
-          color: var(--text-secondary);
-          font-size: 0.88rem;
-          line-height: 1.5;
-        }
-
-        .auth-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .form-group label {
-          color: var(--text-primary);
-          font-size: 0.85rem;
-          font-weight: 500;
-        }
-
-        .input-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .premium-input.with-icon {
-          padding-left: 2.75rem;
-        }
-
-        .input-icon {
-          position: absolute;
-          left: 1rem;
-          color: var(--text-muted);
-          pointer-events: none;
-        }
-
-        .password-toggle {
-          position: absolute;
-          right: 1rem;
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          display: flex;
-          padding: 0.25rem;
-        }
-
-        .btn-block {
-          width: 100%;
-          padding: 0.85rem;
-        }
-
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

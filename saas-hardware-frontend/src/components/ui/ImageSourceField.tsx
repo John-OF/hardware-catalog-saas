@@ -1,3 +1,5 @@
+import './ImageSourceField.css';
+
 import { useEffect, useState } from 'react';
 import { Link2, Upload, Image as ImageIcon } from 'lucide-react';
 
@@ -86,19 +88,6 @@ export default function ImageSourceField({
 
       {hint && <span className="img-source-hint">{hint}</span>}
 
-      <style>{`
-        .img-source-field { display: flex; flex-direction: column; gap: 0.5rem; }
-        .img-source-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-        .img-source-head label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
-        .img-source-tabs { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
-        .img-source-tabs button { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.6rem; background: transparent; border: none; color: var(--text-muted); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: var(--transition); }
-        .img-source-tabs button.active { background: var(--primary); color: #fff; }
-        .img-source-body { display: flex; align-items: center; gap: 0.75rem; }
-        .img-source-body .premium-input { flex: 1; }
-        .img-source-body .file-input { padding: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
-        .img-source-preview { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-sm); border: 1px solid var(--border); object-fit: contain; background: rgba(255,255,255,0.03); color: var(--text-muted); }
-        .img-source-hint { font-size: 0.72rem; color: var(--text-muted); }
-      `}</style>
     </div>
   );
 }

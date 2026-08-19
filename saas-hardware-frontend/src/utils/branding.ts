@@ -5,17 +5,17 @@ import type { TenantAnnouncementStyle, TenantTheme } from '../types';
  * datos del pie.
  *
  * Mismo reparto que el resto de la personalización: aquí viven las etiquetas y
- * la lista de redes, y los colores están en el `<style>` de `AnnouncementBar`.
+ * la lista de redes, y las medidas están en `AnnouncementBar.css`.
  * El panel y la tienda pública leen los dos de aquí, así que un campo nuevo se
  * añade en un solo sitio y aparece en los dos.
  */
 
 /**
- * Los colores van aquí y no en el `<style>` de la franja porque los pintan dos
+ * Los colores van aquí y no en la hoja de la franja porque los pintan dos
  * sitios: la tienda y la muestra del selector de Configuración. En CSS harían
- * falta las reglas en los dos —el panel no carga el `<style>` de un componente
- * público— y la muestra podría acabar prometiendo un color que la tienda ya no
- * usa. Son tokens, así que siguen al tema de cada tienda igual que todo lo demás.
+ * falta las reglas en las dos hojas —son pantallas distintas— y la muestra
+ * podría acabar prometiendo un color que la tienda ya no usa. Son tokens, así
+ * que siguen al tema de cada tienda igual que todo lo demás.
  */
 export interface AnnouncementStyleDef {
   value: TenantAnnouncementStyle;

@@ -1,0 +1,340 @@
+/* Estilos de <OverviewPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-overview`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-overview` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-overview) .overview-loading,
+  :where(.page-overview).overview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: var(--text-secondary);
+    gap: 1rem;
+  }
+  :where(.page-overview) .spinner {
+    animation: spin 1s linear infinite;
+    color: var(--primary);
+  }
+
+:where(.page-overview).overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+:where(.page-overview) .page-description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-top: -0.5rem;
+}
+
+:where(.page-overview) .kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+:where(.page-overview) .kpi-card {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem;
+  gap: 1.25rem;
+  border: 1px solid var(--border);
+}
+
+:where(.page-overview) .kpi-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+
+:where(.page-overview) .sales-icon {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+}
+:where(.page-overview) .orders-icon {
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+}
+:where(.page-overview) .products-icon {
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+}
+:where(.page-overview) .views-icon {
+  background: rgba(14, 165, 233, 0.08);
+  color: #0ea5e9;
+}
+
+:where(.page-overview) .kpi-data {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+:where(.page-overview) .kpi-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-overview) .kpi-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+:where(.page-overview) .kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+:where(.page-overview) .kpi-trend.positive {
+  color: #10b981;
+}
+:where(.page-overview) .kpi-trend.warning {
+  color: #f59e0b;
+}
+:where(.page-overview) .kpi-trend.info {
+  color: #6366f1;
+}
+
+:where(.page-overview) .overview-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  :where(.page-overview) .overview-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+:where(.page-overview) .split-column {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+:where(.page-overview) .column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+:where(.page-overview) .column-header h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-overview) .view-all-link {
+  font-size: 0.8rem;
+  color: var(--primary);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+:where(.page-overview) .view-all-link:hover {
+  color: var(--primary-light);
+  gap: 0.4rem;
+}
+
+:where(.page-overview) .list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+:where(.page-overview) .empty-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem 0;
+  margin: 0;
+}
+
+:where(.page-overview) .list-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-overview) .list-item-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+:where(.page-overview) .item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+:where(.page-overview) .product-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: rgba(var(--overlay-mix), 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+:where(.page-overview) .product-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:where(.page-overview) .product-info-text {
+  overflow: hidden;
+}
+
+:where(.page-overview) .product-info-text h5 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+:where(.page-overview) .product-info-text span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-overview) .order-date-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+:where(.page-overview) .order-info-text h5 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-overview) .order-info-text span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-overview) .item-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+:where(.page-overview) .views-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  background: rgba(14, 165, 233, 0.08);
+  color: #0ea5e9;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+:where(.page-overview) .stock-pill {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+:where(.page-overview) .stock-pill.in-stock {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+}
+
+:where(.page-overview) .stock-pill.out-of-stock {
+  background: rgba(244, 63, 94, 0.08);
+  color: #f43f5e;
+}
+
+:where(.page-overview) .order-price-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-overview) .status-badge-mini {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-overview) .status-badge-mini.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+:where(.page-overview) .status-badge-mini.processing {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+}
+
+:where(.page-overview) .status-badge-mini.attended {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
+:where(.page-overview) .status-badge-mini.cancelled {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--danger);
+}

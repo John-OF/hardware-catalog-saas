@@ -1,3 +1,5 @@
+import './ResetPasswordPage.css';
+
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -68,7 +70,7 @@ export default function ResetPasswordPage() {
   // Enlace manipulado o pegado a medias: no tiene sentido mostrar el formulario.
   if (!token || !email) {
     return (
-      <div className="auth-container animate-fade-in">
+      <div className="auth-container animate-fade-in page-reset-password">
         <div className="auth-card glass-card animate-scale-in">
           <div className="auth-header">
             <div className="logo-badge warning">
@@ -84,13 +86,12 @@ export default function ResetPasswordPage() {
             Pedir un enlace nuevo
           </Link>
         </div>
-        <style>{styles}</style>
       </div>
     );
   }
 
   return (
-    <div className="auth-container animate-fade-in">
+    <div className="auth-container animate-fade-in page-reset-password">
       <div className="auth-card glass-card animate-scale-in">
         <div className="auth-header">
           <div className="logo-badge">
@@ -174,192 +175,7 @@ export default function ResetPasswordPage() {
         </form>
       </div>
 
-      <style>{styles}</style>
     </div>
   );
 }
 
-const styles = `
-  .auth-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    width: 100vw;
-    background-color: var(--bg-app);
-    overflow: hidden;
-    padding: 1.5rem;
-  }
-
-  .auth-card {
-    position: relative;
-    z-index: 10;
-    width: 100%;
-    max-width: 440px;
-    padding: 2.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    border-radius: 20px;
-  }
-
-  .auth-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .logo-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
-    background: rgba(37, 99, 235, 0.08);
-    border: 1px solid rgba(37, 99, 235, 0.2);
-    color: var(--primary);
-    margin-bottom: 1rem;
-  }
-
-  .logo-badge.warning {
-    background: rgba(245, 158, 11, 0.08);
-    border-color: rgba(245, 158, 11, 0.25);
-    color: var(--warning);
-  }
-
-  .auth-header h1 {
-    font-size: 1.6rem;
-    margin-bottom: 0.35rem;
-    color: var(--text-primary);
-  }
-
-  .auth-header p {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    line-height: 1.5;
-    word-break: break-word;
-  }
-
-  .auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .form-group label {
-    color: var(--text-primary);
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-
-  .input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .premium-input.with-icon {
-    padding-left: 2.75rem;
-  }
-
-  .input-icon {
-    position: absolute;
-    left: 1rem;
-    color: var(--text-muted);
-    pointer-events: none;
-    transition: var(--transition);
-  }
-
-  .premium-input:focus + .input-icon {
-    color: var(--primary);
-  }
-
-  .password-toggle {
-    position: absolute;
-    right: 1rem;
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25rem;
-    transition: var(--transition);
-  }
-
-  .password-toggle:hover {
-    color: var(--text-primary);
-  }
-
-  .field-error {
-    color: var(--danger);
-    font-size: 0.78rem;
-  }
-
-  .alert-error {
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: var(--danger);
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 10px;
-    padding: 0.75rem 0.9rem;
-  }
-
-  .alert-error a {
-    color: inherit;
-    font-weight: 600;
-    text-decoration: underline;
-  }
-
-  .btn-block {
-    width: 100%;
-    padding: 0.85rem;
-  }
-
-  .btn-link {
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .auth-footer {
-    text-align: center;
-    font-size: 0.85rem;
-  }
-
-  .back-link {
-    color: var(--text-secondary);
-    font-weight: 500;
-  }
-
-  .back-link:hover {
-    color: var(--primary);
-  }
-
-  .spinner {
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  @media (max-width: 480px) {
-    .auth-card {
-      padding: 1.75rem;
-    }
-  }
-`;

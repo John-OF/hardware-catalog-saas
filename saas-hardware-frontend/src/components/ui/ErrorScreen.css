@@ -1,0 +1,59 @@
+/* Estilos de <ErrorScreen>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Sin acotar a proposito: es un componente que puede montarse en cualquier
+   pantalla, asi que su CSS es global igual que lo era antes. Sus clases
+   estan prefijadas y no chocan con las de ninguna pagina (comprobado con
+   el analisis de colisiones). */
+
+.error-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  background: var(--bg-app);
+}
+
+.error-screen-card {
+  max-width: 520px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.error-screen-card h1 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.error-screen-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.error-screen-detail {
+  text-align: left;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-screen-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.error-screen-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

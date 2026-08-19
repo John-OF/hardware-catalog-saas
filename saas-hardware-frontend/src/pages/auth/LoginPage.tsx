@@ -1,3 +1,5 @@
+import './LoginPage.css';
+
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -53,7 +55,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-container animate-fade-in">
+    <div className="login-container animate-fade-in page-login">
       <div className="login-card glass-card animate-scale-in">
         <div className="login-header">
           <div className="logo-badge">
@@ -128,169 +130,6 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <style>{`
-        .login-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          width: 100vw;
-          background-color: var(--bg-app);
-          overflow: hidden;
-          padding: 1.5rem;
-        }
-
-        .login-card {
-          position: relative;
-          z-index: 10;
-          width: 100%;
-          max-width: 440px;
-          padding: 2.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-          border-radius: 20px;
-        }
-
-        .login-header {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .logo-badge {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          background: rgba(37, 99, 235, 0.08);
-          border: 1px solid rgba(37, 99, 235, 0.2);
-          color: var(--primary);
-          font-size: 1.5rem;
-          margin-bottom: 1rem;
-        }
-
-        .login-header h1 {
-          font-size: 1.75rem;
-          margin-bottom: 0.35rem;
-          color: var(--text-primary);
-        }
-
-        .login-header p {
-          color: var(--text-secondary);
-          font-size: 0.9rem;
-        }
-
-        .login-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .form-group label {
-          color: var(--text-primary);
-          font-size: 0.85rem;
-          font-weight: 500;
-        }
-
-        .label-row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 1rem;
-        }
-
-        .forgot-link {
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-        }
-
-        .forgot-link:hover {
-          color: var(--primary);
-        }
-
-        .input-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .premium-input.with-icon {
-          padding-left: 2.75rem;
-        }
-
-        .input-icon {
-          position: absolute;
-          left: 1rem;
-          color: var(--text-muted);
-          pointer-events: none;
-          transition: var(--transition);
-        }
-
-        .premium-input:focus ~ .input-icon,
-        .premium-input:focus + .input-icon {
-          color: var(--primary);
-        }
-
-        .password-toggle {
-          position: absolute;
-          right: 1rem;
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0.25rem;
-          transition: var(--transition);
-        }
-
-        .password-toggle:hover {
-          color: var(--text-primary);
-        }
-
-        .btn-block {
-          width: 100%;
-          padding: 0.85rem;
-        }
-
-        .login-footer {
-          text-align: center;
-          font-size: 0.85rem;
-          color: var(--text-secondary);
-        }
-
-        .login-footer a {
-          color: var(--primary);
-          font-weight: 500;
-        }
-
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 480px) {
-          .login-card {
-            padding: 1.75rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

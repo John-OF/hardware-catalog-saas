@@ -1,0 +1,29 @@
+/* Estilos de <PageDetailPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-info`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-info` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-info).public-catalog-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+:where(.page-info) .catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-radius: var(--radius-lg);
+}

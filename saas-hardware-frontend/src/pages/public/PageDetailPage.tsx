@@ -1,3 +1,5 @@
+import './PageDetailPage.css';
+
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -65,7 +67,7 @@ export default function PageDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="loading-fullscreen">
+      <div className="loading-fullscreen page-info">
         <Loader2 className="spinner" size={48} />
         <p>Cargando página informativa...</p>
       </div>
@@ -74,7 +76,7 @@ export default function PageDetailPage() {
 
   if (isError || !page || !tenant) {
     return (
-      <div className="error-fullscreen">
+      <div className="error-fullscreen page-info">
         <AlertTriangleIcon size={48} className="text-danger" />
         <h3>Página no encontrada</h3>
         <p>La página que buscas no existe o está configurada como borrador.</p>
@@ -86,7 +88,7 @@ export default function PageDetailPage() {
   }
 
   return (
-    <div className="public-catalog-container font-family-custom">
+    <div className="public-catalog-container font-family-custom page-info">
       <AnnouncementBar theme={tenant.theme} />
 
       {/* Top Header */}
@@ -152,24 +154,6 @@ export default function PageDetailPage() {
           dirección, el horario y con quién está tratando. */}
       <StoreFooter tenant={tenant} pages={publicPages} buildPath={getPublicPath} />
 
-      <style>{`
-        .public-catalog-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 1.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-          width: 100%;
-        }
-        .catalog-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem 2rem;
-          border-radius: var(--radius-lg);
-        }
-      `}</style>
     </div>
   );
 }

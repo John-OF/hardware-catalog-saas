@@ -1,3 +1,5 @@
+import './RegisterStorePage.css';
+
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -118,7 +120,7 @@ export default function RegisterStorePage() {
   };
 
   return (
-    <div className="register-container animate-fade-in">
+    <div className="register-container animate-fade-in page-register-store">
       <div className="register-card glass-card animate-scale-in">
         <div className="register-header">
           <div className="logo-badge">
@@ -290,186 +292,6 @@ export default function RegisterStorePage() {
         </form>
       </div>
 
-      <style>{`
-        .register-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          width: 100vw;
-          background-color: var(--bg-app);
-          padding: 1.5rem;
-        }
-
-        .register-card {
-          position: relative;
-          z-index: 10;
-          width: 100%;
-          max-width: 520px;
-          padding: 2.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-          border-radius: 20px;
-          margin: 2rem 0;
-        }
-
-        .register-header {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .logo-badge {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          background: rgba(37, 99, 235, 0.08);
-          border: 1px solid rgba(37, 99, 235, 0.2);
-          color: var(--primary);
-          margin-bottom: 1rem;
-        }
-
-        .register-header h1 {
-          font-size: 1.75rem;
-          margin-bottom: 0.35rem;
-          color: var(--text-primary);
-        }
-
-        .register-header p {
-          color: var(--text-secondary);
-          font-size: 0.9rem;
-        }
-
-        .register-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.75rem;
-        }
-
-        .form-section {
-          display: flex;
-          flex-direction: column;
-          gap: 1.25rem;
-          border: 1px solid var(--border);
-          border-radius: 14px;
-          padding: 1.25rem;
-          margin: 0;
-        }
-
-        .form-section:disabled {
-          opacity: 0.7;
-        }
-
-        .form-section legend {
-          padding: 0 0.5rem;
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: var(--text-secondary);
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .form-group label {
-          color: var(--text-primary);
-          font-size: 0.85rem;
-          font-weight: 500;
-        }
-
-        .input-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .premium-input.with-icon {
-          padding-left: 2.75rem;
-        }
-
-        .input-icon {
-          position: absolute;
-          left: 1rem;
-          color: var(--text-muted);
-          pointer-events: none;
-          transition: var(--transition);
-        }
-
-        .premium-input:focus ~ .input-icon,
-        .premium-input:focus + .input-icon {
-          color: var(--primary);
-        }
-
-        .password-toggle {
-          position: absolute;
-          right: 1rem;
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0.25rem;
-          transition: var(--transition);
-        }
-
-        .password-toggle:hover {
-          color: var(--text-primary);
-        }
-
-        .field-hint {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          word-break: break-all;
-        }
-
-        .field-error {
-          font-size: 0.75rem;
-          color: var(--danger, #ef4444);
-        }
-
-        .btn-block {
-          width: 100%;
-          padding: 0.85rem;
-        }
-
-        .register-footer {
-          text-align: center;
-          font-size: 0.85rem;
-          color: var(--text-secondary);
-        }
-
-        .register-footer a {
-          color: var(--primary);
-          font-weight: 500;
-        }
-
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 480px) {
-          .register-card {
-            padding: 1.75rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

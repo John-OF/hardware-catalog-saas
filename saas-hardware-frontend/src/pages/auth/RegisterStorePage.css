@@ -1,0 +1,186 @@
+/* Estilos de <RegisterStorePage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-register-store`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-register-store` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-register-store).register-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-app);
+  padding: 1.5rem;
+}
+
+:where(.page-register-store) .register-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 520px;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  border-radius: 20px;
+  margin: 2rem 0;
+}
+
+:where(.page-register-store) .register-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+:where(.page-register-store) .logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+:where(.page-register-store) .register-header h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary);
+}
+
+:where(.page-register-store) .register-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+:where(.page-register-store) .register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+:where(.page-register-store) .form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin: 0;
+}
+
+:where(.page-register-store) .form-section:disabled {
+  opacity: 0.7;
+}
+
+:where(.page-register-store) .form-section legend {
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+:where(.page-register-store) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:where(.page-register-store) .form-group label {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+:where(.page-register-store) .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+:where(.page-register-store) .premium-input.with-icon {
+  padding-left: 2.75rem;
+}
+
+:where(.page-register-store) .input-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: var(--transition);
+}
+
+:where(.page-register-store) .premium-input:focus ~ .input-icon,
+:where(.page-register-store) .premium-input:focus + .input-icon {
+  color: var(--primary);
+}
+
+:where(.page-register-store) .password-toggle {
+  position: absolute;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  transition: var(--transition);
+}
+
+:where(.page-register-store) .password-toggle:hover {
+  color: var(--text-primary);
+}
+
+:where(.page-register-store) .field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+:where(.page-register-store) .field-error {
+  font-size: 0.75rem;
+  color: var(--danger, #ef4444);
+}
+
+:where(.page-register-store) .btn-block {
+  width: 100%;
+  padding: 0.85rem;
+}
+
+:where(.page-register-store) .register-footer {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-register-store) .register-footer a {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+:where(.page-register-store) .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 480px) {
+  :where(.page-register-store) .register-card {
+    padding: 1.75rem;
+  }
+}

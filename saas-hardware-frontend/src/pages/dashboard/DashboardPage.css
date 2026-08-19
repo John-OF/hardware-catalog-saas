@@ -1,0 +1,333 @@
+/* Estilos de <DashboardPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-dashboard`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-dashboard` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-dashboard) .loader-container,
+  :where(.page-dashboard).loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #fafafa;
+    color: var(--text-secondary);
+    gap: 1rem;
+  }
+  :where(.page-dashboard) .loader-ring {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(37, 99, 235, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 0.8s linear infinite;
+  }
+
+:where(.page-dashboard).dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-app);
+  position: relative;
+}
+
+/* Sidebar Styles */
+:where(.page-dashboard) .dashboard-sidebar {
+  width: 280px;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  transition: transform 0.3s ease;
+}
+
+:where(.page-dashboard) .sidebar-brand {
+  padding: 2rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-dashboard) .tenant-logo-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+:where(.page-dashboard) .tenant-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:where(.page-dashboard) .tenant-logo-icon {
+  color: var(--primary);
+}
+
+:where(.page-dashboard) .tenant-info h3 {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.page-dashboard) .plan-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  margin-top: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-dashboard) .sidebar-nav {
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+:where(.page-dashboard) .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: var(--transition);
+  position: relative;
+}
+
+:where(.page-dashboard) .nav-link:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.03);
+}
+
+:where(.page-dashboard) .nav-link.active {
+  color: white;
+  background: var(--primary);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+:where(.page-dashboard) .nav-arrow {
+  margin-left: auto;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+:where(.page-dashboard) .nav-link:hover .nav-arrow {
+  opacity: 0.5;
+  transform: translateX(2px);
+}
+
+:where(.page-dashboard) .nav-link.active .nav-arrow {
+  opacity: 1;
+  color: white;
+}
+
+:where(.page-dashboard) .sidebar-footer {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-dashboard) .user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+:where(.page-dashboard) .avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+:where(.page-dashboard) .user-info h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-dashboard) .user-info p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+:where(.page-dashboard) .logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-dashboard) .logout-btn:hover {
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 4px 12px var(--danger-glow);
+}
+
+/* Main Content area */
+:where(.page-dashboard) .dashboard-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Topbar */
+:where(.page-dashboard) .dashboard-topbar {
+  margin: 1.5rem;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: var(--radius-lg);
+  z-index: 10;
+}
+
+:where(.page-dashboard) .dashboard-topbar h2 {
+  font-size: 1.25rem;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+}
+
+:where(.page-dashboard) .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+:where(.page-dashboard) .storefront-btn {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+}
+
+:where(.page-dashboard) .theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+:where(.page-dashboard) .theme-toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.04);
+  border-color: var(--text-secondary);
+}
+
+:where(.page-dashboard) .dashboard-content {
+  flex: 1;
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+/* Toggle Button Mobile */
+:where(.page-dashboard) .sidebar-toggle-mobile {
+  display: none;
+  position: absolute;
+  top: 1.75rem;
+  left: 1.5rem;
+  z-index: 100;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Media Queries */
+@media (max-width: 1024px) {
+  :where(.page-dashboard) .sidebar-toggle-mobile {
+    display: flex;
+  }
+
+  :where(.page-dashboard) .dashboard-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+  }
+
+  :where(.page-dashboard) .dashboard-sidebar.open {
+    transform: translateX(0);
+  }
+
+  :where(.page-dashboard) .dashboard-main {
+    padding-left: 0;
+  }
+
+  :where(.page-dashboard) .dashboard-topbar {
+    padding-left: 5rem; /* Margen para botón hamburguesa */
+  }
+}
+
+@media (max-width: 580px) {
+  :where(.page-dashboard) .dashboard-topbar {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  :where(.page-dashboard) .storefront-btn {
+    width: 100%;
+  }
+}

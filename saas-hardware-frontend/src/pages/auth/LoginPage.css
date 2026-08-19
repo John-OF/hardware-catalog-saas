@@ -1,0 +1,169 @@
+/* Estilos de <LoginPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-login`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-login` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-login).login-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-app);
+  overflow: hidden;
+  padding: 1.5rem;
+}
+
+:where(.page-login) .login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  border-radius: 20px;
+}
+
+:where(.page-login) .login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+:where(.page-login) .logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--primary);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+:where(.page-login) .login-header h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary);
+}
+
+:where(.page-login) .login-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+:where(.page-login) .login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-login) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:where(.page-login) .form-group label {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+:where(.page-login) .label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+:where(.page-login) .forgot-link {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-login) .forgot-link:hover {
+  color: var(--primary);
+}
+
+:where(.page-login) .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+:where(.page-login) .premium-input.with-icon {
+  padding-left: 2.75rem;
+}
+
+:where(.page-login) .input-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: var(--transition);
+}
+
+:where(.page-login) .premium-input:focus ~ .input-icon,
+:where(.page-login) .premium-input:focus + .input-icon {
+  color: var(--primary);
+}
+
+:where(.page-login) .password-toggle {
+  position: absolute;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  transition: var(--transition);
+}
+
+:where(.page-login) .password-toggle:hover {
+  color: var(--text-primary);
+}
+
+:where(.page-login) .btn-block {
+  width: 100%;
+  padding: 0.85rem;
+}
+
+:where(.page-login) .login-footer {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-login) .login-footer a {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+:where(.page-login) .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 480px) {
+  :where(.page-login) .login-card {
+    padding: 1.75rem;
+  }
+}

@@ -1,3 +1,5 @@
+import './ProductDetailPage.css';
+
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -313,49 +315,20 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="loader-container">
+      <div className="loader-container page-product-detail">
         <Loader2 className="spinner" size={40} />
         <p>Cargando detalles del producto...</p>
-        <style>{`
-          .loader-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background: var(--bg-app);
-            color: var(--text-secondary);
-            gap: 1rem;
-          }
-          .spinner { animation: spin 1s linear infinite; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
       </div>
     );
   }
 
   if (isError || !product) {
     return (
-      <div className="error-container">
+      <div className="error-container page-product-detail">
         <ShoppingBag size={48} />
         <h2>Producto no encontrado</h2>
         <p>El producto que buscas no existe en este catálogo o ha sido desactivado.</p>
         <Link to={isCustomDomain ? '/' : `/${resolvedSlug}`} className="btn-primary" style={{textDecoration: 'none'}}>Volver al Catálogo</Link>
-        <style>{`
-          .error-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background: var(--bg-app);
-            color: var(--text-primary);
-            gap: 1.5rem;
-            text-align: center;
-            padding: 2rem;
-          }
-          .error-container p { color: var(--text-secondary); max-width: 400px; margin-bottom: 0.5rem; }
-        `}</style>
       </div>
     );
   }
@@ -364,7 +337,7 @@ export default function ProductDetailPage() {
   const mainQtyInCart = mainCartItem ? mainCartItem.quantity : 0;
 
   return (
-    <div className="product-detail-container animate-fade-in">
+    <div className="product-detail-container animate-fade-in page-product-detail">
       {/* Back button */}
       <div className="back-navigation">
         <Link to={isCustomDomain ? '/' : `/${resolvedSlug}`} className="btn-secondary back-btn">
@@ -808,13 +781,6 @@ export default function ProductDetailPage() {
             })}
           </div>
 
-          <style>{`
-            .related-product-card:hover {
-              transform: translateY(-4px);
-              border-color: var(--primary) !important;
-              box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-            }
-          `}</style>
         </div>
       )}
 
@@ -1157,340 +1123,6 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      <style>{`
-        .product-detail-container {
-          max-width: 1100px;
-          margin: 0 auto;
-          padding: 2rem 1.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-          width: 100%;
-        }
-
-        .back-navigation {
-          display: flex;
-        }
-
-        .back-btn {
-          padding: 0.6rem 1.2rem;
-          font-size: 0.85rem;
-          border-radius: var(--radius-md);
-        }
-
-        .product-showcase {
-          display: grid;
-          grid-template-columns: 1.1fr 1.2fr;
-          gap: 3rem;
-          padding: 3rem;
-          border-radius: var(--radius-xl);
-        }
-
-        /* Image box */
-        .product-image-block {
-          width: 100%;
-          aspect-ratio: 1/1;
-          border-radius: var(--radius-lg);
-          border: 1px solid var(--border);
-          background: rgba(255, 255, 255, 0.015);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-
-        .product-main-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          transition: transform 0.4s ease;
-        }
-
-        .product-image-block:hover .product-main-img {
-          transform: scale(1.03);
-        }
-
-        .product-placeholder-img {
-          color: var(--text-muted);
-        }
-
-        /* Details */
-        .product-details-block {
-          display: flex;
-          flex-direction: column;
-          gap: 1.75rem;
-        }
-
-        .brand-category-row {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .detail-brand {
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: var(--primary);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .detail-category {
-          font-size: 0.75rem;
-          font-weight: 500;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid var(--border);
-          color: var(--text-secondary);
-          padding: 0.2rem 0.6rem;
-          border-radius: 6px;
-        }
-
-        .detail-title {
-          font-size: 2rem;
-          line-height: 1.2;
-          font-family: var(--font-heading);
-          background: var(--gradient-title);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-
-        .light-mode .detail-title {
-          background: none;
-          -webkit-text-fill-color: initial;
-          color: var(--text-primary);
-        }
-
-        /* Pricing Card */
-        .pricing-stock-card {
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          padding: 1.5rem;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 1.5rem;
-        }
-
-        .detail-price-box {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .price-label {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.02em;
-        }
-
-        .detail-price {
-          font-size: 2.25rem;
-          font-weight: 800;
-          color: var(--text-primary);
-          line-height: 1.1;
-        }
-
-        .stock-indicator {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-
-        .stock-indicator.instock {
-          color: var(--success);
-        }
-
-        .stock-indicator.outofstock {
-          color: var(--danger);
-        }
-
-        .stock-state {
-          display: block;
-          font-weight: 700;
-          font-size: 0.95rem;
-        }
-
-        .stock-count {
-          display: block;
-          font-size: 0.75rem;
-          color: var(--text-muted);
-        }
-
-        /* "Avísame cuando llegue" */
-        .notify-stock-box {
-          margin-top: 1rem;
-          padding: 1rem;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: rgba(255, 255, 255, 0.02);
-        }
-
-        .notify-header {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-size: 0.9rem;
-          font-weight: 600;
-          color: var(--text-primary);
-          margin-bottom: 0.75rem;
-        }
-
-        .notify-header svg { color: var(--primary); }
-
-        .notify-form {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-
-        .notify-input {
-          flex: 1 1 140px;
-          min-width: 0;
-          padding: 0.6rem 0.75rem;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--bg-app, rgba(0, 0, 0, 0.15));
-          color: var(--text-primary);
-          font-size: 0.9rem;
-        }
-
-        .notify-input:focus {
-          outline: none;
-          border-color: var(--primary);
-        }
-
-        .notify-submit {
-          flex: 0 0 auto;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-
-        .notify-success {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-size: 0.9rem;
-          color: var(--text-secondary);
-        }
-
-        /* Buy button */
-        .detail-cta-row {
-          display: flex;
-          gap: 0.75rem;
-        }
-
-        .add-cart-btn {
-          flex: 1;
-          padding: 1rem;
-          font-size: 1rem;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-        }
-        .add-cart-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .add-cart-btn.added { border-color: var(--success); color: var(--success); background: var(--success-glow); }
-        .add-cart-btn.added:hover:not(:disabled) { background: var(--success); color: var(--text-on-primary); }
-
-        .whatsapp-buy-btn {
-          flex: 1;
-          padding: 1rem;
-          font-size: 1.05rem;
-          font-weight: 600;
-          background: var(--success);
-          box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.65rem;
-        }
-
-        .whatsapp-buy-btn:hover {
-          background: var(--success);
-          filter: brightness(0.92);
-          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
-        }
-
-        /* Description Section */
-        .detail-description-section {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .detail-description-section h3 {
-          font-size: 1.1rem;
-          font-family: var(--font-heading);
-          color: var(--text-primary);
-        }
-
-        .detail-description-section p {
-          font-size: 0.95rem;
-          color: var(--text-secondary);
-          line-height: 1.6;
-        }
-
-        /* Specs Section */
-        .detail-specs-section {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
-        .detail-specs-section h3 {
-          font-size: 1.1rem;
-          font-family: var(--font-heading);
-          color: var(--text-primary);
-        }
-
-        .specs-table-wrapper {
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          overflow: hidden;
-        }
-
-        .specs-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 0.9rem;
-        }
-
-        .specs-table td {
-          padding: 0.75rem 1rem;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .specs-table tr:last-child td {
-          border-bottom: none;
-        }
-
-        .spec-name {
-          color: var(--text-secondary);
-          font-weight: 500;
-          width: 40%;
-          background: rgba(255, 255, 255, 0.01);
-        }
-
-        .spec-value {
-          color: var(--text-primary);
-          width: 60%;
-        }
-
-        /* Responsive */
-        @media (max-width: 860px) {
-          .product-showcase {
-            grid-template-columns: 1fr;
-            gap: 2rem;
-            padding: 1.75rem;
-          }
-          .detail-title {
-            font-size: 1.6rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

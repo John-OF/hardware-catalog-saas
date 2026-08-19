@@ -1,0 +1,493 @@
+/* Estilos de <OrdersPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-orders`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-orders` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-orders).orders-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+:where(.page-orders) .page-header-actions {
+  margin-top: -0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-orders) .muted-cell {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+:where(.page-orders) .page-description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+:where(.page-orders) .filters-bar {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  align-items: center;
+}
+
+:where(.page-orders) .search-box {
+  position: relative;
+  flex: 1;
+}
+
+:where(.page-orders) .search-icon {
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+:where(.page-orders) .search-input {
+  padding-left: 2.5rem;
+}
+
+:where(.page-orders) .status-select {
+  width: 220px;
+  cursor: pointer;
+}
+
+:where(.page-orders) .inner-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 0;
+  color: var(--text-muted);
+  gap: 0.75rem;
+}
+
+:where(.page-orders) .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+:where(.page-orders) .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  gap: 0.5rem;
+}
+
+:where(.page-orders) .empty-state h3 {
+  color: var(--text-primary);
+  margin-top: 0.5rem;
+  font-size: 1.2rem;
+}
+
+:where(.page-orders) .empty-state p {
+  max-width: 400px;
+  font-size: 0.9rem;
+}
+
+:where(.page-orders) .table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  padding: 0.25rem;
+}
+
+:where(.page-orders) .orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+:where(.page-orders) .orders-table th,
+:where(.page-orders) .orders-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-orders) .orders-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-orders) .orders-table tr:last-child td {
+  border-bottom: none;
+}
+
+:where(.page-orders) .orders-table tbody tr:hover {
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+:where(.page-orders) .code-cell {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-orders) .name-cell {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+:where(.page-orders) .total-cell {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-orders) .date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-orders) .actions-header {
+  text-align: right;
+}
+
+:where(.page-orders) .actions-cell {
+  text-align: right;
+}
+
+:where(.page-orders) .action-buttons {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+:where(.page-orders) .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-orders) .btn-icon:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.page-orders) .check-btn:hover {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-glow);
+}
+
+:where(.page-orders) .cancel-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-glow);
+}
+
+:where(.page-orders) .delete-btn:hover {
+  border-color: #f43f5e;
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+}
+
+:where(.page-orders) .badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+:where(.page-orders) .pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-orders) .pag-info {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-orders) .pag-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* Modal styling */
+:where(.page-orders) .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  backdrop-filter: blur(4px);
+}
+
+:where(.page-orders) .modal-content {
+  width: 100%;
+  max-width: 600px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+:where(.page-orders) .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-orders) .modal-header h3 {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+:where(.page-orders) .close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+}
+
+:where(.page-orders) .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-orders) .customer-summary-card,
+:where(.page-orders) .items-summary-card {
+  background: rgba(var(--overlay-mix), 0.015);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+:where(.page-orders) .customer-summary-card h4,
+:where(.page-orders) .items-summary-card h4 {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  font-family: var(--font-heading);
+}
+
+:where(.page-orders) .info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+:where(.page-orders) .info-grid label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+
+:where(.page-orders) .info-grid p {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+:where(.page-orders) .full-width {
+  grid-column: span 2;
+}
+
+:where(.page-orders) .phone-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+:where(.page-orders) .btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--success-glow);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success);
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+:where(.page-orders) .btn-whatsapp:hover {
+  background: var(--success);
+  color: #fff;
+}
+
+:where(.page-orders) .note-text {
+  font-style: italic;
+  background: rgba(var(--overlay-mix), 0.02);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--primary);
+}
+
+:where(.page-orders) .detail-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+:where(.page-orders) .detail-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+:where(.page-orders) .detail-item-row:last-child {
+  border-bottom: none;
+}
+
+:where(.page-orders) .item-name-col {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+:where(.page-orders) .item-qty {
+  font-weight: 700;
+  color: var(--primary);
+  font-family: monospace;
+  background: var(--primary-glow);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+:where(.page-orders) .item-name {
+  color: var(--text-primary);
+}
+
+:where(.page-orders) .item-price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+:where(.page-orders) .item-price-col span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-orders) .item-price-col strong {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+:where(.page-orders) .detail-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-orders) .detail-total-row span {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-orders) .detail-total-row strong {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+:where(.page-orders) .modal-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+:where(.page-orders) .modal-actions-bar button {
+  flex: 1;
+}
+
+:where(.page-orders) .badge-info {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+:where(.page-orders) .process-btn:hover {
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.1);
+}
+
+:where(.page-orders) .btn-whatsapp-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+:where(.page-orders) .btn-whatsapp-secondary:hover {
+  background: rgba(var(--overlay-mix), 0.06);
+  color: var(--text-primary);
+}
+
+:where(.page-orders) .spinner-hover {
+  transition: transform 0.8s ease;
+}
+:where(.page-orders) .process-btn:hover .spinner-hover {
+  transform: rotate(360deg);
+}

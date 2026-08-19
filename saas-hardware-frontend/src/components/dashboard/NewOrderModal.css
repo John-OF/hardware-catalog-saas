@@ -1,0 +1,286 @@
+/* Estilos de <NewOrderModal>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Sin acotar a proposito: es un componente que puede montarse en cualquier
+   pantalla, asi que su CSS es global igual que lo era antes. Sus clases
+   estan prefijadas y no chocan con las de ninguna pagina (comprobado con
+   el analisis de colisiones). */
+
+.modal-content.new-order-modal {
+  max-width: 900px;
+  width: 100%;
+}
+
+.no-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.no-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.no-search-input {
+  width: 100%;
+  padding-left: 2.35rem;
+}
+
+.new-order-body {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.new-order-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.column-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.product-results,
+.order-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 260px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.results-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.product-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.product-result:hover {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.result-name {
+  font-weight: 500;
+}
+
+.result-flag {
+  margin-left: 0.4rem;
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--warning);
+}
+
+.result-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.order-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.line-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.line-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-price {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.line-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.line-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.line-actions button:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+
+.line-remove:hover {
+  color: var(--danger) !important;
+  border-color: var(--danger) !important;
+}
+
+.line-qty {
+  width: 46px;
+  height: 26px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.stock-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--warning);
+}
+
+.new-order-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.new-order-fields .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.new-order-fields .form-group.full {
+  grid-column: 1 / -1;
+}
+
+.new-order-fields label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.status-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.status-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.status-choice em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.status-choice.active {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.new-order-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.footer-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.footer-total strong {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+@media (max-width: 820px) {
+  .new-order-body {
+    grid-template-columns: 1fr;
+  }
+
+  .product-results,
+  .order-lines {
+    height: 190px;
+  }
+}

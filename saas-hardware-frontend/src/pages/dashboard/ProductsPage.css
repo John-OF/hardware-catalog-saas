@@ -1,0 +1,651 @@
+/* Estilos de <ProductsPage>. Estaban en un <style> dentro del TSX (TEC-6).
+
+   Van acotados a `.page-products`, que se anade en la raiz del componente. El
+   ambito hace falta porque en un .css importado las reglas son globales y
+   siempre estan cargadas, mientras que el <style> solo existia mientras la
+   pagina estaba montada: hay 40 selectores (.modal-overlay, .form-group
+   label, .spinner...) definidos distinto en varias paginas que, sin
+   acotar, se pisarian entre ellas.
+
+   Es `:where()` y no `.page-products` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas siguen compitiendo con index.css
+   exactamente igual que cuando estaban embebidas. */
+
+:where(.page-products).products-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Filters Bar */
+:where(.page-products) .filters-bar {
+  padding: 1rem 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+:where(.page-products) .search-box {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+:where(.page-products) .search-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--text-muted);
+}
+
+:where(.page-products) .search-box input {
+  padding-left: 2.75rem;
+}
+
+:where(.page-products) .select-filter {
+  width: 220px;
+  cursor: pointer;
+}
+
+:where(.page-products) .select-filter option {
+  background-color: var(--bg-sidebar);
+  color: var(--text-primary);
+}
+
+:where(.page-products) .add-product-btn {
+  padding: 0.75rem 1.25rem;
+}
+
+/* Table Styles */
+:where(.page-products) .table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-products) .premium-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+:where(.page-products) .premium-table th {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-products) .premium-table td {
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+:where(.page-products) .premium-table tbody tr {
+  transition: var(--transition);
+}
+
+:where(.page-products) .premium-table tbody tr:hover {
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+:where(.page-products) .premium-table tbody tr.row-dragging {
+  opacity: 0.35;
+  background: rgba(var(--overlay-mix), 0.03) !important;
+}
+
+:where(.page-products) .drag-handle-cell {
+  cursor: grab;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+  width: 30px;
+}
+
+:where(.page-products) .drag-handle-cell:hover {
+  color: var(--primary);
+}
+
+:where(.page-products) .drag-handle-cell:active {
+  cursor: grabbing;
+}
+
+:where(.page-products) .table-img-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-muted);
+}
+
+:where(.page-products) .table-img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:where(.page-products) .product-info-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+:where(.page-products) .product-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+:where(.page-products) .product-brand {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+:where(.page-products) .category-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+}
+
+:where(.page-products) .price-cell {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-products) .stock-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+:where(.page-products) .stock-number {
+  font-weight: 600;
+  color: var(--success);
+}
+
+:where(.page-products) .stock-number.low {
+  color: var(--warning);
+}
+
+:where(.page-products) .stock-number.out {
+  color: var(--danger);
+}
+
+:where(.page-products) .stock-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+:where(.page-products) .waitlist-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  width: fit-content;
+}
+
+:where(.page-products) .table-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-products) .table-action-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+:where(.page-products) .table-action-btn.edit:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-products) .table-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Pagination styles */
+:where(.page-products) .pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+:where(.page-products) .pag-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+:where(.page-products) .page-indicator {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Drawer Overlay */
+:where(.page-products) .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 200; /* Ensure overlay is on top of everything */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+:where(.page-products) .modal-drawer {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(85vh - 45px); /* Keep the card height bounded within viewport */
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden; /* Hide overflow so that internal form scrolls */
+}
+
+:where(.page-products) .modal-drawer.wide-drawer {
+  max-width: 580px;
+}
+
+:where(.page-products) .drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+:where(.page-products) .drawer-header h3 {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+:where(.page-products) .drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 50%;
+}
+
+:where(.page-products) .drawer-close:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.05);
+}
+
+:where(.page-products) .drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-products) .scrollable-form {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+:where(.page-products) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+:where(.page-products) .form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+:where(.page-products) .form-row {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+:where(.page-products) .form-row .half {
+  flex: 1;
+}
+
+:where(.page-products) .drawer-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-products) .drawer-actions button {
+  flex: 1;
+}
+
+/* Image Dropzone styles */
+:where(.page-products) .image-upload-group label {
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+:where(.page-products) .image-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  text-align: center;
+  transition: var(--transition);
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+:where(.page-products) .image-dropzone:hover {
+  border-color: var(--primary);
+  background: rgba(37, 99, 235, 0.02);
+}
+
+:where(.page-products) .dropzone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 1rem 0;
+}
+
+:where(.page-products) .dropzone-icon {
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+:where(.page-products) .file-limit {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+:where(.page-products) .preview-container {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+:where(.page-products) .preview-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:where(.page-products) .remove-preview {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  background: rgba(3, 7, 18, 0.75);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-products) .remove-preview:hover {
+  background: #ef4444;
+}
+
+:where(.page-products) .textarea-input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Specs Editor */
+:where(.page-products) .specs-editor-group {
+  background: rgba(var(--overlay-mix), 0.015);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+:where(.page-products) .specs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+:where(.page-products) .specs-header label {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+:where(.page-products) .add-spec-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+:where(.page-products) .add-spec-btn:hover {
+  color: var(--primary-hover);
+}
+
+:where(.page-products) .no-specs-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+:where(.page-products) .specs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+:where(.page-products) .spec-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+:where(.page-products) .spec-key {
+  flex: 1;
+}
+
+:where(.page-products) .spec-value {
+  flex: 1.5;
+}
+
+:where(.page-products) .remove-spec-row {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  transition: var(--transition);
+}
+
+:where(.page-products) .remove-spec-row:hover {
+  color: var(--danger);
+}
+
+/* Toggle switches style */
+:where(.page-products) .toggle-switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+:where(.page-products) .toggle-checkbox {
+  display: none;
+}
+
+:where(.page-products) .toggle-label {
+  width: 44px;
+  height: 24px;
+  background: var(--border);
+  border-radius: 50px;
+  position: relative;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-products) .toggle-label::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: var(--transition);
+}
+
+:where(.page-products) .toggle-checkbox:checked + .toggle-label {
+  background: var(--primary);
+}
+
+:where(.page-products) .toggle-checkbox:checked + .toggle-label::after {
+  left: 23px;
+  background: white;
+}
+
+:where(.page-products) .toggle-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Modal styling */
+
+:where(.page-products) .modal-content {
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+:where(.page-products) .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-products) .modal-header h3 {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+:where(.page-products) .close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+}
+
+:where(.page-products) .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+:where(.page-products) .customer-summary-card {
+  background: rgba(var(--overlay-mix), 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+:where(.page-products) .customer-summary-card h4 {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  font-family: var(--font-heading);
+}
+
+:where(.page-products) .modal-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  :where(.page-products) .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  :where(.page-products) .select-filter {
+    width: 100%;
+  }
+}

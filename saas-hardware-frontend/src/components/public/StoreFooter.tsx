@@ -1,3 +1,5 @@
+import './StoreFooter.css';
+
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, Receipt } from 'lucide-react';
 import type { Page, Tenant } from '../../types';
@@ -85,32 +87,6 @@ export default function StoreFooter({ tenant, pages = [], buildPath }: Props) {
 
       <p>&copy; {new Date().getFullYear()} {tenant.name}. Todos los derechos reservados.</p>
 
-      <style>{`
-        .catalog-footer {
-          display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
-          padding: 3rem 0; margin-top: 3rem;
-          border-top: 1px solid var(--border);
-          font-size: 0.85rem;
-        }
-        .footer-brand { display: flex; flex-direction: column; align-items: center; gap: 0.85rem; }
-        /* Fila que se parte sola: son datos sueltos, no columnas. Con tres o
-           cuatro cabe en una linea en escritorio y se apila en movil sin una
-           sola media query. */
-        .footer-data { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1.5rem; }
-        .footer-item { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-secondary); }
-        .footer-item svg { color: var(--primary); flex: none; }
-        .footer-social { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
-        .footer-social .footer-link {
-          padding: 0.35rem 0.85rem;
-          border: 1px solid var(--border); border-radius: var(--radius-md);
-          font-weight: 600;
-          transition: var(--transition);
-        }
-        .footer-social .footer-link:hover { border-color: var(--primary); color: var(--primary); }
-        .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; }
-        .footer-link { color: var(--text-secondary); text-decoration: none; }
-        .footer-link:hover { color: var(--primary); }
-      `}</style>
     </footer>
   );
 }
