@@ -72,11 +72,48 @@ class TenantController extends Controller
             'theme.density'       => 'nullable|in:compact,normal,comfortable',
 
             'theme.layout'        => 'nullable|in:grid,compact,list',
+
+            // Tipografía (PERS-6). `font` era una pareja cerrada: un solo valor
+            // decidía la letra de los títulos y la del texto. Desde 10.3 son dos
+            // familias sueltas y el panel ya no manda `font`, pero la clave se
+            // sigue aceptando y guardando: las tiendas dadas de alta antes solo
+            // tienen esa, y es de donde el frontend deduce sus dos familias
+            // mientras su dueño no entre a Configuración (ver resolveFonts en
+            // src/utils/fonts.ts). Si se quitara de aquí, la primera vez que
+            // esas tiendas guardasen cualquier otra cosa perderían su letra.
             'theme.font'          => 'nullable|in:sans,serif,mono,heading',
+
+            // El catálogo de familias vive en src/utils/fonts.ts, que es también
+            // de donde salen los dos selectores. Al añadir una familia hay que
+            // ampliar estas dos listas o el dueño se come un 422 al guardar.
+            'theme.font_heading'  => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
+            'theme.font_body'     => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
+
             'theme.sections'      => 'nullable|string',
 
             // Branding de la pestaña del navegador (título y favicon)
             'theme.page_title'    => 'nullable|string|max:60',
+
+            // Elementos de marca (PERS-7). La franja se muestra si hay texto:
+            // no hay un booleano de encendido, así que vaciar `announcement` es
+            // lo que la apaga (ver src/utils/branding.ts).
+            'theme.announcement'       => 'nullable|string|max:120',
+            'theme.announcement_style' => 'nullable|in:primary,accent,neutral',
+
+            'theme.footer_address' => 'nullable|string|max:160',
+            'theme.footer_hours'   => 'nullable|string|max:120',
+            'theme.footer_tax_id'  => 'nullable|string|max:40',
+
+            // `url:http,https` y no `url` a secas: estos tres son los únicos
+            // campos del theme que acaban en un href, y de un enlace a una red
+            // social no hay ningún esquema más que tenga sentido. La regla
+            // genérica ya rechaza javascript: y data: por su cuenta (está
+            // comprobado en TenantBrandingTest), pero deja pasar cosas como
+            // ftp://, y no conviene que la seguridad de un href dependa de los
+            // detalles internos de una regla de propósito general.
+            'theme.footer_facebook'  => 'nullable|url:http,https|max:200',
+            'theme.footer_instagram' => 'nullable|url:http,https|max:200',
+            'theme.footer_tiktok'    => 'nullable|url:http,https|max:200',
         ]);
 
         if (isset($data['theme'])) {

@@ -16,7 +16,8 @@ import {
   ArrowDown,
   WandSparkles,
   Check,
-  Frame
+  Frame,
+  Megaphone
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
@@ -36,14 +37,28 @@ import {
   cardStyleClass,
   radiusClass,
 } from '../../utils/shape';
-import { fontOf } from '../../utils/fonts';
+import {
+  DEFAULT_FONT_BODY,
+  DEFAULT_FONT_HEADING,
+  FONT_FAMILIES,
+  familyOf,
+  loadGoogleFonts,
+  resolveFonts,
+} from '../../utils/fonts';
+import {
+  ANNOUNCEMENT_STYLES,
+  DEFAULT_ANNOUNCEMENT_STYLE,
+  SOCIAL_NETWORKS,
+} from '../../utils/branding';
+import type { SocialKey } from '../../utils/branding';
 import { THEME_PRESETS, matchingPreset } from '../../utils/themePresets';
 import type { ThemePreset } from '../../utils/themePresets';
 import type {
+  TenantAnnouncementStyle,
   TenantCardStyle,
   TenantColorMode,
   TenantDensity,
-  TenantFont,
+  TenantFontFamily,
   TenantHeroStyle,
   TenantLayout,
   TenantNeutral,
@@ -56,6 +71,30 @@ const LAYOUT_LABELS: Record<TenantLayout, string> = {
   grid: 'Tarjetas',
   compact: 'Compacta',
   list: 'Lista',
+};
+
+/**
+ * Id del `<link>` con el que el panel se descarga el catálogo tipográfico
+ * entero (10.3).
+ *
+ * Es distinto del de la tienda pública (`tenant-font`, en useTenantTheme) a
+ * propósito: allí se cargan las dos familias que usa la tienda y aquí hacen
+ * falta las ocho a la vez, porque las fichas de tema y los dos selectores
+ * prometen una letra concreta y tienen que enseñarla de verdad. Al salir de
+ * Configuración se quita.
+ */
+const FONT_PREVIEW_LINK_ID = 'settings-font-preview';
+
+/** Las redes vacías, sin repetir las claves: salen de SOCIAL_NETWORKS. */
+const emptySocials = () =>
+  Object.fromEntries(SOCIAL_NETWORKS.map((red) => [red.key, ''])) as Record<SocialKey, string>;
+
+/** «Playfair Display + Lora», o un solo nombre si títulos y texto van iguales. */
+const pairLabel = (heading: TenantFontFamily, body: TenantFontFamily) => {
+  const arriba = familyOf(heading)?.label ?? heading;
+  const abajo  = familyOf(body)?.label ?? body;
+
+  return arriba === abajo ? arriba : `${arriba} + ${abajo}`;
 };
 
 export default function SettingsPage() {
@@ -85,8 +124,17 @@ export default function SettingsPage() {
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
   const [layout, setLayout] = useState<TenantLayout>('grid');
-  const [font, setFont] = useState<TenantFont>('sans');
+  const [fontHeading, setFontHeading] = useState<TenantFontFamily>(DEFAULT_FONT_HEADING);
+  const [fontBody, setFontBody] = useState<TenantFontFamily>(DEFAULT_FONT_BODY);
   const [sections, setSections] = useState<{ id: string; type: string; title: string; enabled: boolean }[]>([]);
+
+  // Elementos de marca (10.4): franja de anuncios y datos del pie.
+  const [announcement, setAnnouncement] = useState('');
+  const [announcementStyle, setAnnouncementStyle] = useState<TenantAnnouncementStyle>(DEFAULT_ANNOUNCEMENT_STYLE);
+  const [footerAddress, setFooterAddress] = useState('');
+  const [footerHours, setFooterHours] = useState('');
+  const [footerTaxId, setFooterTaxId] = useState('');
+  const [socials, setSocials] = useState<Record<SocialKey, string>>(emptySocials);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -118,9 +166,26 @@ export default function SettingsPage() {
     setBannerUrl(th.banner_url ?? '');
     setPageTitle(th.page_title ?? '');
     setFaviconUrl(th.favicon_url ?? '');
+
+    setAnnouncement(th.announcement ?? '');
+    setAnnouncementStyle(th.announcement_style ?? DEFAULT_ANNOUNCEMENT_STYLE);
+    setFooterAddress(th.footer_address ?? '');
+    setFooterHours(th.footer_hours ?? '');
+    setFooterTaxId(th.footer_tax_id ?? '');
+    setSocials(
+      Object.fromEntries(SOCIAL_NETWORKS.map((red) => [red.key, th[red.key] ?? ''])) as Record<SocialKey, string>,
+    );
     
     setLayout(th.layout ?? 'grid');
-    setFont(th.font ?? 'sans');
+
+    // Las dos familias salen de resolveFonts y no del theme a pelo: una tienda
+    // anterior a 10.3 solo tiene la pareja vieja (`font: 'serif'`), y así el
+    // selector abre marcando lo que esa tienda ya se ve, no el valor por
+    // defecto. Si abriera en Inter, guardar cualquier otra cosa le cambiaría la
+    // letra sin que nadie lo pidiera.
+    const fuentes = resolveFonts(th);
+    setFontHeading(fuentes.heading.value);
+    setFontBody(fuentes.body.value);
 
     // Parsear secciones editables de la portada
     let parsedSections = [];
@@ -140,6 +205,21 @@ export default function SettingsPage() {
   }, [tenant]);
 
   /**
+   * Trae de Google las familias del catálogo mientras se está en Configuración.
+   *
+   * Sin esto los selectores y las fichas de tema saldrían en la letra del panel
+   * y elegir tipografía sería elegir a ciegas: el navegador no tiene ninguna de
+   * las seis opcionales cargadas aquí, así que caerían todas a su fallback y
+   * "Playfair" se vería igual que "Lora". Solo se paga al entrar en esta
+   * pantalla, y se deshace al salir.
+   */
+  useEffect(() => {
+    loadGoogleFonts(FONT_PREVIEW_LINK_ID, FONT_FAMILIES.map((f) => f.google));
+
+    return () => document.getElementById(FONT_PREVIEW_LINK_ID)?.remove();
+  }, []);
+
+  /**
    * Preset aplicado ahora mismo, o null si el dueño retocó algo después.
    *
    * Se recalcula en cada render en vez de guardarse en estado: si fuera estado
@@ -151,7 +231,8 @@ export default function SettingsPage() {
     accent_color: accentColor,
     neutral,
     color_mode: colorMode,
-    font,
+    font_heading: fontHeading,
+    font_body: fontBody,
     layout,
     radius,
     card_style: cardStyle,
@@ -175,9 +256,9 @@ export default function SettingsPage() {
    * verian identicas y el selector no diria nada. Con el tono de la tienda
    * detras (y los dos manchones de color del CSS) la diferencia se ve.
    */
-  const previewSkin = (extra: string) => ({
+  const previewSkin = (extra: string, vars?: React.CSSProperties) => ({
     className: `shape-preview ${neutralClass(neutral)}${colorMode === 'light' ? ' light-mode' : ''} ${extra}`,
-    style: { '--primary': primaryColor, '--accent': accentColor } as React.CSSProperties,
+    style: { '--primary': primaryColor, '--accent': accentColor, ...vars } as React.CSSProperties,
   });
 
   /** Miniatura de forma: el radio y el estilo de tarjeta que se previsualizan. */
@@ -189,7 +270,8 @@ export default function SettingsPage() {
     setAccentColor(preset.accent_color);
     setNeutral(preset.neutral);
     setColorMode(preset.color_mode);
-    setFont(preset.font);
+    setFontHeading(preset.font_heading);
+    setFontBody(preset.font_body);
     setLayout(preset.layout);
     setRadius(preset.radius);
     setCardStyle(preset.card_style);
@@ -221,8 +303,20 @@ export default function SettingsPage() {
         density,
         page_title: pageTitle || null,
         favicon_url: faviconUrl || null,
+        announcement: announcement.trim() || null,
+        announcement_style: announcementStyle,
+        footer_address: footerAddress.trim() || null,
+        footer_hours: footerHours.trim() || null,
+        footer_tax_id: footerTaxId.trim() || null,
+        // Las redes se vuelcan por la lista, no una a una: el formulario y el
+        // payload no pueden desincronizarse al añadir una.
+        ...Object.fromEntries(SOCIAL_NETWORKS.map((red) => [red.key, socials[red.key].trim() || null])),
         layout,
-        font,
+        // La pareja vieja (`font`) ya no se manda: el backend hace merge del
+        // theme, así que la clave sigue ahí para quien no haya guardado desde
+        // 10.3, pero estas dos mandan sobre ella y dejan de leerla.
+        font_heading: fontHeading,
+        font_body: fontBody,
         sections: JSON.stringify(sections) // Serializamos para enviarlo en FormData
       },
       logoFile,
@@ -364,7 +458,7 @@ export default function SettingsPage() {
                   style={{
                     '--primary': preset.primary_color,
                     '--accent': preset.accent_color,
-                    fontFamily: fontOf(preset.font).heading,
+                    fontFamily: familyOf(preset.font_heading)?.stack,
                   } as React.CSSProperties}
                 >
                   <span className="pp-hero">
@@ -390,7 +484,7 @@ export default function SettingsPage() {
                 <span className="preset-hint">{preset.hint}</span>
                 <span className="preset-meta">
                   {preset.color_mode === 'light' ? 'Claro' : 'Oscuro'}
-                  {' · '}{fontOf(preset.font).label}
+                  {' · '}{pairLabel(preset.font_heading, preset.font_body)}
                   {' · '}{LAYOUT_LABELS[preset.layout]}
                 </span>
               </button>
@@ -401,7 +495,7 @@ export default function SettingsPage() {
         <span className="helper-text preset-foot">
           {activePreset
             ? `Estás usando «${activePreset.name}». Cualquier cambio que hagas abajo lo deja como tema propio.`
-            : 'Tu tienda usa una combinación propia. Aplicar un tema reemplaza colores, tono, modo, fuente, plantilla, forma y estilo de portada; no toca la densidad ni tus textos.'}
+            : 'Tu tienda usa una combinación propia. Aplicar un tema reemplaza colores, tono, modo, tipografías, plantilla, forma y estilo de portada; no toca la densidad ni tus textos.'}
         </span>
       </section>
 
@@ -411,7 +505,7 @@ export default function SettingsPage() {
           <Layout size={18} />
           <div>
             <h3>Estructura y Tipografía</h3>
-            <p>Elige el tipo de grilla de productos y la fuente tipográfica de la tienda.</p>
+            <p>Elige la grilla de productos y las dos tipografías de la tienda: una para los títulos y otra para el texto.</p>
           </div>
         </div>
         <div className="settings-grid">
@@ -429,19 +523,73 @@ export default function SettingsPage() {
             </select>
           </div>
           
+          {/* Tipografía (10.3): dos familias sueltas en vez de la pareja
+              cerrada de antes. La misma lista en los dos selectores a
+              propósito: restringir cuál puede ir arriba y cuál abajo se
+              convierte en "por qué no me deja", y una serif de cuerpo con una
+              sans de título es una combinación legítima. */}
           <div className="form-group">
-            <label>Fuente Tipográfica</label>
-            <select 
-              value={font} 
-              onChange={(e) => setFont(e.target.value as TenantFont)}
+            <label>Fuente de los títulos</label>
+            <select
+              value={fontHeading}
+              onChange={(e) => setFontHeading(e.target.value as TenantFontFamily)}
               className="premium-input"
               style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
             >
-              <option value="sans">Interfaz Moderna (Inter / Sans)</option>
-              <option value="serif">Editorial / Elegante (Merriweather / Serif)</option>
-              <option value="mono">Código / Tecnológico (Fira Code / Mono)</option>
-              <option value="heading">Marca de Impacto (Outfit / Montserrat)</option>
+              {FONT_FAMILIES.map((f) => (
+                <option key={f.value} value={f.value} style={{ fontFamily: f.stack }}>
+                  {f.label} — {f.hint}
+                </option>
+              ))}
             </select>
+          </div>
+
+          <div className="form-group">
+            <label>Fuente del texto</label>
+            <select
+              value={fontBody}
+              onChange={(e) => setFontBody(e.target.value as TenantFontFamily)}
+              className="premium-input"
+              style={{ height: '42px', border: '1px solid var(--border)', padding: '0 0.5rem', borderRadius: 'var(--radius-md)' }}
+            >
+              {FONT_FAMILIES.map((f) => (
+                <option key={f.value} value={f.value} style={{ fontFamily: f.stack }}>
+                  {f.label} — {f.hint}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Muestra viva. Un nombre de familia no dice nada: lo que decide al
+              dueño es ver un título y un párrafo suyos con esas dos letras
+              juntas, que es donde se nota si la combinación pega o no. */}
+          <div className="form-group full">
+            <label>Cómo se lee</label>
+            <span
+              {...previewSkin(
+                `${radiusClass(radius)} ${cardStyleClass(cardStyle)} font-sample`,
+                // Las mismas dos variables que inyecta useTenantTheme en la
+                // tienda, pero acotadas a esta caja: la muestra se pinta por el
+                // mismo camino que el catálogo, no imitándolo.
+                {
+                  '--font-heading': familyOf(fontHeading)?.stack,
+                  '--font-sans': familyOf(fontBody)?.stack,
+                } as React.CSSProperties,
+              )}
+            >
+              <span className="glass-card fs-card">
+                <span className="fs-title">Tarjeta gráfica RTX 4070 Super</span>
+                <span className="fs-body">
+                  Ideal para jugar en 1440p a 144 Hz. Garantía de 12 meses y stock disponible
+                  para entrega inmediata.
+                </span>
+                <span className="fs-price">{formatMoney(2499, currency)}</span>
+              </span>
+            </span>
+            <span className="helper-text">
+              Los títulos, el nombre de la tienda y los precios usan la primera; las
+              descripciones y los botones, la segunda. Puedes poner la misma en los dos.
+            </span>
           </div>
         </div>
       </section>
@@ -729,6 +877,120 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Marca y contacto (10.4) */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Megaphone size={18} />
+          <div>
+            <h3>Marca y contacto</h3>
+            <p>Una franja de anuncios sobre el catálogo y los datos de tu tienda en el pie de página.</p>
+          </div>
+        </div>
+        <div className="settings-grid">
+          <div className="form-group full">
+            <label>Mensaje de la franja <span className="optional">(opcional)</span></label>
+            <input
+              className="premium-input"
+              value={announcement}
+              onChange={(e) => setAnnouncement(e.target.value)}
+              maxLength={120}
+              placeholder="Envío gratis en Lima por compras desde S/ 300"
+            />
+            <span className="helper-text">
+              Sale arriba del todo, en el catálogo y en tus páginas. Se muestra mientras haya
+              texto: para quitarla, borra el mensaje.
+            </span>
+          </div>
+
+          {announcement.trim() !== '' && (
+            <div className="form-group full">
+              <label>Color de la franja</label>
+              <div className="shape-picker">
+                {ANNOUNCEMENT_STYLES.map((estilo) => (
+                  <button
+                    key={estilo.value}
+                    type="button"
+                    className={`shape-option${announcementStyle === estilo.value ? ' active' : ''}`}
+                    onClick={() => setAnnouncementStyle(estilo.value)}
+                    aria-pressed={announcementStyle === estilo.value}
+                  >
+                    {/* La muestra lleva el mensaje de verdad y los colores de
+                        esta tienda: los tres estilos salen del mismo sitio que
+                        la franja pública, así que no pueden discrepar. */}
+                    <span {...previewSkin('ab-preview')}>
+                      <span
+                        className="ab-sample"
+                        style={{ background: estilo.bg, color: estilo.fg, borderColor: estilo.border }}
+                      >
+                        {announcement.trim()}
+                      </span>
+                    </span>
+                    <span className="shape-name">{estilo.label}</span>
+                    <span className="shape-hint">{estilo.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Dirección <span className="optional">(opcional)</span></label>
+            <input
+              className="premium-input"
+              value={footerAddress}
+              onChange={(e) => setFooterAddress(e.target.value)}
+              maxLength={160}
+              placeholder="Av. Garcilaso de la Vega 1234, Lima"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Horario de atención <span className="optional">(opcional)</span></label>
+            <input
+              className="premium-input"
+              value={footerHours}
+              onChange={(e) => setFooterHours(e.target.value)}
+              maxLength={120}
+              placeholder="Lun a Sáb de 10:00 a 20:00"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Identificación fiscal <span className="optional">(opcional)</span></label>
+            <input
+              className="premium-input"
+              value={footerTaxId}
+              onChange={(e) => setFooterTaxId(e.target.value)}
+              maxLength={40}
+              placeholder="RUC 20512345678"
+            />
+            <span className="helper-text">Se muestra tal cual lo escribas, incluido el prefijo.</span>
+          </div>
+
+          {/* Las redes salen de SOCIAL_NETWORKS: añadir una es tocar esa lista
+              (y la whitelist del backend), no este formulario. */}
+          {SOCIAL_NETWORKS.map((red) => (
+            <div className="form-group" key={red.key}>
+              <label>{red.label} <span className="optional">(opcional)</span></label>
+              <input
+                className="premium-input"
+                value={socials[red.key]}
+                onChange={(e) => setSocials((prev) => ({ ...prev, [red.key]: e.target.value }))}
+                maxLength={200}
+                placeholder={red.placeholder}
+              />
+            </div>
+          ))}
+
+          <div className="form-group full">
+            <span className="helper-text">
+              Pega el enlace completo de cada red, tal como lo ves en tu navegador
+              (empezando por https://). Las que dejes vacías no aparecen en el pie.
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* Pestaña del navegador */}
       <section className="settings-card glass-card">
         <div className="settings-card-head">
@@ -839,6 +1101,26 @@ export default function SettingsPage() {
         /* La miniatura es estatica: el hover del .glass-card real la levantaria
            dentro del boton, que ya se mueve solo. */
         .shape-preview .glass-card:hover { transform: none; }
+        /* Tipografia (10.3): la muestra reutiliza el marco de miniatura, que ya
+           trae la paleta y la forma de la tienda, pero con texto de verdad. Dos
+           familias solo se juzgan viendolas juntas y a su tamanio real: en una
+           lista de nombres, "Lora" y "Merriweather" son la misma palabra.
+           --font-heading y --font-sans las inyecta el componente en el span. */
+        .font-sample .fs-card { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.9rem 1rem; }
+        .fs-title { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; line-height: 1.25; color: var(--text-primary); }
+        .fs-body { font-family: var(--font-sans); font-size: 0.83rem; line-height: 1.5; color: var(--text-secondary); }
+        .fs-price { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; color: var(--primary); }
+        /* Marca (10.4): la muestra de la franja. El marco es el de siempre
+           (.shape-preview, que ya trae la paleta de la tienda) y la banda de
+           dentro copia las medidas de .announcement-bar; los colores vienen de
+           branding.ts en linea, que es lo unico que no puede divergir. */
+        .ab-preview { display: flex; align-items: center; min-height: 46px; }
+        .ab-sample {
+          display: block; width: 100%; padding: 0.45rem 0.6rem;
+          border: 1px solid transparent; border-radius: var(--radius-md);
+          font-size: 0.68rem; font-weight: 600; line-height: 1.3; text-align: center;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
         /* Portada (10.2): mismo chrome de opcion que la forma (.shape-option) y
            el mismo marco de miniatura (.shape-preview), que ya trae la paleta de
            la tienda; lo unico propio es el esquema de dentro. */

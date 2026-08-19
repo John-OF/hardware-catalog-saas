@@ -1,7 +1,7 @@
 import type {
   TenantCardStyle,
   TenantColorMode,
-  TenantFont,
+  TenantFontFamily,
   TenantLayout,
   TenantNeutral,
   TenantHeroStyle,
@@ -26,6 +26,11 @@ import type {
  * para los presets: entró igual que `radius` y `card_style` al cerrarse 10.1 —
  * un campo más en la interfaz, uno en cada preset y nada que tocar del resto.
  *
+ * En 10.3 el `font` de pareja cerrada se parte en `font_heading` y `font_body`,
+ * que es lo que permite que un preset proponga una **combinación**: "Boutique"
+ * lleva Playfair en los títulos y Lora en el texto, que es una decisión de
+ * diseño que la perilla vieja no sabía expresar.
+ *
  * **`density` queda fuera a propósito**: el radio y el estilo de tarjeta son
  * identidad (hacen que la tienda parezca de otra marca), pero cuántos productos
  * caben en pantalla es preferencia de quien la lleva y no tiene por qué cambiar
@@ -41,7 +46,8 @@ export interface ThemePreset {
   accent_color: string;
   neutral: TenantNeutral;
   color_mode: TenantColorMode;
-  font: TenantFont;
+  font_heading: TenantFontFamily;
+  font_body: TenantFontFamily;
   layout: TenantLayout;
   radius: TenantRadius;
   card_style: TenantCardStyle;
@@ -57,7 +63,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#22d3ee',
     neutral: 'plum',
     color_mode: 'dark',
-    font: 'heading',
+    font_heading: 'space-grotesk',
+    font_body: 'inter',
     layout: 'grid',
     radius: 'round',
     card_style: 'glass',
@@ -71,7 +78,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#a3e635',
     neutral: 'zinc',
     color_mode: 'dark',
-    font: 'mono',
+    font_heading: 'fira-code',
+    font_body: 'fira-code',
     layout: 'compact',
     radius: 'sharp',
     card_style: 'flat',
@@ -85,7 +93,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#818cf8',
     neutral: 'navy',
     color_mode: 'dark',
-    font: 'sans',
+    font_heading: 'outfit',
+    font_body: 'inter',
     layout: 'grid',
     radius: 'soft',
     card_style: 'glass',
@@ -99,7 +108,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#f59e0b',
     neutral: 'stone',
     color_mode: 'dark',
-    font: 'sans',
+    font_heading: 'montserrat',
+    font_body: 'inter',
     layout: 'compact',
     radius: 'sharp',
     card_style: 'solid',
@@ -117,7 +127,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#0ea5e9',
     neutral: 'slate',
     color_mode: 'light',
-    font: 'sans',
+    font_heading: 'inter',
+    font_body: 'inter',
     layout: 'list',
     radius: 'sharp',
     card_style: 'flat',
@@ -131,7 +142,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#0891b2',
     neutral: 'navy',
     color_mode: 'light',
-    font: 'sans',
+    font_heading: 'lora',
+    font_body: 'inter',
     layout: 'grid',
     radius: 'soft',
     card_style: 'solid',
@@ -145,7 +157,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#a16207',
     neutral: 'stone',
     color_mode: 'light',
-    font: 'serif',
+    font_heading: 'playfair',
+    font_body: 'lora',
     layout: 'grid',
     radius: 'round',
     card_style: 'solid',
@@ -159,7 +172,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     accent_color: '#71717a',
     neutral: 'zinc',
     color_mode: 'light',
-    font: 'sans',
+    font_heading: 'inter',
+    font_body: 'inter',
     layout: 'compact',
     radius: 'soft',
     card_style: 'flat',
@@ -171,7 +185,7 @@ export const THEME_PRESETS: ThemePreset[] = [
 export type PresetValues = Pick<
   ThemePreset,
   | 'primary_color' | 'accent_color' | 'neutral' | 'color_mode'
-  | 'font' | 'layout' | 'radius' | 'card_style' | 'hero_style'
+  | 'font_heading' | 'font_body' | 'layout' | 'radius' | 'card_style' | 'hero_style'
 >;
 
 /**
@@ -187,7 +201,8 @@ export function matchingPreset(values: PresetValues): ThemePreset | null {
     && p.accent_color.toLowerCase() === values.accent_color.toLowerCase()
     && p.neutral === values.neutral
     && p.color_mode === values.color_mode
-    && p.font === values.font
+    && p.font_heading === values.font_heading
+    && p.font_body === values.font_body
     && p.layout === values.layout
     && p.radius === values.radius
     && p.card_style === values.card_style

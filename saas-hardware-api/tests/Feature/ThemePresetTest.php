@@ -12,8 +12,8 @@ use Tests\TestCase;
  * Temas prediseñados (PERS-3 / 9.3).
  *
  * Un preset no es un campo nuevo: es una combinacion de perillas que ya existian
- * (primario, acento, tono, modo, fuente, plantilla y, desde 10.1 y 10.2, forma
- * de tarjeta, radio y estilo de portada) aplicadas de una vez. Por eso el backend no cambio para esto y lo que hay que probar es que esa
+ * (primario, acento, tono, modo, tipografias, plantilla y, desde 10.1 y 10.2,
+ * forma de tarjeta, radio y estilo de portada) aplicadas de una vez. Por eso el backend no cambio para esto y lo que hay que probar es que esa
  * combinacion entra entera en un solo PUT y no se lleva por delante el contenido
  * de la tienda.
  *
@@ -74,7 +74,8 @@ class ThemePresetTest extends TestCase
                 'accent_color' => $preset['accent_color'],
                 'neutral'      => $preset['neutral'],
                 'color_mode'   => $preset['color_mode'],
-                'font'         => $preset['font'],
+                'font_heading' => $preset['font_heading'],
+                'font_body'    => $preset['font_body'],
                 'layout'       => $preset['layout'],
                 'radius'       => $preset['radius'],
                 'card_style'   => $preset['card_style'],
@@ -90,7 +91,8 @@ class ThemePresetTest extends TestCase
             'accent_color'  => '#22d3ee',
             'neutral'       => 'plum',
             'color_mode'    => 'dark',
-            'font'          => 'heading',
+            'font_heading'  => 'space-grotesk',
+            'font_body'     => 'inter',
             'layout'        => 'grid',
             'radius'        => 'round',
             'card_style'    => 'glass',
@@ -107,7 +109,8 @@ class ThemePresetTest extends TestCase
         $this->assertSame('#22d3ee', $fresh->theme['accent_color']);
         $this->assertSame('plum', $fresh->theme['neutral']);
         $this->assertSame('dark', $fresh->theme['color_mode']);
-        $this->assertSame('heading', $fresh->theme['font']);
+        $this->assertSame('space-grotesk', $fresh->theme['font_heading']);
+        $this->assertSame('inter', $fresh->theme['font_body']);
         $this->assertSame('grid', $fresh->theme['layout']);
         $this->assertSame('round', $fresh->theme['radius']);
         $this->assertSame('glass', $fresh->theme['card_style']);
@@ -126,7 +129,8 @@ class ThemePresetTest extends TestCase
                 'accent_color'  => '#22d3ee',
                 'neutral'       => 'plum',
                 'color_mode'    => 'dark',
-                'font'          => 'heading',
+                'font_heading'  => 'space-grotesk',
+                'font_body'     => 'inter',
                 'layout'        => 'grid',
                 'radius'        => 'round',
                 'card_style'    => 'glass',
@@ -155,7 +159,8 @@ class ThemePresetTest extends TestCase
                 'accent_color'  => '#a16207',
                 'neutral'       => 'stone',
                 'color_mode'    => 'light',
-                'font'          => 'serif',
+                'font_heading'  => 'playfair',
+                'font_body'     => 'lora',
                 'layout'        => 'grid',
                 'radius'        => 'round',
                 'card_style'    => 'solid',
@@ -170,7 +175,8 @@ class ThemePresetTest extends TestCase
         $this->assertSame('https://cdn.example.com/portada.webp', $theme['banner_url']);
         $this->assertSame('Mi Tienda', $theme['page_title']);
         $this->assertSame('[{"id":"1","type":"hero","enabled":true}]', $theme['sections']);
-        $this->assertSame('serif', $theme['font']);
+        $this->assertSame('playfair', $theme['font_heading']);
+        $this->assertSame('lora', $theme['font_body']);
     }
 
     public function test_todos_los_presets_del_frontend_pasan_la_validacion(): void
@@ -211,10 +217,12 @@ class ThemePresetTest extends TestCase
 
         // Al aniadir una perilla a los presets hay que aniadirla tambien aqui, o
         // el guard deja de cubrirla en silencio. `radius` y `card_style`
-        // entraron con 10.1; `hero_style`, con 10.2.
+        // entraron con 10.1; `hero_style`, con 10.2; `font_heading` y
+        // `font_body` sustituyeron a `font` en 10.3.
         $campos = [
             'id', 'primary_color', 'accent_color', 'neutral',
-            'color_mode', 'font', 'layout', 'radius', 'card_style', 'hero_style',
+            'color_mode', 'font_heading', 'font_body', 'layout',
+            'radius', 'card_style', 'hero_style',
         ];
         $trozos  = preg_split("/(?=\bid:\s*')/", $cuerpo);
         $presets = [];

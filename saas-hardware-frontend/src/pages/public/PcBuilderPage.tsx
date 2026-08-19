@@ -25,6 +25,7 @@ import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
 import { useCartStore } from '../../stores/cartStore';
 import CategoryIcon from '../../components/ui/CategoryIcon';
+import AnnouncementBar from '../../components/public/AnnouncementBar';
 import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
 
 // Pasos predefinidos para armar la PC
@@ -347,6 +348,8 @@ export default function PcBuilderPage() {
 
   return (
     <div className="pc-builder-page animate-fade-in">
+      <AnnouncementBar theme={tenant?.theme} />
+
       {/* Top Header */}
       <header className="catalog-header glass-card">
         <Link to={getPublicPath('/')} className="back-catalog-link">

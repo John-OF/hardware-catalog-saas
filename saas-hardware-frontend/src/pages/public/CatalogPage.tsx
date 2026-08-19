@@ -28,6 +28,8 @@ import { getPublicPages } from '../../api/pages';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import CartDrawer from '../../components/public/CartDrawer';
 import CustomerAccountModal from '../../components/public/CustomerAccountModal';
+import AnnouncementBar from '../../components/public/AnnouncementBar';
+import StoreFooter from '../../components/public/StoreFooter';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
@@ -273,6 +275,10 @@ export default function CatalogPage() {
 
   return (
     <div className="public-catalog-container animate-fade-in">
+      {/* Franja de anuncios (10.4): encima del header, no dentro. Sin texto no
+          pinta nada. */}
+      <AnnouncementBar theme={tenant.theme} />
+
       {/* Header Store */}
       <header className="catalog-header glass-card">
         <div className="header-logo-area">
@@ -889,26 +895,18 @@ export default function CatalogPage() {
           </div>
         )}
 
-        <footer className="catalog-footer text-muted" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', padding: '3rem 0', borderTop: '1px solid var(--border)', marginTop: '3rem', fontSize: '0.85rem' }}>
-          {publicPages.length > 0 && (
-            <div className="footer-links" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {publicPages.map((page) => (
-                <Link 
-                  key={page.id} 
-                  to={getPublicPath(`/p/${page.slug}`)} 
-                  style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}
-                  className="hover-underline"
-                >
-                  {page.title}
-                </Link>
-              ))}
-            </div>
-          )}
-          <p>&copy; {new Date().getFullYear()} {tenant?.name}. Todos los derechos reservados.</p>
-        </footer>
+        {/* El pie sale de un componente desde 10.4: el mismo va en las páginas
+            informativas, y duplicado los datos de la tienda se habrían quedado
+            solo aquí. */}
+        <StoreFooter tenant={tenant} pages={publicPages} buildPath={getPublicPath} />
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;600;700;800&display=swap');
+        /* Aquí había un @import que se traía Fira Code y Merriweather en TODAS
+           las tiendas, usaran esas letras o no. Lo quita 10.3: useTenantTheme
+           pide a Google exactamente las dos familias de esta tienda, así que la
+           que se queda en Inter y Outfit —las del @import base de index.css— ya
+           no descarga nada. Nada de este CSS nombra una familia: todo va por
+           --font-sans y --font-heading. */
 
         .public-catalog-container {
           max-width: 1280px;

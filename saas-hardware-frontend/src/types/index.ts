@@ -1,8 +1,23 @@
 /** Base neutral de la tienda (PERS-2). Ver src/utils/neutrals.ts. */
 export type TenantNeutral = 'slate' | 'zinc' | 'stone' | 'navy' | 'plum';
 
-/** Familia tipografica de la tienda (PERS-6). Ver src/utils/fonts.ts. */
+/**
+ * Pareja tipografica cerrada (PERS-6, anterior a 10.3). Ya no se edita desde
+ * el panel: sobrevive como fallback de las tiendas que solo tienen esta clave.
+ * Ver src/utils/fonts.ts.
+ */
 export type TenantFont = 'sans' | 'serif' | 'mono' | 'heading';
+
+/** Familia tipografica suelta (PERS-6 / 10.3). Ver src/utils/fonts.ts. */
+export type TenantFontFamily =
+  | 'inter'
+  | 'outfit'
+  | 'space-grotesk'
+  | 'montserrat'
+  | 'playfair'
+  | 'lora'
+  | 'merriweather'
+  | 'fira-code';
 
 /** Plantilla de la grilla del catalogo (4.4). */
 export type TenantLayout = 'grid' | 'compact' | 'list';
@@ -16,6 +31,9 @@ export type TenantDensity = 'compact' | 'normal' | 'comfortable';
 
 /** Estilo de portada (PERS-5). Ver src/utils/hero.ts. */
 export type TenantHeroStyle = 'classic' | 'centered' | 'split' | 'minimal';
+
+/** Color de la barra de anuncios (PERS-7). Ver src/utils/branding.ts. */
+export type TenantAnnouncementStyle = 'primary' | 'accent' | 'neutral';
 
 export interface TenantTheme {
   hero_title?: string | null;
@@ -31,7 +49,24 @@ export interface TenantTheme {
   page_title?: string | null;
   favicon_url?: string | null;
   layout?: TenantLayout | null;
+  /** Pareja cerrada; solo se lee si faltan las dos claves de abajo. */
   font?: TenantFont | null;
+  font_heading?: TenantFontFamily | null;
+  font_body?: TenantFontFamily | null;
+
+  /**
+   * Elementos de marca (PERS-7). La barra se muestra si `announcement` tiene
+   * texto: no hay un booleano aparte a proposito, ver src/utils/branding.ts.
+   */
+  announcement?: string | null;
+  announcement_style?: TenantAnnouncementStyle | null;
+  footer_address?: string | null;
+  footer_hours?: string | null;
+  footer_tax_id?: string | null;
+  footer_facebook?: string | null;
+  footer_instagram?: string | null;
+  footer_tiktok?: string | null;
+
   sections?: any;
 }
 

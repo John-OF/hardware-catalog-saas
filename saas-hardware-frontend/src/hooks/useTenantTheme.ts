@@ -2,37 +2,9 @@ import { useEffect } from 'react';
 import type { Tenant } from '../types';
 import { NEUTRAL_CLASSES, neutralClass } from '../utils/neutrals';
 import { SHAPE_CLASSES, shapeClasses } from '../utils/shape';
-import { fontOf } from '../utils/fonts';
+import { loadGoogleFonts, resolveFonts } from '../utils/fonts';
 
 const FONT_LINK_ID = 'tenant-font';
-
-/**
- * Carga una familia de Google Fonts solo cuando la tienda la usa.
- *
- * Se hace bajo demanda y no en el `@import` de index.css para no pagar la
- * descarga de Merriweather y Fira Code en las tiendas que no las eligieron.
- */
-function loadFontFamily(googleFamily: string | null) {
-  const existing = document.getElementById(FONT_LINK_ID) as HTMLLinkElement | null;
-
-  if (!googleFamily) {
-    existing?.remove();
-    return;
-  }
-
-  const href = `https://fonts.googleapis.com/css2?family=${googleFamily}&display=swap`;
-
-  if (existing) {
-    if (existing.href !== href) existing.href = href;
-    return;
-  }
-
-  const link = document.createElement('link');
-  link.id = FONT_LINK_ID;
-  link.rel = 'stylesheet';
-  link.href = href;
-  document.head.appendChild(link);
-}
 
 /**
  * Aplica los estilos y colores dinámicos del tenant al documento.
@@ -59,11 +31,13 @@ export function useTenantTheme(tenant?: Tenant | null) {
     }
 
     // Tipografía: se inyecta como variable para que la hereden TODAS las vistas
-    // públicas y, sobre todo, los encabezados (PERS-6).
-    const font = fontOf(tenant.theme?.font);
-    root.style.setProperty('--font-sans', font.sans);
-    root.style.setProperty('--font-heading', font.heading);
-    loadFontFamily(font.google);
+    // públicas y, sobre todo, los encabezados (PERS-6). Desde 10.3 son dos
+    // familias independientes, así que la tienda puede llevar una display en
+    // los títulos y otra legible en el texto.
+    const fonts = resolveFonts(tenant.theme);
+    root.style.setProperty('--font-sans', fonts.body.stack);
+    root.style.setProperty('--font-heading', fonts.heading.stack);
+    loadGoogleFonts(FONT_LINK_ID, [fonts.heading.google, fonts.body.google]);
 
     // Tono neutral (PERS-2) y modo claro/oscuro: los dos van como clase en el
     // <body>, que es lo que abarca todo el viewport. La paleta estructural sale

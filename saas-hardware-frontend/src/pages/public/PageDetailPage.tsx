@@ -8,7 +8,9 @@ import {
   FileText
 } from 'lucide-react';
 import { getPublicTenant, resolveTenantDomain } from '../../api/public';
-import { getPublicPageDetail } from '../../api/pages';
+import { getPublicPageDetail, getPublicPages } from '../../api/pages';
+import AnnouncementBar from '../../components/public/AnnouncementBar';
+import StoreFooter from '../../components/public/StoreFooter';
 import type { Tenant, Page } from '../../types';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
@@ -38,6 +40,14 @@ export default function PageDetailPage() {
     queryKey: ['publicPageDetail', resolvedSlug, pageSlug],
     queryFn: () => getPublicPageDetail(resolvedSlug!, pageSlug!),
     enabled: !!resolvedSlug && !!pageSlug,
+  });
+
+  // Las demás páginas informativas, para la fila de enlaces del pie: desde una
+  // se llega a las otras sin volver al catálogo.
+  const { data: publicPages = [] } = useQuery<Page[]>({
+    queryKey: ['publicPages', resolvedSlug],
+    queryFn: () => getPublicPages(resolvedSlug!),
+    enabled: !!resolvedSlug,
   });
 
   const getPublicPath = (path: string) => {
@@ -77,6 +87,8 @@ export default function PageDetailPage() {
 
   return (
     <div className="public-catalog-container font-family-custom">
+      <AnnouncementBar theme={tenant.theme} />
+
       {/* Top Header */}
       <header className="catalog-header glass-card">
         <div className="header-logo-area">
@@ -135,9 +147,10 @@ export default function PageDetailPage() {
         )}
       </main>
 
-      <footer className="catalog-footer text-muted" style={{ textAlign: 'center', padding: '2rem 0', fontSize: '0.85rem' }}>
-        <p>&copy; {new Date().getFullYear()} {tenant.name}. Todos los derechos reservados.</p>
-      </footer>
+      {/* Mismo pie que el catálogo (10.4). Aquí es donde más se usa: quien
+          entra a "Sobre nosotros" o "Garantía" viene buscando justamente la
+          dirección, el horario y con quién está tratando. */}
+      <StoreFooter tenant={tenant} pages={publicPages} buildPath={getPublicPath} />
 
       <style>{`
         .public-catalog-container {
