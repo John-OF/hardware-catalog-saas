@@ -140,6 +140,60 @@ class CsvImportTest extends TestCase
         $this->assertNotEmpty($respuesta->json('errors'));
     }
 
+    /**
+     * AUD-10: un archivo por encima del tope se rechaza con un mensaje que se
+     * entiende, en vez de dejar la transaccion abierta hasta agotar el tiempo
+     * de ejecucion y devolver un 504 sin explicacion.
+     */
+    public function test_un_csv_por_encima_del_tope_se_rechaza_sin_importar_nada(): void
+    {
+        $filas = '';
+        for ($i = 0; $i < 2001; $i++) {
+            $filas .= "Producto {$i};Marca;100;;5;Categoria;\"Desc\";\"\"\n";
+        }
+
+        $respuesta = $this->importar(self::PLANTILLA_CABECERA.$filas);
+
+        $respuesta->assertStatus(422);
+        $this->assertStringContainsString('2000', $respuesta->json('message'));
+        $this->assertSame(0, Product::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
+    }
+
+    /**
+     * AUD-10: el import ya no guarda fila a fila. El INSERT en lote se salta los
+     * hooks del modelo, asi que lo que ellos ponian hay que comprobarlo: uuid,
+     * tenant_id, timestamps, los casts y la invalidacion de la cache publica.
+     */
+    public function test_el_insert_en_lote_cruza_varios_lotes_y_conserva_lo_que_ponian_los_hooks(): void
+    {
+        $versionAntes = (int) \Illuminate\Support\Facades\Cache::get("tenant:{$this->tenant->slug}:cache_version", 0);
+
+        // Mas de LOTE_CSV (500) para que haya al menos dos INSERT y un resto.
+        $filas = '';
+        for ($i = 0; $i < 600; $i++) {
+            $filas .= "Producto {$i};Marca;100;;5;Categoria;\"Desc\";\"Socket:AM5\"\n";
+        }
+
+        $this->importar(self::PLANTILLA_CABECERA.$filas)->assertOk();
+
+        $productos = Product::withoutTenant()->where('tenant_id', $this->tenant->id)->get();
+
+        $this->assertCount(600, $productos);
+        $this->assertCount(600, $productos->pluck('id')->unique(), 'Los uuid del lote no son unicos.');
+
+        $primero = $productos->firstWhere('name', 'Producto 0');
+        $this->assertNotNull($primero->created_at);
+        $this->assertNotNull($primero->updated_at);
+        $this->assertSame(['Socket' => 'AM5'], $primero->specs);
+        $this->assertSame('Desc', $primero->description);
+
+        // Todas comparten la misma categoria: se crea una sola vez.
+        $this->assertSame(1, \App\Models\Category::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
+
+        $versionDespues = (int) \Illuminate\Support\Facades\Cache::get("tenant:{$this->tenant->slug}:cache_version", 0);
+        $this->assertGreaterThan($versionAntes, $versionDespues, 'El import no invalido la cache publica.');
+    }
+
     public function test_el_import_es_de_la_tienda_del_token(): void
     {
         $otraTienda = Tenant::create([

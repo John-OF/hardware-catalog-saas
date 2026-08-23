@@ -13,6 +13,19 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    /**
+     * Tope de filas del import CSV (AUD-10).
+     *
+     * No es un numero magico: con 2.000 filas el import tarda un par de segundos
+     * y cabe de sobra en el tiempo de ejecucion por defecto. Un catalogo mas
+     * grande que eso no es una carga puntual sino una migracion, y se hace por
+     * partes o por consola.
+     */
+    private const MAX_FILAS_CSV = 2000;
+
+    /** Filas por INSERT en el import. */
+    private const LOTE_CSV = 500;
+
     public function __construct(private ImageService $imageService) {}
 
     public function index(Request $request): JsonResponse
@@ -149,6 +162,17 @@ class ProductController extends Controller
         fclose($handle);
         $delimiter = strpos($firstLine, ';') !== false ? ';' : ',';
 
+        // AUD-10: el tope se comprueba ANTES de abrir la transaccion. Sin el, un
+        // CSV de 50.000 filas agotaba el tiempo de ejecucion con la transaccion
+        // abierta, y el dueno se quedaba con un 504 sin saber si se habia
+        // importado algo o no. La pasada de conteo no toca la base y corta en
+        // cuanto pasa del tope, asi que no recorre el archivo entero.
+        if ($this->excedeElTope($path, $delimiter)) {
+            return response()->json([
+                'message' => 'El archivo tiene más de ' . self::MAX_FILAS_CSV . ' productos. Divídelo en varios archivos e impórtalos por partes.',
+            ], 422);
+        }
+
         $handle = fopen($path, 'r');
         $header = fgetcsv($handle, 0, $delimiter);
 
@@ -169,6 +193,8 @@ class ProductController extends Controller
         $successCount = 0;
         $errors = [];
         $rowCount = 1;
+        $lote = [];
+        $categoriasPorNombre = [];
 
         // Mapear índices
         $map = [
@@ -244,11 +270,15 @@ class ProductController extends Controller
                 $categoryId = null;
 
                 if (!empty($categoryName)) {
-                    $category = Category::firstOrCreate(
-                        ['name' => $categoryName],
-                        ['icon' => 'folder', 'sort_order' => 0, 'is_active' => true]
-                    );
-                    $categoryId = $category->id;
+                    // Un CSV repite la misma categoria en decenas de filas: sin
+                    // este memo, cada una de ellas era un SELECT.
+                    if (!array_key_exists($categoryName, $categoriasPorNombre)) {
+                        $categoriasPorNombre[$categoryName] = Category::firstOrCreate(
+                            ['name' => $categoryName],
+                            ['icon' => 'folder', 'sort_order' => 0, 'is_active' => true]
+                        )->id;
+                    }
+                    $categoryId = $categoriasPorNombre[$categoryName];
                 }
 
                 $description = $map['descripcion'] !== false && isset($row[$map['descripcion']]) ? trim($row[$map['descripcion']]) : null;
@@ -275,7 +305,7 @@ class ProductController extends Controller
                     }
                 }
 
-                Product::create([
+                $lote[] = $this->filaAAtributos([
                     'name'        => $name,
                     'brand'       => $brand,
                     'price'       => $price,
@@ -288,7 +318,18 @@ class ProductController extends Controller
                 ]);
 
                 $successCount++;
+
+                if (count($lote) >= self::LOTE_CSV) {
+                    Product::insert($lote);
+                    $lote = [];
+                }
             }
+
+            if ($lote !== []) {
+                Product::insert($lote);
+                $lote = [];
+            }
+
             \DB::commit();
         } catch (\Exception $e) {
             \DB::rollBack();
@@ -307,6 +348,14 @@ class ProductController extends Controller
         }
 
         fclose($handle);
+
+        // El insert en lote no pasa por el hook `saved` del modelo, que es quien
+        // sube la version de cache (AUD-6). Se sube una sola vez al terminar, lo
+        // que ademas ahorra las N escrituras en cache que hacia el import cuando
+        // guardaba fila a fila.
+        if ($successCount > 0) {
+            $this->invalidarCachePublica();
+        }
 
         return response()->json([
             'message'       => "Proceso completado. Se importaron {$successCount} productos con éxito.",
@@ -457,4 +506,62 @@ class ProductController extends Controller
 
         \Illuminate\Support\Facades\Cache::increment("tenant:{$tenant->slug}:cache_version");
     }
+
+    /**
+     * Si el CSV trae mas filas de datos que el tope (AUD-10).
+     *
+     * Cuenta con `fgetcsv` y no por lineas porque un campo entrecomillado puede
+     * llevar saltos de linea dentro, y corta en cuanto pasa del tope: de un
+     * archivo enorme solo se leen las primeras MAX_FILAS_CSV + 1 filas.
+     */
+    private function excedeElTope(string $path, string $delimiter): bool
+    {
+        $handle = fopen($path, 'r');
+
+        if ($handle === false) {
+            return false;
+        }
+
+        // La cabecera no cuenta como fila de datos.
+        fgetcsv($handle, 0, $delimiter);
+
+        $filas = 0;
+
+        while (fgetcsv($handle, 0, $delimiter) !== false) {
+            $filas++;
+
+            if ($filas > self::MAX_FILAS_CSV) {
+                fclose($handle);
+
+                return true;
+            }
+        }
+
+        fclose($handle);
+
+        return false;
+    }
+
+    /**
+     * Fila del CSV -> fila lista para un INSERT en lote.
+     *
+     * Se arma con un modelo de verdad en vez de a mano para que los casts sigan
+     * aplicandose igual que antes: `description` cruza SanitizedHtml (SEC-3) y
+     * `specs` se serializa a JSON. A cambio, lo que el `insert()` masivo se
+     * salta -el uuid de HasUuids, el `tenant_id` de BelongsToTenant y los
+     * timestamps- hay que ponerlo aqui a mano.
+     */
+    private function filaAAtributos(array $datos): array
+    {
+        $producto = new Product($datos);
+        $ahora = now();
+
+        return array_merge($producto->getAttributes(), [
+            'id'         => $producto->newUniqueId(),
+            'tenant_id'  => app('currentTenant')->id,
+            'created_at' => $ahora,
+            'updated_at' => $ahora,
+        ]);
+    }
+
 }
