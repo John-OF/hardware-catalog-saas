@@ -63,7 +63,7 @@ export default function ImageSourceField({
 
       <div className="img-source-body">
         {preview ? (
-          <img className="img-source-preview" src={preview} alt="" />
+          <img loading="lazy" decoding="async" className="img-source-preview" src={preview} alt="" />
         ) : (
           <span className="img-source-preview placeholder"><ImageIcon size={16} /></span>
         )}

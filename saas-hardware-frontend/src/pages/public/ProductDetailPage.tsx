@@ -387,6 +387,11 @@ export default function ProductDetailPage() {
               cursor: 'zoom-in'
             }}
           >
+            {/* AUD-19: la imagen principal se queda sin `loading="lazy"` a
+                proposito. Es el LCP de la ficha -lo mas grande que se pinta y lo
+                que decide la sensacion de rapidez-, asi que aplazarla empeoraria
+                justo lo que el punto quiere mejorar. Igual que los logos de
+                cabecera. */}
             {activeImage ? (
               <img src={activeImage} alt={product.name} className="product-main-img" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
             ) : (
@@ -420,7 +425,7 @@ export default function ProductDetailPage() {
                     transition: 'var(--transition)',
                   }}
                 >
-                  <img src={product.thumbnail_url || product.image_url} alt="Main thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                  <img loading="lazy" decoding="async" src={product.thumbnail_url || product.image_url} alt="Main thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
                 </button>
               )}
               {/* Gallery images thumbnails */}
@@ -445,7 +450,7 @@ export default function ProductDetailPage() {
                     transition: 'var(--transition)',
                   }}
                 >
-                  <img src={img.thumbnail_url || img.image_url} alt="Gallery thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                  <img loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
                 </button>
               ))}
             </div>
@@ -715,7 +720,7 @@ export default function ProductDetailPage() {
                 >
                   <div style={{ position: 'relative', width: '100%', height: '140px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {displayImageUrl ? (
-                      <img 
+                      <img loading="lazy" decoding="async" 
                         src={displayImageUrl} 
                         alt={p.name} 
                         style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
@@ -1139,7 +1144,7 @@ export default function ProductDetailPage() {
             </>
           )}
 
-          <img 
+          <img loading="lazy" decoding="async" 
             src={activeImage} 
             alt={product.name} 
             onClick={(e) => e.stopPropagation()}

@@ -328,7 +328,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <img 
+                              <img loading="lazy" decoding="async" 
                                 src={fav.images?.[0]?.image_url || fav.image_url || 'https://via.placeholder.com/50'} 
                                 alt={fav.name} 
                                 style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }}

@@ -396,7 +396,7 @@ export default function PcBuilderPage() {
                     <div className="selected-product-preview animate-fade-in">
                       <div className="prod-img">
                         {selectedProduct.thumbnail_url ? (
-                          <img src={selectedProduct.thumbnail_url} alt={selectedProduct.name} />
+                          <img loading="lazy" decoding="async" src={selectedProduct.thumbnail_url} alt={selectedProduct.name} />
                         ) : (
                           <ShoppingBag size={24} />
                         )}
@@ -591,7 +591,7 @@ export default function PcBuilderPage() {
                       <div key={product.id} className="drawer-product-card glass-card">
                         <div className="dp-img">
                           {product.thumbnail_url ? (
-                            <img src={product.thumbnail_url} alt={product.name} />
+                            <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
                           ) : (
                             <ShoppingBag size={20} />
                           )}

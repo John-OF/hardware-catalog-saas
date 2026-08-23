@@ -136,7 +136,7 @@ export default function OverviewPage() {
                   <div className="item-left">
                     <div className="product-thumb">
                       {product.thumbnail_url ? (
-                        <img src={product.thumbnail_url} alt={product.name} />
+                        <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
                       ) : (
                         <Package size={16} className="text-muted" />
                       )}

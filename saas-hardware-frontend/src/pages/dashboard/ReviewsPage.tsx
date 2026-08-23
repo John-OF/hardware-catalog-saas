@@ -160,7 +160,7 @@ export default function ReviewsPage() {
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         {review.product?.image_url ? (
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={review.product.image_url}
                             alt={review.product.name}
                             style={{ width: '40px', height: '40px', objectFit: 'contain', background: 'rgba(var(--overlay-mix),0.03)', borderRadius: '4px', border: '1px solid var(--border)' }}

@@ -648,7 +648,7 @@ export default function ProductsPage() {
                       <td>
                         <div className="table-img-wrapper">
                           {product.thumbnail_url ? (
-                            <img src={product.thumbnail_url} alt={product.name} />
+                            <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
                           ) : (
                             <ImageIcon size={18} className="placeholder-icon" />
                           )}
@@ -781,7 +781,7 @@ export default function ProductsPage() {
                 <div className="image-dropzone">
                   {imagePreview ? (
                     <div className="preview-container">
-                      <img src={imagePreview} alt="Vista previa" />
+                      <img loading="lazy" decoding="async" src={imagePreview} alt="Vista previa" />
                       <button type="button" className="remove-preview" onClick={() => { setImageFile(null); setImagePreview(null); }}>
                         <X size={14} />
                       </button>
@@ -804,7 +804,7 @@ export default function ProductsPage() {
                   {/* Existing gallery images */}
                   {existingGallery.map((img) => (
                     <div key={img.id} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                      <img src={img.thumbnail_url || img.image_url} alt="Gallery item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button 
                         type="button" 
                         className="remove-preview" 
@@ -822,7 +822,7 @@ export default function ProductsPage() {
                   {/* New gallery previews */}
                   {galleryPreviews.map((url, idx) => (
                     <div key={idx} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                      <img src={url} alt="New preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img loading="lazy" decoding="async" src={url} alt="New preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button 
                         type="button" 
                         className="remove-preview" 

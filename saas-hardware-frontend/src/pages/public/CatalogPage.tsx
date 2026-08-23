@@ -637,7 +637,7 @@ export default function CatalogPage() {
                                   </button>
                                 )}
                                 {product.thumbnail_url ? (
-                                  <img src={product.thumbnail_url} alt={product.name} />
+                                  <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
                                 ) : (
                                   <div className="image-placeholder">
                                     <ShoppingBag size={32} />
@@ -754,7 +754,7 @@ export default function CatalogPage() {
                 {comparedProducts.map((p) => (
                   <div key={p.id} className="compare-thumb-wrapper">
                     {p.thumbnail_url ? (
-                      <img src={p.thumbnail_url} alt={p.name} />
+                      <img loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name} />
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                         <ShoppingBag size={16} />
@@ -809,7 +809,7 @@ export default function CatalogPage() {
                         <th key={p.id} style={{ width: `${80 / comparedProducts.length}%` }}>
                           <div className="compare-header-item">
                             {p.thumbnail_url ? (
-                              <img src={p.thumbnail_url} alt={p.name} className="compare-header-img" />
+                              <img loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name} className="compare-header-img" />
                             ) : (
                               <div className="compare-header-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
                                 <ShoppingBag size={24} />

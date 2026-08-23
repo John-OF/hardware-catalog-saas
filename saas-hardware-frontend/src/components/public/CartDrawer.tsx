@@ -121,7 +121,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                 <div className="cart-item" key={i.product.id}>
                   <div className="cart-item-img">
                     {i.product.thumbnail_url
-                      ? <img src={i.product.thumbnail_url} alt={i.product.name} />
+                      ? <img loading="lazy" decoding="async" src={i.product.thumbnail_url} alt={i.product.name} />
                       : <ShoppingCart size={18} />}
                   </div>
                   <div className="cart-item-info">

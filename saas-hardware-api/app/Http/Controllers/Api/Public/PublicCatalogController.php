@@ -104,6 +104,28 @@ class PublicCatalogController extends Controller
                 // Los OR van agrupados en su propio closure a proposito: sueltos se
                 // mezclarian con los where de tenant_id/is_active/status y la busqueda
                 // acabaria mostrando productos de otras tiendas o despublicados.
+                //
+                // AUD-21 propone FULLTEXT porque este LIKE con comodin delante no
+                // puede usar indice y hace scan. Se evalua y se deja como esta, a
+                // sabiendas:
+                //
+                // - FULLTEXT busca PALABRAS, y aqui media busqueda es un trozo:
+                //   "7600" dentro de "Ryzen 5 7600X", "b550" dentro de un SKU. Eso
+                //   con MATCH ... AGAINST no sale, y el comprador que hoy encuentra
+                //   su pieza dejaria de encontrarla. Un indice mas rapido que no
+                //   devuelve el producto no sirve de nada en una tienda.
+                // - Los tests corren sobre SQLite y produccion sobre MySQL: MATCH
+                //   ... AGAINST partiria en dos el comportamiento probado y el
+                //   ejecutado, justo en la consulta mas usada del proyecto.
+                // - El scan cae sobre las filas de UNA tienda (el filtro por
+                //   tenant_id sigue usando indice) y la respuesta esta cacheada 5
+                //   minutos. Con catalogos de miles de productos no se nota.
+                //
+                // Cuando deje de valer: catalogos de decenas de miles de productos
+                // por tienda, o busquedas que se noten lentas al medirlas. La
+                // salida entonces no es FULLTEXT a secas sino un indice de
+                // busqueda de verdad (Meilisearch/Typesense via Scout), que sabe de
+                // prefijos y de erratas. Queda escrito para no volver a levantarlo.
                 ->when($request->search, function ($q) use ($request) {
                     $termino = '%' . $request->search . '%';
 
