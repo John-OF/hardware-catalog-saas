@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant'     => \App\Http\Middleware\InitializeTenantByHeader::class,
             'admin'      => \App\Http\Middleware\EnsureAdmin::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            // Solo para las rutas publicas con sesion de cliente: el token tiene
+            // que ser de la tienda del slug, no de cualquiera (AUD-3).
+            'customer'   => \App\Http\Middleware\EnsureTenantCustomer::class,
         ]);
 
         // El tenant debe resolverse ANTES de SubstituteBindings para que el

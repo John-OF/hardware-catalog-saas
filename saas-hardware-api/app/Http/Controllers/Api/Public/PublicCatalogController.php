@@ -229,16 +229,18 @@ class PublicCatalogController extends Controller
         // por visita (AUD-2). Aqui la fila caliente es la del producto de moda.
         $vistas->record('products', $product->id);
 
-        // Check if the current user or visitor has already reviewed this product
-        $user = $request->user('sanctum');
+        // ¿Ya ha reseñado este producto quien lo está mirando? Se resuelve con la
+        // misma regla que al publicar (AUD-3): un token de otra tienda cuenta
+        // como visitante anónimo, no como el autor de nada.
+        $cliente = $this->clienteDeLaTienda($request, $tenant);
         $visitorId = $request->header('X-Visitor-Id') ?? $request->query('visitor_id');
         $userReview = null;
 
-        if ($user || $visitorId) {
+        if ($cliente || $visitorId) {
             $userReview = \App\Models\Review::where('product_id', $product->id)
-                ->where(function ($q) use ($user, $visitorId) {
-                    if ($user) {
-                        $q->where('user_id', $user->id);
+                ->where(function ($q) use ($cliente, $visitorId) {
+                    if ($cliente) {
+                        $q->where('user_id', $cliente->id);
                     }
                     if ($visitorId) {
                         $q->orWhere('visitor_id', $visitorId);
@@ -344,6 +346,29 @@ class PublicCatalogController extends Controller
         return response()->json($productArray);
     }
 
+    /**
+     * El usuario del token SOLO si es cliente de esta tienda; null en cualquier
+     * otro caso (AUD-3).
+     *
+     * Las rutas de cliente con sesion obligatoria cierran esto con el middleware
+     * 'customer', pero estas dos aceptan visitante anonimo, asi que aqui no se
+     * puede rechazar la peticion: hay que decidir a quien se le cree. El registro
+     * de clientes es abierto, o sea que un token de "algun usuario" no acredita
+     * nada; lo que acredita es un token de ESTA tienda.
+     *
+     * @return \App\Models\User|null
+     */
+    private function clienteDeLaTienda(Request $request, Tenant $tenant)
+    {
+        $user = $request->user('sanctum');
+
+        if (!$user || $user->tenant_id !== $tenant->id || $user->role !== 'customer' || !$user->is_active) {
+            return null;
+        }
+
+        return $user;
+    }
+
     public function storeReview(Request $request, string $slug, string $productId): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
@@ -369,13 +394,30 @@ class PublicCatalogController extends Controller
         }
 
         // Capa 2: Control de identidad (evitar dobles reseñas)
-        $user = $request->user('sanctum');
+        //
+        // AUD-3: aquí la sesión es OPCIONAL —una reseña anónima es legítima—, así
+        // que esta ruta no puede llevar el middleware 'customer' y la comprobación
+        // va a mano. Lo que importa es que el token sea de ESTA tienda: el
+        // registro de clientes es abierto, así que cualquiera se daba de alta en
+        // su propia tienda y con ese token publicaba reseñas ya aprobadas en el
+        // catálogo de la competencia, saltándose la moderación del dueño, que es
+        // la única barrera contra el spam y la difamación. Turnstile no lo
+        // impide: es un humano con cuenta.
+        //
+        // El rol también se exige: un admin de la tienda reseñando sus propios
+        // productos con sello de cliente es justamente el patrón de reseña falsa.
+        // Puede publicar igual, pero pasando por su propia moderación.
+        //
+        // A partir de aquí manda $cliente, no $user: quien no cumple las dos
+        // condiciones se trata como anónimo, no como error.
+        $cliente = $this->clienteDeLaTienda($request, $tenant);
+
         $visitorId = $data['visitor_id'] ?? $request->header('X-Visitor-Id');
 
         $existingReview = \App\Models\Review::where('product_id', $product->id)
-            ->where(function ($q) use ($user, $visitorId) {
-                if ($user) {
-                    $q->where('user_id', $user->id);
+            ->where(function ($q) use ($cliente, $visitorId) {
+                if ($cliente) {
+                    $q->where('user_id', $cliente->id);
                 }
                 if ($visitorId) {
                     $q->orWhere('visitor_id', $visitorId);
@@ -408,8 +450,8 @@ class PublicCatalogController extends Controller
             }
         }
 
-        if ($user) {
-            // Caso A: Usuario Logueado
+        if ($cliente) {
+            // Caso A: Cliente registrado en ESTA tienda
             $isApproved = true;
         } elseif ($verifiedPurchase) {
             // Caso B: Compra Verificada (Anónimo)
@@ -421,8 +463,11 @@ class PublicCatalogController extends Controller
 
         $review = $product->reviews()->create([
             'tenant_id'         => $tenant->id,
-            'user_id'           => $user ? $user->id : null,
-            'visitor_id'        => $user ? null : $visitorId,
+            // Un usuario de otra tienda se guarda como anónimo: colgar la reseña
+            // de su user_id dejaría una fila de esta tienda apuntando a un
+            // usuario de otra, que es la referencia cruzada que se quiere evitar.
+            'user_id'           => $cliente?->id,
+            'visitor_id'        => $cliente ? null : $visitorId,
             'customer_name'     => $data['customer_name'],
             'customer_email'    => $data['customer_email'] ?? null,
             'rating'            => $data['rating'],

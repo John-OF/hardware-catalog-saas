@@ -75,8 +75,13 @@ Route::prefix('public/{slug}')->middleware('throttle:catalogo_publico')->group(f
     Route::post('/auth/login', [PublicAuthController::class, 'login'])
         ->middleware('throttle:5,1');
 
-    // Rutas protegidas para clientes
-    Route::middleware('auth:sanctum')->group(function () {
+    // Rutas protegidas para clientes.
+    //
+    // AUD-3: 'customer' va detras de 'auth:sanctum' y comprueba que el token sea
+    // de ESTA tienda. Sanctum solo valida que el token exista, y el registro de
+    // clientes es abierto, asi que sin esto un token de la tienda A servia en la
+    // B (en favoritos llegaba a escribir en su pivote).
+    Route::middleware(['auth:sanctum', 'customer'])->group(function () {
         Route::post('/auth/logout', [PublicAuthController::class, 'logout']);
         Route::get('/auth/me', [PublicAuthController::class, 'me']);
         Route::get('/my-orders', [PublicOrdersController::class, 'index']);
