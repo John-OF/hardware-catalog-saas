@@ -32,8 +32,15 @@ class OrderPricing
         // Una sola consulta para todos los productos, siempre scopeada al tenant.
         $productIds = collect($items)->pluck('product_id')->unique();
 
+        // AUD-5: `status` va junto a `is_active` porque el catalogo publico exige
+        // los dos para mostrar un producto, y aqui solo se miraba el primero. El
+        // carrito persiste en el navegador: sin esto, el dueno pasa un producto a
+        // borrador para dejar de venderlo y le sigue entrando el pedido de quien
+        // lo tenia guardado, al precio viejo. En el panel se deja como estaba: el
+        // dueno vende de mostrador lo que tenga fisicamente aunque lo haya
+        // despublicado, que es justo para lo que existe `soloVisibles`.
         $products = Product::where('tenant_id', $tenant->id)
-            ->when($soloVisibles, fn ($q) => $q->where('is_active', true))
+            ->when($soloVisibles, fn ($q) => $q->where('is_active', true)->where('status', 'published'))
             ->whereIn('id', $productIds)
             ->get()
             ->keyBy('id');
