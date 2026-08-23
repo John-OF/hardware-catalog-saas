@@ -88,6 +88,24 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+      # AUD-14: esta regla concreta SI bloquea, y va aparte por eso.
+      #
+      # Un hook detras de un return temprano no es un aviso de estilo como los
+      # `no-explicit-any` de arriba: el dia que el componente se re-renderiza por
+      # el otro camino, React se encuentra con menos hooks de los que registro y
+      # tumba la pantalla entera. Estaba en `CatalogPage`, se arreglo, y hoy la
+      # cuenta es cero en todo `src`; este paso es lo que impide que vuelva sin
+      # que nadie se entere, sin tener que esperar a que bajen los otros 74.
+      - name: Lint - regla de hooks (bloqueante)
+        run: |
+          npx eslint src -f json > /tmp/eslint.json || true
+          if grep -q '"ruleId":"react-hooks/rules-of-hooks"' /tmp/eslint.json; then
+            echo "::error::Hay hooks detras de un return temprano (react-hooks/rules-of-hooks)"
+            npx eslint src | grep -B 6 'rules-of-hooks' || true
+            exit 1
+          fi
+          echo "Sin violaciones de react-hooks/rules-of-hooks"
+
   # AUD-1: hasta ahora nada vigilaba los avisos de seguridad de las dependencias,
   # y se acumularon 17 en Composer (guzzle, psr7, commonmark) y 7 en npm
   # (react-router, postcss, nanoid, form-data...) sin que nadie se enterara.

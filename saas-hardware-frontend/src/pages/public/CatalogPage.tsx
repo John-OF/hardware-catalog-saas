@@ -114,11 +114,12 @@ export default function CatalogPage() {
     });
   };
 
-  // Redireccionar en localhost si falta el slug
+  // Redireccionar en localhost si falta el slug.
+  //
+  // AUD-14: aqui solo se DECIDE; el `<Navigate>` se devuelve mas abajo, despues
+  // de todos los hooks. Ver el comentario que acompaña al return.
   const isSaaSBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isSaaSBase && !slug) {
-    return <Navigate to="/login" replace />;
-  }
+  const redirigirAlLogin = isSaaSBase && !slug;
 
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant, isError: isErrorTenant } = useQuery<Tenant>({
@@ -130,6 +131,11 @@ export default function CatalogPage() {
         return resolveTenantDomain(currentDomain);
       }
     },
+    // Mientras se redirige no hay tienda que resolver: sin esto, quitar el
+    // return de arriba habria estrenado una peticion a `resolve-domain` con
+    // 'localhost' que solo puede fallar. Las demas consultas ya estaban
+    // apagadas por su cuenta, porque cuelgan de `resolvedSlug`.
+    enabled: !redirigirAlLogin,
   });
 
   const resolvedSlug = tenant?.slug;
@@ -225,6 +231,18 @@ export default function CatalogPage() {
         });
     }
   }, [isCustomerAuthenticated, resolvedSlug]);
+
+  // AUD-14: este return va DESPUES de todos los hooks a proposito.
+  //
+  // Estaba arriba del todo, antes de los `useQuery`, que es lo que marca
+  // `react-hooks/rules-of-hooks`. Hoy no rompe porque `slug` no cambia dentro de
+  // una misma instancia del componente, pero el dia que una navegacion alterne
+  // `/:slug` -> `/` con el componente montado, React se encuentra con menos
+  // hooks de los que registro la vez anterior ("Rendered fewer hooks than
+  // expected") y se cae la tienda entera, no solo esta pantalla.
+  if (redirigirAlLogin) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (isLoadingTenant) {
     return (
