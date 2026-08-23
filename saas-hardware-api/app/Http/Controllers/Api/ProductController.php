@@ -391,14 +391,32 @@ class ProductController extends Controller
         }
 
         if ($action === 'delete') {
-            $products = $query->get();
+            // AUD-23: la galeria se trae de una vez. Antes `$prod->images` era
+            // una consulta por producto, asi que borrar 50 productos costaba 50
+            // consultas solo para averiguar que imagenes tenian.
+            $products = $query->with('images')->get();
+
             foreach ($products as $prod) {
                 $this->imageService->deleteProductImages($prod->image_url, $prod->thumbnail_url);
+
                 foreach ($prod->images as $img) {
                     $this->imageService->deleteProductImages($img->image_url, $img->thumbnail_url);
                 }
-                $prod->delete();
             }
+
+            if ($products->isNotEmpty()) {
+                // Y un solo DELETE en vez de uno por producto. Las filas hijas
+                // -galeria, resenias, favoritos, avisos de stock- caen por
+                // ON DELETE CASCADE y las lineas de pedido se quedan con
+                // `product_id` a null, exactamente igual que borrando de uno en
+                // uno: el historial de ventas no se toca.
+                Product::whereIn('id', $products->pluck('id'))->delete();
+
+                // El DELETE masivo no pasa por el hook `deleted` del modelo, que
+                // es quien sube la version de cache (AUD-6).
+                $this->invalidarCachePublica();
+            }
+
             return response()->json(['message' => 'Productos eliminados en lote con éxito.']);
         }
 
@@ -481,11 +499,35 @@ class ProductController extends Controller
 
         $tenant = app('currentTenant');
 
-        foreach ($data['ids'] as $index => $id) {
-            Product::where('id', $id)
-                ->where('tenant_id', $tenant->id)
-                ->update(['sort_order' => $index]);
+        // AUD-22: un solo UPDATE con CASE en vez de uno por producto. Reordenar
+        // 200 productos eran 200 consultas -y 200 viajes a la base- para escribir
+        // un entero en cada fila, y el panel guarda el orden en cada arrastre.
+        //
+        // `array_values` no es cosmetico: la posicion en la lista es lo que acaba
+        // en `sort_order`, y si `ids` llega como objeto en vez de como lista las
+        // claves vienen siendo texto.
+        $ids = array_values($data['ids']);
+
+        $casos = '';
+        $bindings = [];
+
+        foreach ($ids as $posicion => $id) {
+            $casos .= ' WHEN ? THEN ?';
+            $bindings[] = $id;
+            $bindings[] = $posicion;
         }
+
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $tabla = (new Product)->getTable();
+
+        // Va en SQL a mano porque un `update()` de Eloquent con `DB::raw` no
+        // liga los `?` del CASE: se mezclarian con los del WHERE. El filtro por
+        // `tenant_id` sigue donde estaba, que es lo que impide reordenar los
+        // productos de otra tienda pasando sus ids.
+        \DB::update(
+            "UPDATE {$tabla} SET sort_order = CASE id{$casos} END, updated_at = ? WHERE id IN ({$marcas}) AND tenant_id = ?",
+            array_merge($bindings, [now()], $ids, [$tenant->id])
+        );
 
         $this->invalidarCachePublica();
 
