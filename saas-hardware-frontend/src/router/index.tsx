@@ -1,25 +1,58 @@
+/* eslint-disable react-refresh/only-export-components --
+ * Este fichero es la CONFIGURACION del router, no un modulo de componentes: lo
+ * unico que exporta es `router`. La regla salta porque los `lazy()` se declaran
+ * con nombre en mayuscula y los toma por componentes sueltos.
+ *
+ * No se pierde nada desactivandola aqui: Fast Refresh ya estaba descartado en
+ * este fichero antes de trocear, porque exportar algo que no es un componente
+ * (`router`) ya lo desactiva. Y mover las 18 declaraciones a otro fichero solo
+ * para callar la regla dejaria la lista de rutas partida en dos sitios.
+ */
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Outlet } from 'react-router-dom';
 import RouteErrorFallback from '../components/ui/RouteErrorFallback';
+import RouteFallback from '../components/ui/RouteFallback';
 import PrivateRoute from './PrivateRoute';
-import LoginPage from '../pages/auth/LoginPage';
-import RegisterStorePage from '../pages/auth/RegisterStorePage';
-import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
-import PlatformLoginPage from '../pages/platform/PlatformLoginPage';
-import PlatformPage from '../pages/platform/PlatformPage';
-import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
-import DashboardPage from '../pages/dashboard/DashboardPage';
-import ProductsPage from '../pages/dashboard/ProductsPage';
-import CategoriesPage from '../pages/dashboard/CategoriesPage';
-import SettingsPage from '../pages/dashboard/SettingsPage';
-import OrdersPage from '../pages/dashboard/OrdersPage';
-import PagesPage from '../pages/dashboard/PagesPage';
-import ReviewsPage from '../pages/dashboard/ReviewsPage';
 import CatalogPage from '../pages/public/CatalogPage';
-import ProductDetailPage from '../pages/public/ProductDetailPage';
-import PcBuilderPage from '../pages/public/PcBuilderPage';
-import PageDetailPage from '../pages/public/PageDetailPage';
-import OverviewPage from '../pages/dashboard/OverviewPage';
-import NotFoundPage from '../pages/NotFoundPage';
+
+// AUD-18: hasta aquí no había ni un solo import dinámico, así que quien entraba
+// por WhatsApp a ver un catálogo desde el móvil se descargaba también el panel
+// entero, el CRUD de productos, la importación CSV y la administración de
+// plataforma. Con las páginas del panel siendo la mitad del código de páginas
+// del proyecto, eso es la mayor parte del bundle para gente que no va a entrar
+// nunca al panel.
+//
+// EL CATÁLOGO SE QUEDA ESTÁTICO A PROPÓSITO. Es la ruta de entrada de casi todo
+// el tráfico: si fuera `lazy`, el navegador tendría que pedir primero el bundle
+// de entrada y DESPUÉS el chunk del catálogo, dos viajes en serie justo en la
+// pantalla que más importa. Trocear no es gratis, y el objetivo no es tener
+// muchos chunks sino que el visitante no pague por lo que no usa.
+//
+// El resto va bajo demanda. Las de dentro del panel no las pide nadie sin haber
+// pasado por el login, y `PrivateRoute` sigue siendo estático a propósito: así
+// quien no ha iniciado sesión ni siquiera dispara la descarga del panel.
+const ProductDetailPage = lazy(() => import('../pages/public/ProductDetailPage'));
+const PcBuilderPage = lazy(() => import('../pages/public/PcBuilderPage'));
+const PageDetailPage = lazy(() => import('../pages/public/PageDetailPage'));
+
+const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
+const RegisterStorePage = lazy(() => import('../pages/auth/RegisterStorePage'));
+const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
+
+const PlatformLoginPage = lazy(() => import('../pages/platform/PlatformLoginPage'));
+const PlatformPage = lazy(() => import('../pages/platform/PlatformPage'));
+
+const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
+const OverviewPage = lazy(() => import('../pages/dashboard/OverviewPage'));
+const ProductsPage = lazy(() => import('../pages/dashboard/ProductsPage'));
+const CategoriesPage = lazy(() => import('../pages/dashboard/CategoriesPage'));
+const SettingsPage = lazy(() => import('../pages/dashboard/SettingsPage'));
+const OrdersPage = lazy(() => import('../pages/dashboard/OrdersPage'));
+const PagesPage = lazy(() => import('../pages/dashboard/PagesPage'));
+const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
+
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +60,16 @@ export const router = createBrowserRouter([
     // cubra TODAS las rutas hijas. React Router intercepta los errores de una
     // ruta antes de que lleguen a un boundary de React, asi que sin esto el
     // usuario veria la pantalla de desarrollo del router con el stack trace.
-    element: <Outlet />,
+    //
+    // El Suspense va aqui por el mismo motivo: uno solo, envolviendo el Outlet,
+    // cubre todas las rutas perezosas sin repetirlo en cada una. Si un chunk no
+    // llega a descargarse (un despliegue nuevo mientras alguien navega, por
+    // ejemplo), React lanza el error y lo recoge el errorElement de al lado.
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <Outlet />
+      </Suspense>
+    ),
     errorElement: <RouteErrorFallback />,
     children: [
   { path: '/login', element: <LoginPage /> },

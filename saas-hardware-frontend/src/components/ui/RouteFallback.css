@@ -1,0 +1,46 @@
+/* Pantalla de espera mientras se descarga el chunk de una ruta (AUD-18).
+ *
+ * Es CSS de COMPONENTE, no de pagina, asi que va global y sin acotar con
+ * :where(.page-x): este loader puede aparecer sobre cualquier ruta. Las clases
+ * llevan el prefijo route-fallback- justo por eso, para no chocar con las
+ * .loader-container / .spinner que cada pagina define para su propia carga.
+ *
+ * @keyframes spin vive en index.css, que se importa antes que nada. */
+
+.route-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+}
+
+.route-fallback__spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--border-color, rgba(127, 127, 127, 0.25));
+  border-top-color: var(--primary-color, currentColor);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* El texto solo aparece si la descarga se alarga. En una conexion normal el
+ * chunk llega antes y el usuario no llega a leer nada, que es lo que se quiere:
+ * un cartel que parpadea 80 ms es peor que ningun cartel. */
+.route-fallback__texto {
+  opacity: 0;
+  font-size: 0.9rem;
+  animation: route-fallback-aparecer 0.2s ease-in 0.6s forwards;
+}
+
+@keyframes route-fallback-aparecer {
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-fallback__spinner { animation-duration: 2s; }
+  .route-fallback__texto { animation: none; opacity: 1; }
+}
