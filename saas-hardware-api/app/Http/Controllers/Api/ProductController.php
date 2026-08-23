@@ -293,9 +293,16 @@ class ProductController extends Controller
         } catch (\Exception $e) {
             \DB::rollBack();
             fclose($handle);
+            // AUD-8: el mensaje de la excepción NO viaja al navegador. Filtraba
+            // SQL, nombres de columnas y rutas del servidor, y además lo hacía
+            // pasara lo que pasara con APP_DEBUG. Al log, que es donde sirve.
+            \Illuminate\Support\Facades\Log::error('Fallo al importar productos por CSV', [
+                'tenant_id' => app()->bound('currentTenant') ? app('currentTenant')->id : null,
+                'exception' => $e,
+            ]);
+
             return response()->json([
                 'message' => 'Ocurrió un error inesperado al procesar el archivo.',
-                'error'   => $e->getMessage(),
             ], 500);
         }
 

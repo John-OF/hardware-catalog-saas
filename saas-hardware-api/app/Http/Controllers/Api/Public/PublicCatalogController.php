@@ -21,12 +21,30 @@ use Illuminate\Support\Facades\Notification;
 
 class PublicCatalogController extends Controller
 {
+    /**
+     * Lo unico de una tienda que se publica sin autenticacion (AUD-9).
+     *
+     * En una constante y no repetido en cada consulta a proposito: si manana se
+     * anade una columna a `tenants`, lo que NO puede pasar es que se publique
+     * sola por estar en dos sitios y haberse actualizado uno.
+     */
+    private const COLUMNAS_PUBLICAS_TENANT = [
+        'id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency',
+    ];
+
     public function resolveDomain(Request $request): JsonResponse
     {
         $domain = $request->query('domain') ?? $request->getHost();
 
+        // AUD-9: las MISMAS columnas que `tenant()`, ni una más. Esto es un
+        // endpoint sin autenticación y antes devolvía la fila entera: `plan`,
+        // `views_count`, `is_active`, `custom_domain` y los timestamps. O sea que
+        // cualquiera podía ver qué plan tienes contratado y cuánto tráfico
+        // mueves. El frontend usa esta respuesta y la de `tenant()` para lo
+        // mismo, así que además de tapar la fuga las deja coherentes.
         $tenant = Tenant::where('custom_domain', $domain)
             ->where('is_active', true)
+            ->select(self::COLUMNAS_PUBLICAS_TENANT)
             ->first();
 
         if (!$tenant) {
@@ -41,7 +59,7 @@ class PublicCatalogController extends Controller
         $tenant = Cache::remember("tenant:{$slug}", 300, function () use ($slug) {
             return Tenant::where('slug', $slug)
                 ->where('is_active', true)
-                ->select(['id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency'])
+                ->select(self::COLUMNAS_PUBLICAS_TENANT)
                 ->firstOrFail()
                 ->toArray();
         });
