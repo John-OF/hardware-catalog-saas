@@ -61,12 +61,19 @@ class PublicCatalogController extends Controller
         // Obtener la versión de caché actual para el tenant (soporte de invalidación en driver file)
         $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn() => 1);
 
-        // IMPORTANTE: usar only() para prevenir cache flooding con parámetros arbitrarios
-        $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($request->only([
-            'category_id', 'search', 'in_stock', 'specs', 'page', 'sort'
-        ])));
+        // AUD-7: los filtros de spec se contrastan contra las specs que existen
+        // de verdad ANTES de tocar nada más. Ver `specsFiltrables()`.
+        $specs = $this->specsFiltrables($tenant, $slug, $version, $request->input('specs'));
 
-        $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request) {
+        // IMPORTANTE: usar only() para prevenir cache flooding con parámetros
+        // arbitrarios. `specs` va aparte y ya saneado: si entrara en crudo, la
+        // clave de caché seguiría siendo libre y el flooding también.
+        $criterios = $request->only(['category_id', 'search', 'in_stock', 'page', 'sort']);
+        $criterios['specs'] = $specs;
+
+        $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($criterios));
+
+        $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request, $specs) {
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->where('status', 'published')
@@ -89,11 +96,9 @@ class PublicCatalogController extends Controller
                     });
                 })
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
-                ->when($request->specs, function ($q) use ($request) {
-                    foreach ($request->specs as $key => $value) {
-                        if ($value !== null && $value !== '') {
-                            $q->where('specs->' . $key, $value);
-                        }
+                ->when($specs, function ($q) use ($specs) {
+                    foreach ($specs as $key => $value) {
+                        $q->where('specs->' . $key, $value);
                     }
                 })
                 ->tap(fn ($q) => $this->applyCatalogSort($q, $request->query('sort')))
@@ -123,9 +128,21 @@ class PublicCatalogController extends Controller
 
         $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn () => 1);
         $categoryId = $request->query('category_id');
+
+        return response()->json(['specs' => $this->facetsDelCatalogo($tenant, $slug, $version, $categoryId)]);
+    }
+
+    /**
+     * Specs reales del catálogo, cacheadas. Las usan dos sitios: la respuesta de
+     * `facets()` y la validación del filtro en `products()` (AUD-7).
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function facetsDelCatalogo(Tenant $tenant, string $slug, int $version, ?string $categoryId): array
+    {
         $cacheKey = "facets:{$slug}:v{$version}:".md5((string) $categoryId);
 
-        $facets = Cache::remember($cacheKey, 300, function () use ($tenant, $categoryId) {
+        return Cache::remember($cacheKey, 300, function () use ($tenant, $categoryId) {
             $listas = Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->where('status', 'published')
@@ -175,8 +192,59 @@ class PublicCatalogController extends Controller
 
             return $resultado;
         });
+    }
 
-        return response()->json(['specs' => $facets]);
+    /**
+     * Deja pasar solo los filtros de spec que existen de verdad en el catálogo
+     * (AUD-7).
+     *
+     * Antes, la clave que mandara el visitante entraba tal cual en la ruta JSON
+     * de la consulta: `?specs[a"]=x` devolvía un **500** (`Invalid JSON path
+     * expression`) sin autenticación y llenando el log. No había inyección —el
+     * valor va parametrizado y Laravel escapa lo demás—, pero un 500 gratis es
+     * un 500 gratis.
+     *
+     * Y hay un segundo efecto menos visible: la clave de caché es un `md5` de los
+     * parámetros, `specs` incluido. Con claves y valores libres se pueden crear
+     * entradas de caché ilimitadas, y en producción `CACHE_STORE=database`: eso
+     * engorda una tabla de MySQL con blobs del tamaño de una página de catálogo.
+     * Por eso no basta con validar la FORMA de la clave con una expresión
+     * regular: hay que acotar el conjunto, y el conjunto real son las facetas.
+     *
+     * Se contrastan clave **y** valor. Lo que no cuadra se descarta en silencio y
+     * la petición sigue: un filtro que ya no existe porque el dueño cambió el
+     * catálogo no es motivo para darle un error a quien está comprando.
+     *
+     * Nota: `facetsDelCatalogo()` corta a 60 valores por spec, así que un valor
+     * más allá del 60 se descarta aquí. Es coherente con la interfaz, que arma
+     * sus filtros con esa misma lista y tampoco lo ofrece.
+     *
+     * @return array<string, string>
+     */
+    private function specsFiltrables(Tenant $tenant, string $slug, int $version, mixed $specs): array
+    {
+        if (! is_array($specs) || $specs === []) {
+            return [];
+        }
+
+        $reales = $this->facetsDelCatalogo($tenant, $slug, $version, null);
+        $validas = [];
+
+        foreach ($specs as $clave => $valor) {
+            if (! is_string($clave) || ! is_string($valor) || $valor === '') {
+                continue;
+            }
+
+            if (isset($reales[$clave]) && in_array($valor, $reales[$clave], true)) {
+                $validas[$clave] = $valor;
+            }
+        }
+
+        // Ordenadas para que el mismo filtro en distinto orden no genere dos
+        // entradas de caché distintas.
+        ksort($validas);
+
+        return $validas;
     }
 
     /**
