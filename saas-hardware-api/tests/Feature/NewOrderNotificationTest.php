@@ -159,6 +159,38 @@ class NewOrderNotificationTest extends TestCase
         });
     }
 
+    /**
+     * AUD-11: el aviso va a la cola, y eso obliga a que sobreviva al viaje.
+     *
+     * El worker corre en otro proceso, sin peticion y por tanto sin tienda
+     * resuelta. Como el scope de tenant falla en cerrado (AUD-4), una
+     * notificacion que llevara el `Order` dentro se habria quedado sin pedido y
+     * sin lineas justo al restaurarla. Por eso lleva una copia plana, y esto lo
+     * comprueba haciendo lo mismo que hace la cola: serializar y restaurar.
+     */
+    public function test_el_aviso_va_a_la_cola_y_sobrevive_a_la_serializacion(): void
+    {
+        $this->placeOrder($this->tenant, $this->producto, quantity: 3)->assertCreated();
+
+        Notification::assertSentTo($this->admin, NewOrderNotification::class, function (NewOrderNotification $notification) {
+            $this->assertInstanceOf(\Illuminate\Contracts\Queue\ShouldQueue::class, $notification);
+
+            // Aqui ya no hay tienda actual: la peticion termino y se la llevo.
+            $this->assertFalse(app()->bound('currentTenant'));
+
+            $restaurada = unserialize(serialize($notification));
+            $mail = $restaurada->toMail($this->admin);
+            $texto = implode("\n", array_merge($mail->introLines, $mail->outroLines));
+
+            $this->assertStringContainsString('$136.50', $mail->subject);
+            $this->assertStringContainsString('Ana Compradora', $texto);
+            $this->assertStringContainsString('3 x Kingston Fury 16GB', $texto);
+            $this->assertStringContainsString('**Total: $136.50**', $texto);
+
+            return true;
+        });
+    }
+
     public function test_el_pedido_se_crea_aunque_el_mailer_falle(): void
     {
         // Esta es la razon de ser del try/catch en storeOrder: el pedido ya esta

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -14,10 +15,14 @@ use Illuminate\Notifications\Notification;
  * apunta al SPA, no a una ruta Blade de la API — aqui el frontend es una app
  * aparte, asi que Laravel no tiene ninguna pantalla de reset que ofrecer.
  *
- * Deliberadamente NO implementa ShouldQueue: QUEUE_CONNECTION=database y no hay
- * worker corriendo, asi que encolarla dejaria el correo sin enviar en silencio.
+ * AUD-11: va a la cola. Quien pide recuperar la contrasenia esperaba al SMTP
+ * dentro de su peticion, y con un servidor de correo lento eso se veia como un
+ * formulario colgado. Solo lleva el token, un string: nada que restaurar en el
+ * worker, asi que no le afecta que alli no haya tienda resuelta (AUD-4).
+ *
+ * Requiere un worker corriendo (`php artisan queue:work`); ver `.env.example`.
  */
-class ResetPasswordNotification extends Notification
+class ResetPasswordNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

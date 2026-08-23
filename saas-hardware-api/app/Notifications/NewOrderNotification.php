@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Order;
 use App\Support\Money;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -15,18 +16,50 @@ use Illuminate\Notifications\Notification;
  * si cerraba el chat sin enviarlo, el pedido se quedaba en el panel sin que
  * nadie lo supiera.
  *
- * Sin ShouldQueue por el mismo motivo que ResetPasswordNotification:
- * QUEUE_CONNECTION=database y no hay worker, asi que encolarla dejaria el aviso
- * sin enviar en silencio. Quien la dispara la envuelve en try/catch para que un
- * fallo del mailer no tumbe la creacion del pedido.
+ * AUD-11: ahora va a la cola. Antes se enviaba dentro de la peticion, asi que el
+ * comprador esperaba al SMTP —unos segundos, o el timeout entero si el servidor
+ * de correo no respondia— cuando su pedido ya estaba guardado y no dependia de
+ * ese correo para nada.
+ *
+ * **Lo que viaja a la cola es una copia plana del pedido, no el modelo.** El
+ * trabajo se ejecuta en otro proceso, sin peticion y por tanto sin tienda
+ * resuelta, y desde AUD-4 el scope de tenant falla en cerrado: si aqui viajara
+ * el `Order`, al restaurarlo el worker no encontraria ni el pedido ni sus
+ * lineas y el aviso moriria en `failed_jobs`. El constructor corre dentro de la
+ * peticion —con su tienda resuelta—, asi que resuelve ahi el texto y el worker
+ * ya no necesita saber de tiendas.
  */
-class NewOrderNotification extends Notification
+class NewOrderNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(
-        public Order $order,
-    ) {
+    /**
+     * Lo que el correo necesita del pedido, ya resuelto a texto.
+     *
+     * @var array<string, mixed>
+     */
+    public array $pedido;
+
+    public function __construct(Order $order)
+    {
+        // La moneda se lee del tenant del pedido, no del usuario que recibe el
+        // correo: son el mismo tenant, pero el dato correcto es el de la venta (OWN-1).
+        $moneda = $order->tenant?->currency;
+
+        $this->pedido = [
+            // Mismo identificador corto que muestra el panel (OrdersPage), para que
+            // el dueño pueda casar el correo con la fila de la tabla.
+            'referencia' => '#'.substr($order->id, -8),
+            'cliente'    => $order->customer_name,
+            'telefono'   => $order->customer_phone,
+            'nota'       => $order->customer_note,
+            'total'      => Money::format($order->total, $moneda),
+            'lineas'     => $order->items->map(fn ($item) => [
+                'cantidad' => $item->quantity,
+                'producto' => $item->product_name,
+                'subtotal' => Money::format($item->subtotal, $moneda),
+            ])->all(),
+        ];
     }
 
     /**
@@ -39,41 +72,25 @@ class NewOrderNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        // Mismo identificador corto que muestra el panel (OrdersPage), para que
-        // el dueño pueda casar el correo con la fila de la tabla.
-        $referencia = '#'.substr($this->order->id, -8);
-        $total = $this->money($this->order->total);
-
         $mail = (new MailMessage)
-            ->subject("Pedido nuevo {$referencia} por {$total}")
+            ->subject("Pedido nuevo {$this->pedido['referencia']} por {$this->pedido['total']}")
             ->greeting("Hola {$notifiable->name},")
-            ->line("**{$this->order->customer_name}** acaba de hacer un pedido en tu tienda.")
-            ->line("Telefono: {$this->order->customer_phone}");
+            ->line("**{$this->pedido['cliente']}** acaba de hacer un pedido en tu tienda.")
+            ->line("Telefono: {$this->pedido['telefono']}");
 
-        if ($this->order->customer_note) {
-            $mail->line("Nota del cliente: {$this->order->customer_note}");
+        if ($this->pedido['nota']) {
+            $mail->line("Nota del cliente: {$this->pedido['nota']}");
         }
 
         $mail->line('---');
 
-        foreach ($this->order->items as $item) {
-            $mail->line("{$item->quantity} x {$item->product_name} — {$this->money($item->subtotal)}");
+        foreach ($this->pedido['lineas'] as $linea) {
+            $mail->line("{$linea['cantidad']} x {$linea['producto']} — {$linea['subtotal']}");
         }
 
         return $mail
-            ->line("**Total: {$total}**")
+            ->line("**Total: {$this->pedido['total']}**")
             ->action('Ver el pedido en el panel', rtrim(config('app.frontend_url'), '/').'/dashboard/orders')
             ->line('El pedido queda en estado pendiente hasta que lo atiendas desde el panel.');
-    }
-
-    /**
-     * Formato de importe en la moneda de la tienda (OWN-1).
-     *
-     * La moneda se lee del tenant del pedido, no del usuario que recibe el
-     * correo: son el mismo tenant, pero el dato correcto es el de la venta.
-     */
-    private function money(float|string $amount): string
-    {
-        return Money::format($amount, $this->order->tenant?->currency);
     }
 }
