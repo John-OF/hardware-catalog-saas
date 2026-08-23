@@ -346,13 +346,23 @@ class ProductController extends Controller
             return response()->json(['message' => 'Productos eliminados en lote con éxito.']);
         }
 
+        // AUD-6: un `update()` masivo NO dispara los eventos del modelo, y la
+        // invalidación de la caché pública vive en el hook `saved` de `Product`.
+        // Sin esto, ocultar 30 productos de golpe para una liquidación los dejaba
+        // visibles en el catálogo hasta 5 minutos, mientras que ocultar uno suelto
+        // se veía al instante: desde el panel no había forma de entender por qué.
+        // Se hace igual que en `reorder`, que ya lo resolvía así.
         if ($action === 'activate') {
             $query->update(['is_active' => true]);
+            $this->invalidarCachePublica();
+
             return response()->json(['message' => 'Productos publicados en lote con éxito.']);
         }
 
         if ($action === 'deactivate') {
             $query->update(['is_active' => false]);
+            $this->invalidarCachePublica();
+
             return response()->json(['message' => 'Productos ocultados en lote con éxito.']);
         }
 
@@ -421,9 +431,23 @@ class ProductController extends Controller
                 ->update(['sort_order' => $index]);
         }
 
-        // Invalidar caché pública
-        \Illuminate\Support\Facades\Cache::increment("tenant:{$tenant->slug}:cache_version");
+        $this->invalidarCachePublica();
 
         return response()->json(['message' => 'Productos reordenados correctamente']);
+    }
+
+    /**
+     * Sube la versión de caché de la tienda para que el catálogo público se vea
+     * al instante (AUD-6).
+     *
+     * Hace falta solo cuando se escribe SIN pasar por el modelo —un `update()`
+     * masivo, que no dispara eventos—. Lo que guarda producto a producto ya lo
+     * hace el hook `saved` de `Product`.
+     */
+    private function invalidarCachePublica(): void
+    {
+        $tenant = app('currentTenant');
+
+        \Illuminate\Support\Facades\Cache::increment("tenant:{$tenant->slug}:cache_version");
     }
 }
