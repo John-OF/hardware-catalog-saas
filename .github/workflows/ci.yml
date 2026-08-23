@@ -87,3 +87,40 @@ jobs:
       - name: Lint (informativo, no bloquea)
         run: npm run lint
         continue-on-error: true
+
+  # AUD-1: hasta ahora nada vigilaba los avisos de seguridad de las dependencias,
+  # y se acumularon 17 en Composer (guzzle, psr7, commonmark) y 7 en npm
+  # (react-router, postcss, nanoid, form-data...) sin que nadie se enterara.
+  #
+  # Va en un job aparte a proposito. Un aviso nuevo se publica rio arriba, sin
+  # que nadie de aqui toque nada: si el paso viviera dentro de los jobs de API o
+  # frontend, ese dia el CI se pondria rojo y ademas cortaria los tests y el
+  # build, que es justo la informacion que hace falta para decidir si el
+  # actualizarse rompe algo. Asi cada cosa da su resultado por separado.
+  #
+  # Los dos audits leen solo los ficheros de lock, asi que no hace falta instalar
+  # dependencias: ni `composer install` ni `npm ci`.
+  seguridad:
+    name: Auditoria de dependencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+
+      - name: composer audit
+        working-directory: saas-hardware-api
+        run: composer audit --locked
+
+      # Sin --audit-level: hoy esta en cero, asi que cualquier aviso nuevo (de la
+      # severidad que sea) debe verse. Si algun dia hay ruido de severidad baja
+      # que no se puede resolver, se sube el umbral aqui con su porque.
+      - name: npm audit
+        working-directory: saas-hardware-frontend
+        run: npm audit
