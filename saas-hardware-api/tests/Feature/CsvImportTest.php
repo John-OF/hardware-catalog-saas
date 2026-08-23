@@ -76,7 +76,10 @@ class CsvImportTest extends TestCase
 
         $this->importar($contenido)->assertOk();
 
-        $producto = Product::where('tenant_id', $this->tenant->id)->first();
+        // `withoutTenant()` porque aqui ya no hay tienda actual: la resolvio la
+        // peticion de import y muere con ella (AUD-4). El filtro por tenant_id
+        // que sigue es el que hace el trabajo, y es el que el test quiere probar.
+        $producto = Product::withoutTenant()->where('tenant_id', $this->tenant->id)->first();
 
         $this->assertNotNull($producto, 'La plantilla oficial no importó ningún producto.');
         $this->assertSame('Intel Core i7-14700K', $producto->name);
@@ -104,7 +107,7 @@ class CsvImportTest extends TestCase
 
         $this->importar($contenido)->assertOk();
 
-        $producto = Product::where('tenant_id', $this->tenant->id)->first();
+        $producto = Product::withoutTenant()->where('tenant_id', $this->tenant->id)->first();
 
         $this->assertSame('Intel Core i7-14700K', $producto->name);
         $this->assertSame('Intel', $producto->brand);
@@ -119,7 +122,7 @@ class CsvImportTest extends TestCase
 
         $this->importar($contenido)->assertOk();
 
-        $producto = Product::where('tenant_id', $this->tenant->id)->first();
+        $producto = Product::withoutTenant()->where('tenant_id', $this->tenant->id)->first();
 
         $this->assertSame(['Socket' => 'AM5', 'Nucleos' => '6'], $producto->specs);
     }
@@ -133,7 +136,7 @@ class CsvImportTest extends TestCase
 
         $respuesta = $this->importar($contenido)->assertOk();
 
-        $this->assertSame(1, Product::where('tenant_id', $this->tenant->id)->count());
+        $this->assertSame(1, Product::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
         $this->assertNotEmpty($respuesta->json('errors'));
     }
 
@@ -148,7 +151,7 @@ class CsvImportTest extends TestCase
 
         $this->importar(self::PLANTILLA_CABECERA.self::PLANTILLA_FILA)->assertOk();
 
-        $this->assertSame(1, Product::where('tenant_id', $this->tenant->id)->count());
-        $this->assertSame(0, Product::where('tenant_id', $otraTienda->id)->count());
+        $this->assertSame(1, Product::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
+        $this->assertSame(0, Product::withoutTenant()->where('tenant_id', $otraTienda->id)->count());
     }
 }

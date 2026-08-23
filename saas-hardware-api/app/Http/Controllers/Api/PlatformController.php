@@ -85,10 +85,19 @@ class PlatformController extends Controller
     public function tenants(Request $request): JsonResponse
     {
         $tenants = Tenant::query()
-            // Estos withCount funcionan sin filtrar por tenant porque en estas
-            // rutas nunca se hace makeCurrent(), así que el global scope de
-            // BelongsToTenant queda inerte.
-            ->withCount(['products', 'orders', 'users'])
+            // AUD-4: antes esto funcionaba SIN pedir nada, porque en estas rutas
+            // no se hace makeCurrent() y el global scope quedaba inerte. Ahora el
+            // scope falla en cerrado, así que sin `withoutTenant()` los tres
+            // contadores saldrían a cero: exactamente el tipo de suposición
+            // tácita que el cambio pretende sacar a la luz.
+            //
+            // Aquí mirar por encima de las tiendas es lo correcto —es el panel
+            // del operador del SaaS— y ahora queda dicho en el código.
+            ->withCount([
+                'products' => fn ($q) => $q->withoutTenant(),
+                'orders'   => fn ($q) => $q->withoutTenant(),
+                'users'    => fn ($q) => $q->withoutTenant(),
+            ])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $termino = '%'.$request->string('search').'%';
 
@@ -127,7 +136,13 @@ class PlatformController extends Controller
         // suspendida seguiría sirviéndose desde caché.
         $this->forgetPublicCache($tenant);
 
-        return response()->json($tenant->fresh()->loadCount(['products', 'orders', 'users']));
+        // Mismo motivo que en tenants(): sin `withoutTenant()` los contadores
+        // saldrian a cero, porque aqui no hay tienda actual (AUD-4).
+        return response()->json($tenant->fresh()->loadCount([
+            'products' => fn ($q) => $q->withoutTenant(),
+            'orders'   => fn ($q) => $q->withoutTenant(),
+            'users'    => fn ($q) => $q->withoutTenant(),
+        ]));
     }
 
     /**

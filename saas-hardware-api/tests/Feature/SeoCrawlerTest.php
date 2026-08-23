@@ -30,7 +30,11 @@ class SeoCrawlerTest extends TestCase
             ]
         ]);
 
-        app()->instance('currentTenant', $this->tenant);
+        // A proposito NO se enlaza aqui `currentTenant`. Antes se hacia, y eso
+        // tapaba el fallo: en produccion un crawler llega sin tienda resuelta, y
+        // con el scope de AUD-4 fallando en cerrado la vista previa habria sido
+        // un 404. Que estos tests corran sin tienda enlazada es justo lo que hace
+        // que sirvan de red.
     }
 
     public function test_crawler_receives_tenant_page_og_view(): void
@@ -48,8 +52,9 @@ class SeoCrawlerTest extends TestCase
 
     public function test_crawler_receives_product_page_og_view(): void
     {
-        $product = Product::create([
-            'tenant_id' => $this->tenant->id,
+        // `tenant_id` se asigna a mano y no por `create()`: no es fillable, antes
+        // se lo ponia el hook `creating` desde la tienda que enlazaba el setUp.
+        $product = new Product([
             'name' => 'Intel Core i9',
             'description' => 'Procesador de alto rendimiento para gaming.',
             'price' => 599.99,
@@ -58,6 +63,8 @@ class SeoCrawlerTest extends TestCase
             'is_active' => true,
             'image_url' => 'https://example.com/i9.png'
         ]);
+        $product->tenant_id = $this->tenant->id;
+        $product->save();
 
         $response = $this->withHeaders([
             'User-Agent' => 'twitterbot'
@@ -72,13 +79,14 @@ class SeoCrawlerTest extends TestCase
 
     public function test_crawler_receives_custom_page_og_view(): void
     {
-        $page = Page::create([
-            'tenant_id' => $this->tenant->id,
+        $page = new Page([
             'title' => 'Quiénes Somos',
             'slug' => 'quienes-somos',
             'content' => 'Somos una empresa líder en componentes de PC.',
             'is_active' => true
         ]);
+        $page->tenant_id = $this->tenant->id;
+        $page->save();
 
         $response = $this->withHeaders([
             'User-Agent' => 'googlebot'

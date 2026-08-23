@@ -39,4 +39,24 @@ class InitializeTenantByHeader
 
         return $next($request);
     }
+
+    /**
+     * La tienda actual muere con la peticion.
+     *
+     * Desde AUD-4 el global scope falla en cerrado, o sea que "que tienda es la
+     * actual" pasa a ser dato de correctitud y no un detalle: dejarla enlazada
+     * despues de responder significa que el siguiente trabajo que corra en este
+     * mismo proceso consultaria filtrando por una tienda que no es la suya.
+     *
+     * Con PHP-FPM cada peticion arranca un contenedor nuevo y no se notaria,
+     * pero eso es que lo tapa el modelo de proceso, no que este bien: bajo
+     * Octane, en la cola o en la suite de tests -donde varias peticiones
+     * comparten contenedor- si se nota. Se limpia aqui para que produccion y
+     * pruebas se comporten igual.
+     */
+    public function terminate(Request $request, $response): void
+    {
+        Tenant::forgetCurrent();
+    }
+
 }

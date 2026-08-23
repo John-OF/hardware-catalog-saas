@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // Solo para las rutas publicas con sesion de cliente: el token tiene
             // que ser de la tienda del slug, no de cualquiera (AUD-3).
             'customer'   => \App\Http\Middleware\EnsureTenantCustomer::class,
+            // Resuelve la tienda de las rutas publicas desde el slug de la URL,
+            // para que el global scope de BelongsToTenant filtre tambien ahi
+            // (AUD-4). El panel usa 'tenant', que resuelve por header.
+            'tenant.slug' => \App\Http\Middleware\InitializeTenantBySlug::class,
         ]);
 
         // El tenant debe resolverse ANTES de SubstituteBindings para que el
@@ -28,6 +32,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
             prepend: \App\Http\Middleware\InitializeTenantByHeader::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\InitializeTenantBySlug::class,
         );
         $middleware->prependToPriorityList(
             before: \Illuminate\Routing\Middleware\SubstituteBindings::class,

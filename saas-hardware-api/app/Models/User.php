@@ -13,6 +13,31 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasUuids, BelongsToTenant;
 
+    /**
+     * `User` es la excepcion al fallo en cerrado de AUD-4, y conviene entender
+     * por que antes de copiar esto en otro modelo.
+     *
+     * Es el problema del huevo y la gallina: para saber QUE tienda es esta hace
+     * falta a veces saber QUIEN eres, y `auth:sanctum` resuelve al usuario a
+     * partir del token ANTES de que ningun middleware haya resuelto la tienda
+     * —`InitializeTenantByHeader` incluso consulta `Auth::check()` para su propia
+     * comprobacion de pertenencia—. Con el fallo en cerrado, esa consulta no
+     * devolveria a nadie y el panel entero respondaria 401.
+     *
+     * Ademas hay caminos legitimamente sin tienda que van contra `users`: el
+     * login del panel, el alta de tienda, el super-admin de plataforma y el
+     * comando que lo crea.
+     *
+     * Lo que protege a `users` no es este scope, es que cada consulta filtra por
+     * tienda a mano y hay tests que lo fijan: el email es unico por tienda
+     * (`SEC-4`), el login discrimina por rol (`SEC-1`) y un token de cliente solo
+     * vale en su tienda (`AUD-3`).
+     */
+    protected static function veTodoSinTenant(): bool
+    {
+        return true;
+    }
+
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
     {

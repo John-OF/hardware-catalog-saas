@@ -52,6 +52,13 @@ Route::get('/{slug}/product/{productId}', function ($slug, $productId) {
         if (!$tenant) {
             abort(404);
         }
+        // AUD-4: el scope de BelongsToTenant falla en cerrado, y aqui no hay
+        // middleware que resuelva la tienda —estas rutas las pide un crawler,
+        // no el frontend—, asi que sin esto la consulta no devolveria nada y la
+        // vista previa de WhatsApp seria un 404. Ademas de arreglarlo, deja la
+        // red debajo: el filtro por tenant_id de abajo pasa a ser el segundo.
+        $tenant->makeCurrent();
+
         $product = Product::where('tenant_id', $tenant->id)
             ->where('id', $productId)
             ->where('is_active', true)
@@ -90,6 +97,9 @@ Route::get('/{slug}/page/{pageSlug}', function ($slug, $pageSlug) {
         if (!$tenant) {
             abort(404);
         }
+        // Mismo motivo que en la ruta de producto (AUD-4).
+        $tenant->makeCurrent();
+
         $page = Page::where('tenant_id', $tenant->id)
             ->where('slug', $pageSlug)
             ->where('is_active', true)

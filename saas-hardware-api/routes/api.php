@@ -46,7 +46,12 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
 Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDomain'])
     ->middleware('throttle:catalogo_publico');
 
-Route::prefix('public/{slug}')->middleware('throttle:catalogo_publico')->group(function () {
+//
+// AUD-4: 'tenant.slug' resuelve la tienda desde el slug y la deja como la actual,
+// para que el global scope de BelongsToTenant filtre tambien en lo publico. Antes
+// aqui no se resolvia ninguna y cada consulta filtraba a mano; seguian filtrando
+// a mano, pero ahora hay red debajo.
+Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant.slug'])->group(function () {
     Route::get('/',          [PublicCatalogController::class, 'tenant']);
     Route::get('/categories', [PublicCatalogController::class, 'categories']);
     Route::get('/products',  [PublicCatalogController::class, 'products']);
