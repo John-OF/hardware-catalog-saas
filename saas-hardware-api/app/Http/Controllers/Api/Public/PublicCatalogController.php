@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Services\OrderPricing;
+use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -48,12 +49,14 @@ class PublicCatalogController extends Controller
         return response()->json($tenant);
     }
 
-    public function products(Request $request, string $slug): JsonResponse
+    public function products(Request $request, string $slug, ViewCounter $vistas): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
-        // Increment catalog views count
-        $tenant->increment('views_count');
+        // Visita del catalogo. Antes esto era un increment() directo, es decir un
+        // UPDATE por peticion sobre la misma fila y ademas antes de mirar la
+        // cache; ahora se acumula y se vuelca cada pocos minutos (AUD-2).
+        $vistas->record('tenants', $tenant->id);
 
         // Obtener la versión de caché actual para el tenant (soporte de invalidación en driver file)
         $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn() => 1);
@@ -209,7 +212,7 @@ class PublicCatalogController extends Controller
         }
     }
 
-    public function product(Request $request, string $slug, string $productId): JsonResponse
+    public function product(Request $request, string $slug, string $productId, ViewCounter $vistas): JsonResponse
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
@@ -222,8 +225,9 @@ class PublicCatalogController extends Controller
             ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
             ->firstOrFail();
 
-        // Increment product views count
-        $product->increment('views_count');
+        // Misma historia que en el catalogo: acumulado en cache, no un UPDATE
+        // por visita (AUD-2). Aqui la fila caliente es la del producto de moda.
+        $vistas->record('products', $product->id);
 
         // Check if the current user or visitor has already reviewed this product
         $user = $request->user('sanctum');

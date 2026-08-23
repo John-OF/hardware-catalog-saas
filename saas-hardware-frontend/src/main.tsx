@@ -6,6 +6,7 @@
 // regla de página sigue pisando a la base al empatar, como hasta ahora.
 import './index.css';
 
+import { isAxiosError } from 'axios';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
@@ -14,7 +15,29 @@ import { Toaster } from 'react-hot-toast';
 import { router } from './router';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 
-const queryClient = new QueryClient();
+// AUD-2: con el rate limit del catálogo público ya en el servidor, los
+// reintentos por defecto de react-query (3, con backoff) se vuelven un tiro en
+// el pie: un 429 dispararía 3 peticiones más por consulta, y una carga del
+// catálogo son ~6 consultas. Justo el visitante al que ya se le ha dicho
+// "espera" es el que más tráfico generaría.
+//
+// Ningún 4xx merece reintento: son respuestas del servidor diciendo que la
+// petición no va a mejorar repitiéndola. Los 5xx y los fallos de red sí, que es
+// para lo que sirve el reintento.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (isAxiosError(error)) {
+          const status = error.response?.status;
+          if (status !== undefined && status >= 400 && status < 500) return false;
+        }
+
+        return failureCount < 3;
+      },
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -34,9 +34,19 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,1');
 
 // Catálogo público (consultado por el frontend sin login)
-Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDomain']);
+//
+// AUD-2: 'throttle:catalogo_publico' va en TODO el grupo, no ruta a ruta. Antes
+// solo lo llevaban las que escriben (reseñas, pedidos, avisos de stock, auth), y
+// las de lectura —que son las que un script repetiría— iban sin nada. El límite
+// se define en AppServiceProvider, con el porqué de la cifra.
+//
+// Las rutas que ya traían su propio throttle lo conservan: los dos middleware se
+// aplican y manda el más estricto, que es justo lo que se quiere (un pedido sigue
+// siendo 10/min aunque el grupo permita 120).
+Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDomain'])
+    ->middleware('throttle:catalogo_publico');
 
-Route::prefix('public/{slug}')->group(function () {
+Route::prefix('public/{slug}')->middleware('throttle:catalogo_publico')->group(function () {
     Route::get('/',          [PublicCatalogController::class, 'tenant']);
     Route::get('/categories', [PublicCatalogController::class, 'categories']);
     Route::get('/products',  [PublicCatalogController::class, 'products']);
