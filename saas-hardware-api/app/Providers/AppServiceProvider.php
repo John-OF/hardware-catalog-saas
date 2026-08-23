@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->guardarDeAppDebug();
+        $this->politicaDeContrasenias();
+
         // AUD-2: el catalogo publico no tenia ningun limite. La auditoria lo
         // comprobo a mano: 70 peticiones seguidas, 70 respuestas 200, ningun 429.
         //
@@ -48,6 +52,54 @@ class AppServiceProvider extends ServiceProvider
             }
             // Límite de 60 por hora en desarrollo para facilitar pruebas cómodas
             return Limit::perHour(60)->by($request->ip());
+        });
+    }
+
+    /**
+     * AUD-12: en produccion, APP_DEBUG=true no arranca.
+     *
+     * Habia un comentario en `.env.example` avisando de ponerlo en false, pero
+     * el valor que se copia es el peligroso y nada comprobaba el resultado. Con
+     * debug activo, cualquier 500 devuelve el stack trace, la consulta SQL y las
+     * variables de entorno a quien haya provocado el error.
+     *
+     * Falla en el arranque y no en la primera peticion que reviente, para que el
+     * despiste se note al desplegar -tambien al correr `artisan`- y no meses
+     * despues, cuando ya lo ha visto alguien de fuera.
+     */
+    private function guardarDeAppDebug(): void
+    {
+        if ($this->app->isProduction() && config('app.debug')) {
+            throw new \RuntimeException(
+                'APP_DEBUG=true con APP_ENV=production: cualquier error 500 devolveria el stack trace, '
+                .'la consulta SQL y variables de entorno al cliente. Pon APP_DEBUG=false en el .env del '
+                .'servidor y vuelve a cachear la configuracion (php artisan config:cache).'
+            );
+        }
+    }
+
+    /**
+     * AUD-17: politica de contrasenias unica para todo el proyecto.
+     *
+     * Antes cada endpoint pedia `min:8` por su cuenta, asi que subir el liston
+     * era acordarse de tres sitios. Ahora los tres piden `Password::defaults()`
+     * y la politica se decide aqui.
+     *
+     * `uncompromised()` contrasta la contrasenia contra la lista de Have I Been
+     * Pwned -por k-anonimato: viaja un prefijo de 5 caracteres del hash, nunca
+     * la contrasenia-, que es lo que de verdad frena el relleno de credenciales.
+     * Se puede apagar con PASSWORD_UNCOMPROMISED=false, y la suite lo apaga: son
+     * llamadas HTTP a internet, lentas en local e imposibles en un CI sin salida.
+     * El test que cubre el camino la vuelve a encender con un verificador falso.
+     */
+    private function politicaDeContrasenias(): void
+    {
+        Password::defaults(function () {
+            $regla = Password::min(8);
+
+            return config('auth.password_uncompromised')
+                ? $regla->uncompromised()
+                : $regla;
         });
     }
 }

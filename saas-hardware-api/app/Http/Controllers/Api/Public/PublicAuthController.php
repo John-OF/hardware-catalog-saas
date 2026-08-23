@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class PublicAuthController extends Controller
@@ -24,7 +25,9 @@ class PublicAuthController extends Controller
             'name'     => 'required|string|max:200',
             'email'    => 'required|email',
             'phone'    => 'nullable|string|max:30',
-            'password' => 'required|string|min:8|confirmed',
+            // Misma politica que el panel (AUD-17): la cuenta de un cliente
+            // guarda su historial de pedidos y sus datos de contacto.
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
         ]);
 
         // Asegurar que el correo sea único DENTRO del mismo tenant (multi-tenancy)

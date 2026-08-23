@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+// La fachada `Password` de arriba es el broker de recuperacion; esta es la regla
+// de validacion (AUD-17). Comparten nombre, asi que una de las dos va con alias.
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -48,7 +51,7 @@ class AuthController extends Controller
                 'email',
                 Rule::unique('users', 'email')->where(fn ($query) => $query->where('role', 'admin')),
             ],
-            'password'       => 'required|string|min:8|confirmed',
+            'password'       => ['required', 'string', 'confirmed', PasswordRule::defaults()],
         ], [
             // El locale de la app es 'en' y no hay carpeta lang/, asi que sin esto
             // el alta self-service muestra "The slug has already been taken." en una
@@ -187,7 +190,7 @@ class AuthController extends Controller
         $request->validate([
             'token'    => 'required|string',
             'email'    => 'required|email',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'string', 'confirmed', PasswordRule::defaults()],
         ], [
             'email.required'     => 'Escribe tu correo electrónico.',
             'email.email'        => 'Ese correo no parece válido.',

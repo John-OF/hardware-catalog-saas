@@ -114,4 +114,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Contrasenias filtradas (AUD-17)
+    |--------------------------------------------------------------------------
+    |
+    | Si `Password::defaults()` contrasta la contrasenia contra la lista de Have
+    | I Been Pwned. Es una llamada HTTP, asi que la suite lo apaga desde
+    | phpunit.xml: en un CI sin salida a internet seria un test rojo por algo que
+    | no es del proyecto. En produccion se queda encendido.
+    |
+    */
+
+    'password_uncompromised' => env('PASSWORD_UNCOMPROMISED', true),
+
 ];

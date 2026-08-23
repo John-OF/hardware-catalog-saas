@@ -104,9 +104,9 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
 | de todas las tiendas y no pertenece a ninguna.
 */
 Route::post('/platform/login', [PlatformController::class, 'login'])
-    ->middleware('throttle:5,1');
+    ->middleware(['platform.ip', 'throttle:5,1']);
 
-Route::middleware(['auth:sanctum', 'superadmin'])->prefix('platform')->group(function () {
+Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platform')->group(function () {
     Route::post('/logout', [PlatformController::class, 'logout']);
     Route::get('/me',      [PlatformController::class, 'me']);
 

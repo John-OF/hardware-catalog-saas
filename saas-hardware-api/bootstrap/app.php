@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
             // para que el global scope de BelongsToTenant filtre tambien ahi
             // (AUD-4). El panel usa 'tenant', que resuelve por header.
             'tenant.slug' => \App\Http\Middleware\InitializeTenantBySlug::class,
+            // Cerca de IP para el panel de plataforma (AUD-13). Va en el login
+            // ademas de en el grupo autenticado: el login es donde se prueban
+            // contrasenias, asi que protegerlo solo a partir del token habria
+            // dejado abierto justo lo que hay que cerrar.
+            'platform.ip' => \App\Http\Middleware\RestrictPlatformIp::class,
         ]);
 
         // El tenant debe resolverse ANTES de SubstituteBindings para que el

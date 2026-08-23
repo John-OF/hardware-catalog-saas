@@ -28,6 +28,18 @@ import { COUNTRY_CODES, deriveCountryCode } from '../../utils/phone';
 import { useCartStore } from '../../stores/cartStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
+
+/**
+ * Sitekey publica de Cloudflare Turnstile (AUD-15).
+ *
+ * Antes esto caia a `1x00000000000000000000AA`, la clave de pruebas de
+ * Cloudflare, cuando faltaba la variable. No abria un agujero -el servidor
+ * valida contra la clave secreta de verdad y habria rechazado el token-, pero
+ * convertia un despiste de configuracion en "las resenias no funcionan y nadie
+ * sabe por que": el widget se resolvia bien en el navegador y el fallo aparecia
+ * despues, al enviar. Sin sitekey se dice ahora donde se puede arreglar.
+ */
+const TURNSTILE_SITEKEY = import.meta.env.VITE_TURNSTILE_SITEKEY as string | undefined;
 import type { Tenant, Product } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
@@ -97,6 +109,14 @@ export default function ProductDetailPage() {
 
   // Render Turnstile widget
   useEffect(() => {
+    if (isReviewFormOpen && !TURNSTILE_SITEKEY) {
+      console.error(
+        '[Turnstile] Falta VITE_TURNSTILE_SITEKEY: el formulario de resenias queda deshabilitado. ' +
+        'Define la sitekey publica de Cloudflare Turnstile en el .env del frontend y reconstruye.'
+      );
+      return;
+    }
+
     if (isReviewFormOpen && turnstileContainerRef.current) {
       const checkTurnstile = setInterval(() => {
         if ((window as any).turnstile) {
@@ -111,7 +131,7 @@ export default function ProductDetailPage() {
           }
           
           widgetIdRef.current = (window as any).turnstile.render(turnstileContainerRef.current, {
-            sitekey: import.meta.env.VITE_TURNSTILE_SITEKEY || '1x00000000000000000000AA',
+            sitekey: TURNSTILE_SITEKEY,
             callback: (token: string) => {
               setTurnstileToken(token);
             },
@@ -944,15 +964,26 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Cloudflare Turnstile container */}
-            <div 
-              ref={turnstileContainerRef} 
-              className="cf-turnstile-wrapper" 
-              style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}
-            />
+            {TURNSTILE_SITEKEY ? (
+              <div
+                ref={turnstileContainerRef}
+                className="cf-turnstile-wrapper"
+                style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}
+              />
+            ) : (
+              /* AUD-15: sin sitekey no se finge que la verificacion existe. */
+              <div
+                className="turnstile-misconfigured"
+                style={{ marginTop: '0.5rem', marginBottom: '0.5rem', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}
+              >
+                La verificación anti-bot no está configurada en este sitio, así que
+                ahora mismo no se pueden enviar reseñas.
+              </div>
+            )}
 
             <button
               type="submit"
-              disabled={reviewMutation.isPending}
+              disabled={reviewMutation.isPending || !TURNSTILE_SITEKEY}
               className="btn-primary"
               style={{ padding: '0.6rem 1.5rem', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
