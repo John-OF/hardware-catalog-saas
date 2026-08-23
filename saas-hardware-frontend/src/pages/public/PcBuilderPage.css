@@ -577,3 +577,29 @@
     align-items: stretch;
   }
 }
+
+/* Pantalla de carga de la propia pagina.
+ *
+ * Estas reglas faltaban: el TSX pinta `<div className="loader-container
+ * page-pc-builder">` desde antes de TEC-6, pero al sacar el CSS del <style> la
+ * pantalla de carga se quedo sin ninguna regla que la apuntara —.loader-container
+ * solo esta definida bajo :where(.page-catalog) y bajo :where(.page-product)—,
+ * asi que el armador cargaba con el spinner pegado a la esquina superior
+ * izquierda. Se vio al verificar AUD-18 en el navegador, y se comprobo que ya
+ * pasaba igual antes de trocear el bundle.
+ *
+ * Va con las dos formas del selector, como el resto de paginas: unas veces la
+ * clase de ambito esta en el propio contenedor y otras en un ancestro. */
+:where(.page-pc-builder) .loader-container,
+:where(.page-pc-builder).loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  gap: 1rem;
+}
+
+:where(.page-pc-builder) .spinner { animation: spin 1s linear infinite; }
