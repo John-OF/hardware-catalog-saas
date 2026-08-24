@@ -137,3 +137,10 @@
 :where(.page-settings) .helper-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
 :where(.page-settings) .helper-text code { background: rgba(var(--overlay-mix),0.05); padding: 1px 4px; border-radius: 4px; }
 @media (max-width: 640px) { :where(.page-settings) .settings-grid { grid-template-columns: 1fr; } :where(.page-settings) .hero-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Aviso de funcion no incluida en el plan (SAAS-3). Acompania al helper-text
+   normal en vez de sustituirlo: la explicacion del campo sigue haciendo falta
+   aunque el plan no lo traiga. */
+:where(.page-settings) .helper-text-warning {
+  color: var(--warning);
+}

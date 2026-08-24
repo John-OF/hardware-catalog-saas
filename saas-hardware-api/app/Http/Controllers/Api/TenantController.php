@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\ImageService;
+use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -115,6 +116,19 @@ class TenantController extends Controller
             'theme.footer_instagram' => 'nullable|url:http,https|max:200',
             'theme.footer_tiktok'    => 'nullable|url:http,https|max:200',
         ]);
+
+        // Dominio propio: funcion de plan (SAAS-3). Se comprueba despues de
+        // validar, para que un dominio mal escrito siga dando el 422 de formato
+        // de siempre y no uno de plan.
+        //
+        // Solo se mira cuando el valor CAMBIA a algo no vacio. Vaciarlo tiene que
+        // poder hacerse siempre: si no, una tienda que baja de plan se quedaria
+        // con el dominio puesto y sin forma de quitarlo desde el panel.
+        if (array_key_exists('custom_domain', $data)
+            && filled($data['custom_domain'])
+            && $data['custom_domain'] !== $tenant->custom_domain) {
+            PlanGate::ensureAllows('custom_domain');
+        }
 
         if (isset($data['theme'])) {
             $data['theme'] = array_merge($tenant->theme ?? [], $data['theme']);

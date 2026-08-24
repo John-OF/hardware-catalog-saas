@@ -1,8 +1,10 @@
 import './SettingsPage.css';
 
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTenantStore } from '../../stores/tenantStore';
 import { updateTenant } from '../../api/tenant';
+import { getPlan } from '../../api/plan';
 import type { UpdateTenantPayload } from '../../api/tenant';
 import { 
   Store, 
@@ -125,6 +127,13 @@ export default function SettingsPage() {
   
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
+
+  // El dominio propio es una funcion de plan (SAAS-3). El campo se deja
+  // editable aunque el plan no lo incluya: si se bloqueara, una tienda que baja
+  // de plan se quedaria con el dominio puesto y sin forma de vaciarlo, que es
+  // justo lo unico que el backend sigue permitiendo hacer.
+  const { data: plan } = useQuery({ queryKey: ['plan'], queryFn: getPlan });
+  const dominioIncluido = plan ? plan.limits.custom_domain === true : true;
   const [layout, setLayout] = useState<TenantLayout>('grid');
   const [fontHeading, setFontHeading] = useState<TenantFontFamily>(DEFAULT_FONT_HEADING);
   const [fontBody, setFontBody] = useState<TenantFontFamily>(DEFAULT_FONT_BODY);
@@ -424,6 +433,11 @@ export default function SettingsPage() {
             <span className="helper-text">
               Deja en blanco para usar la URL por defecto: <code>http://localhost:5173/{tenant.slug}</code>
             </span>
+            {!dominioIncluido && (
+              <span className="helper-text helper-text-warning">
+                Tu plan {plan?.label} no incluye dominio propio. Mejora de plan para activarlo.
+              </span>
+            )}
           </div>
         </div>
       </section>

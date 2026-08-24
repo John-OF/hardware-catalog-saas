@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,6 +20,8 @@ class PageController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        PlanGate::ensureCanCreate('pages');
+
         $tenant = app('currentTenant');
 
         $data = $request->validate([

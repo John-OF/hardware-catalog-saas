@@ -39,11 +39,16 @@ class CsvImportTest extends TestCase
 
         $this->withoutMiddleware(ThrottleRequests::class);
 
+        // SAAS-3: el import es una funcion de plan y los topes de catalogo son
+        // por plan. Este test es sobre el parseo del CSV, no sobre los limites
+        // (esos van en PlanLimitsTest), asi que la tienda va en el plan que no
+        // topa nada y el import se mide contra el archivo, no contra el plan.
         $this->tenant = Tenant::create([
             'slug'            => 'tienda-a',
             'name'            => 'Tienda A',
             'whatsapp_number' => '51999999999',
             'is_active'       => true,
+            'plan'            => 'enterprise',
         ]);
 
         $this->admin = new User([

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\PlatformController;
 use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
@@ -131,6 +132,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
     // Configuración del tenant
     Route::get('/tenant',    [TenantController::class, 'show']);
     Route::put('/tenant',    [TenantController::class, 'update']);
+
+    // Plan, limites y consumo (SAAS-3). Aparte de /tenant para no tocar la
+    // forma de esa respuesta; el porque esta en PlanController.
+    Route::get('/plan',      [PlanController::class, 'show']);
 
     // Productos
     Route::post('products/reorder', [ProductController::class, 'reorder']);

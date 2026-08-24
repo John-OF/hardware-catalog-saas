@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
+import { getPlan } from '../../api/plan';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatMoney } from '../../utils/money';
@@ -38,6 +39,15 @@ export default function ProductsPage() {
   const tenant = useTenantStore((s) => s.tenant);
   const currencyCode = tenant?.currency ?? 'USD';
   const money = (n: number | string | null | undefined) => formatMoney(n, currencyCode);
+
+  // Consumo del plan (SAAS-3). Se pinta junto al boton de crear para que el
+  // tope se vea VENIR: un limite que solo aparece en el error del intento 21 se
+  // vive como un fallo del programa, no como el plan que se contrato.
+  const { data: plan } = useQuery({ queryKey: ['plan'], queryFn: getPlan });
+
+  const topeProductos = typeof plan?.limits.products === 'number' ? plan.limits.products : null;
+  const usoProductos = plan?.usage.products ?? 0;
+  const sinHuecoProductos = topeProductos !== null && usoProductos >= topeProductos;
 
   // Page filter states
   const [search, setSearch] = useState('');
@@ -163,6 +173,7 @@ export default function ProductsPage() {
     mutationFn: createProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       toast.success('Producto creado con éxito');
       closeModal();
     },
@@ -192,6 +203,7 @@ export default function ProductsPage() {
     mutationFn: deleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       toast.success('Producto eliminado con éxito');
     },
     onError: (err: any) => {
@@ -205,6 +217,7 @@ export default function ProductsPage() {
     mutationFn: duplicateProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       toast.success('Producto clonado con éxito');
     },
     onError: (err: any) => {
@@ -218,6 +231,7 @@ export default function ProductsPage() {
     mutationFn: bulkActionProducts,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       setSelectedProductIds([]); // Limpiar selección
       toast.success(data.message || 'Acción masiva aplicada con éxito');
     },
@@ -383,6 +397,7 @@ export default function ProductsPage() {
       const report = await importProductsCsv(importFile);
       setImportReport(report);
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['plan'] });
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       
       if (report.errors.length === 0) {
@@ -523,6 +538,15 @@ export default function ProductsPage() {
         </select>
 
         <div className="action-buttons-group" style={{ display: 'flex', gap: '0.5rem' }}>
+          {topeProductos !== null && (
+            <span
+              className={`plan-usage ${sinHuecoProductos ? 'plan-usage-full' : ''}`}
+              title={`Tu plan ${plan?.label ?? ''} permite ${topeProductos} productos.`}
+            >
+              {usoProductos} / {topeProductos}
+            </span>
+          )}
+
           <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
             <Upload size={18} />
             <span>Importar CSV</span>

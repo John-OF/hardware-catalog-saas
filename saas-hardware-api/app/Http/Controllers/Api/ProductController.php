@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
 use App\Models\Category;
 use App\Services\ImageService;
+use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -47,6 +48,15 @@ class ProductController extends Controller
 
     public function store(StoreProductRequest $request): JsonResponse
     {
+        // SAAS-3: los dos topes se comprueban antes de subir nada. Al reves, un
+        // producto rechazado dejaria sus imagenes ya escritas en disco sin
+        // ninguna fila que las referencie.
+        PlanGate::ensureCanCreate('products');
+
+        if ($request->hasFile('gallery')) {
+            PlanGate::ensureCanAdd('images_per_product', 0, count($request->file('gallery')));
+        }
+
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
@@ -82,6 +92,30 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
     {
+        // Las imagenes marcadas para borrar se leen aqui arriba y no en su bloque
+        // de mas abajo porque el tope de galeria del plan (SAAS-3) tiene que
+        // contar el saldo: quien cambia tres fotos por otras tres no esta
+        // añadiendo ninguna.
+        $deletedIds = [];
+
+        if ($request->has('deleted_image_ids')) {
+            $deletedIds = is_array($request->deleted_image_ids)
+                ? $request->deleted_image_ids
+                : json_decode($request->deleted_image_ids, true) ?? [];
+        }
+
+        if ($request->hasFile('gallery')) {
+            $actual = $product->images()->count();
+
+            // Solo descuentan las que existen y son de este producto: la lista
+            // llega del navegador y puede traer ids repetidos o ajenos.
+            if ($deletedIds !== []) {
+                $actual -= $product->images()->whereIn('id', $deletedIds)->count();
+            }
+
+            PlanGate::ensureCanAdd('images_per_product', $actual, count($request->file('gallery')));
+        }
+
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
@@ -96,17 +130,11 @@ class ProductController extends Controller
         $product->update($data);
 
         // Eliminar imágenes de galería seleccionadas
-        if ($request->has('deleted_image_ids')) {
-            $deletedIds = is_array($request->deleted_image_ids) 
-                ? $request->deleted_image_ids 
-                : json_decode($request->deleted_image_ids, true) ?? [];
-
-            foreach ($deletedIds as $imgId) {
-                $imgModel = $product->images()->find($imgId);
-                if ($imgModel) {
-                    $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
-                    $imgModel->delete();
-                }
+        foreach ($deletedIds as $imgId) {
+            $imgModel = $product->images()->find($imgId);
+            if ($imgModel) {
+                $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
+                $imgModel->delete();
             }
         }
 
@@ -149,6 +177,11 @@ class ProductController extends Controller
      */
     public function import(Request $request): JsonResponse
     {
+        // SAAS-3: el import es una funcion del plan, no un tope. Va lo primero,
+        // antes incluso de mirar el archivo: si no esta incluido, no hay nada
+        // que procesar.
+        PlanGate::ensureAllows('csv_import');
+
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:4096',
         ]);
@@ -196,6 +229,9 @@ class ProductController extends Controller
         $lote = [];
         $categoriasPorNombre = [];
 
+        $categoriasCreadas  = 0;
+        $categoriasOmitidas = false;
+
         // Mapear índices
         $map = [
             'nombre'           => array_search('nombre', $header),
@@ -225,8 +261,28 @@ class ProductController extends Controller
 
         \DB::beginTransaction();
         try {
+            // Hueco que deja el plan (SAAS-3). `null` en cualquiera de los dos es
+            // "sin tope". Se piden una sola vez y no por fila, que serian dos
+            // COUNT por cada linea del CSV.
+            //
+            // Van DENTRO del try aunque no escriban nada: son consultas, y si la
+            // base se cae justo aqui el fallo tiene que salir por el mismo sitio
+            // que el resto -mensaje generico y traza al log- en vez de devolver
+            // el SQL crudo al navegador (AUD-8).
+            $huecoProductos  = PlanGate::hueco('products');
+            $huecoCategorias = PlanGate::hueco('categories');
+
             while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                 $rowCount++;
+
+                // El tope del plan corta el import, no lo rechaza entero: entra
+                // lo que cabe y el resto se reporta como aviso. Rechazar un
+                // archivo de 300 filas porque las 10 ultimas no caben obligaria
+                // al dueño a editar el CSV para no perder las 290 que si.
+                if ($huecoProductos !== null && $successCount >= $huecoProductos) {
+                    $errors[] = 'Tu plan ' . PlanGate::label() . " admite {$huecoProductos} productos más: el resto del archivo no se importó.";
+                    break;
+                }
 
                 // Ignorar filas vacías
                 if (empty($row) || (count($row) === 1 && $row[0] === null)) {
@@ -273,10 +329,29 @@ class ProductController extends Controller
                     // Un CSV repite la misma categoria en decenas de filas: sin
                     // este memo, cada una de ellas era un SELECT.
                     if (!array_key_exists($categoryName, $categoriasPorNombre)) {
-                        $categoriasPorNombre[$categoryName] = Category::firstOrCreate(
-                            ['name' => $categoryName],
-                            ['icon' => 'folder', 'sort_order' => 0, 'is_active' => true]
-                        )->id;
+                        // firstOrCreate partido en dos porque hace falta saber si
+                        // la categoria es nueva: las que ya existen no gastan
+                        // hueco del plan por mucho que el CSV las nombre.
+                        $categoria = Category::where('name', $categoryName)->first();
+
+                        if (! $categoria && ($huecoCategorias === null || $categoriasCreadas < $huecoCategorias)) {
+                            $categoria = Category::create([
+                                'name'       => $categoryName,
+                                'icon'       => 'folder',
+                                'sort_order' => 0,
+                                'is_active'  => true,
+                            ]);
+                            $categoriasCreadas++;
+                        }
+
+                        // Sin hueco, el producto entra SIN categoria en vez de no
+                        // entrar: perder la clasificacion se arregla desde el
+                        // panel, perder el producto no.
+                        if (! $categoria) {
+                            $categoriasOmitidas = true;
+                        }
+
+                        $categoriasPorNombre[$categoryName] = $categoria?->id;
                     }
                     $categoryId = $categoriasPorNombre[$categoryName];
                 }
@@ -348,6 +423,10 @@ class ProductController extends Controller
         }
 
         fclose($handle);
+
+        if ($categoriasOmitidas) {
+            $errors[] = 'Algunas categorías nuevas no se crearon porque tu plan ' . PlanGate::label() . ' no admite más: esos productos se importaron sin categoría.';
+        }
 
         // El insert en lote no pasa por el hook `saved` del modelo, que es quien
         // sube la version de cache (AUD-6). Se sube una sola vez al terminar, lo
@@ -467,6 +546,12 @@ class ProductController extends Controller
      */
     public function duplicate(Product $product): JsonResponse
     {
+        // SAAS-3: duplicar crea un producto, asi que gasta tope. La galeria que
+        // se copia NO se recorta al tope de imagenes del plan: son las que el
+        // original ya tenia, y recortarlas seria perder contenido en silencio.
+        // Los limites topan lo que se añade, no lo que ya existe.
+        PlanGate::ensureCanCreate('products');
+
         $newProduct = $product->replicate();
         $newProduct->name = $product->name . ' (Copia)';
         // replicate() copia los atributos crudos sin pasar por los casts. Reasignamos

@@ -649,3 +649,24 @@
     width: 100%;
   }
 }
+
+/* Consumo del plan junto a los botones de la barra de filtros (SAAS-3). En
+   cuanto se agota el hueco cambia a tono de aviso: el boton sigue activo -el
+   mensaje del servidor es el que explica que pasa- pero el numero deja de
+   pasar desapercibido. */
+:where(.page-products) .plan-usage {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+:where(.page-products) .plan-usage-full {
+  border-color: var(--warning);
+  color: var(--warning);
+}

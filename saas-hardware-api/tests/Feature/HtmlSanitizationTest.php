@@ -37,10 +37,14 @@ class HtmlSanitizationTest extends TestCase
     {
         parent::setUp();
 
+        // Plan 'pro' porque uno de los casos importa por CSV, que desde SAAS-3
+        // es una funcion de plan. Este test va del saneado del HTML, no de los
+        // limites (esos estan en PlanLimitsTest).
         $this->tenant = Tenant::create([
             'slug'            => 'tienda-xss',
             'name'            => 'Tienda XSS',
             'whatsapp_number' => '51999999999',
+            'plan'            => 'pro',
             'is_active'       => true,
         ]);
 

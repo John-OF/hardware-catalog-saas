@@ -86,6 +86,20 @@ export interface Tenant {
 }
 
 /**
+ * Plan de la tienda, sus limites y su consumo (SAAS-3). Lo sirve `GET /plan`.
+ *
+ * En `limits`, un numero es un tope, `null` es "sin tope" y un booleano es una
+ * funcion que el plan trae o no. La matriz manda desde `config/plans.php` del
+ * backend: aqui NO hay una segunda copia que mantener, solo la forma.
+ */
+export interface PlanInfo {
+  plan: string;
+  label: string;
+  limits: Record<string, number | boolean | null>;
+  usage: Record<string, number>;
+}
+
+/**
  * Lo que devuelve `UserResource` en el backend (TEC-4). `tenant_id` y los
  * timestamps ya no viajan al navegador: nadie los usaba.
  */

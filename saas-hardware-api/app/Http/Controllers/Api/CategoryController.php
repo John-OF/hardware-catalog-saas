@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCategoryRequest;
 use App\Models\Category;
+use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
@@ -21,6 +22,8 @@ class CategoryController extends Controller
 
     public function store(StoreCategoryRequest $request): JsonResponse
     {
+        PlanGate::ensureCanCreate('categories');
+
         // No pasar 'id' manualmente — HasUuids + newUniqueId() genera UUID v7 automáticamente
         $category = Category::create($request->validated());
 
