@@ -106,6 +106,21 @@ jobs:
           fi
           echo "Sin violaciones de react-hooks/rules-of-hooks"
 
+      # UI-5: mismo criterio que el paso de arriba, otra regla que si bloquea.
+      #
+      # El CSS de pagina va acotado con `:where(.page-x)`, que no suma
+      # especificidad. Si una de esas reglas apunta a una clase de un componente
+      # -CSS global, sin acotar- las dos valen (0,1,0) y el empate lo decide el
+      # orden de carga de los chunks, o sea por que ruta entro el usuario: la
+      # misma regla sale bien en una pantalla y mal en otra, y el navegador no
+      # avisa de nada. Paso justo con el pie de tienda.
+      #
+      # No es un aviso de estilo: es un fallo que solo se reproduce navegando en
+      # cierto orden, asi que encontrarlo a mano cuesta una tarde. Hoy la cuenta
+      # es cero y este paso es lo que impide que vuelva.
+      - name: CSS - empates pagina/componente (bloqueante)
+        run: npm run check:css
+
   # AUD-1: hasta ahora nada vigilaba los avisos de seguridad de las dependencias,
   # y se acumularon 17 en Composer (guzzle, psr7, commonmark) y 7 en npm
   # (react-router, postcss, nanoid, form-data...) sin que nadie se enterara.
