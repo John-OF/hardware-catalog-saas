@@ -28,7 +28,9 @@ import { formatMoney } from '../../utils/money';
 import { useCartStore } from '../../stores/cartStore';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
-import type { Tenant, Product, Category, PaginatedResponse } from '../../types';
+import StoreFooter from '../../components/public/StoreFooter';
+import { getPublicPages } from '../../api/pages';
+import type { Tenant, Product, Category, PaginatedResponse, Page } from '../../types';
 
 // Pasos predefinidos para armar la PC
 const BUILDER_STEPS = [
@@ -84,6 +86,13 @@ export default function PcBuilderPage() {
 
   useTenantBranding(tenant, 'Armador de PC compatible', 'Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada.');
   useTenantTheme(tenant);
+
+  // Para el pie de tienda: los enlaces a las paginas informativas.
+  const { data: publicPages = [] } = useQuery<Page[]>({
+    queryKey: ['publicPages', resolvedSlug],
+    queryFn: () => getPublicPages(resolvedSlug!),
+    enabled: !!resolvedSlug,
+  });
 
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
@@ -652,7 +661,9 @@ export default function PcBuilderPage() {
         </div>
       )}
 
-      {/* Embedded Styles */}
+      {/* Mismo pie que el catalogo (UI-3): quien esta armando un equipo es
+          quien mas necesita saber donde esta la tienda y como contactarla. */}
+      {tenant && <StoreFooter tenant={tenant} pages={publicPages} buildPath={getPublicPath} />}
     </div>
   );
 }

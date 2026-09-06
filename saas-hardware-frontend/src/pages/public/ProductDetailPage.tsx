@@ -21,6 +21,8 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview, subscribeStockNotification } from '../../api/public';
+import { getPublicPages } from '../../api/pages';
+import StoreFooter from '../../components/public/StoreFooter';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
@@ -40,7 +42,7 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
  * despues, al enviar. Sin sitekey se dice ahora donde se puede arreglar.
  */
 const TURNSTILE_SITEKEY = import.meta.env.VITE_TURNSTILE_SITEKEY as string | undefined;
-import type { Tenant, Product } from '../../types';
+import type { Tenant, Product, Page } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 export default function ProductDetailPage() {
@@ -168,6 +170,20 @@ export default function ProductDetailPage() {
   });
 
   const resolvedSlug = tenant?.slug;
+
+  // Para el pie de tienda: los enlaces a las paginas informativas.
+  const { data: publicPages = [] } = useQuery<Page[]>({
+    queryKey: ['publicPages', resolvedSlug],
+    queryFn: () => getPublicPages(resolvedSlug!),
+    enabled: !!resolvedSlug,
+  });
+
+  const getPublicPath = (path: string) => {
+    if (isCustomDomain) {
+      return path;
+    }
+    return `/${resolvedSlug}${path}`;
+  };
 
   const reviewMutation = useMutation({
     mutationFn: (payload: { customer_name: string; customer_email?: string; customer_phone?: string; rating: number; comment?: string; visitor_id?: string; turnstile_token: string }) =>
@@ -1159,6 +1175,10 @@ export default function ProductDetailPage() {
         </div>
       )}
 
+      {/* Mismo pie que el catalogo (UI-3). Aqui es donde se decide la compra,
+          asi que es justo donde hacen falta la direccion, el horario y con
+          quien se esta tratando. */}
+      {tenant && <StoreFooter tenant={tenant} pages={publicPages} buildPath={getPublicPath} />}
     </div>
   );
 }

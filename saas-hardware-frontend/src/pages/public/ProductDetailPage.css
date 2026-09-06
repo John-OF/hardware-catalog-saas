@@ -54,6 +54,11 @@
   flex-direction: column;
   gap: 1.5rem;
   width: 100%;
+  /* #root ya es un flex column de min-height 100vh y este contenedor es su
+     hijo directo, asi que ocupa el alto libre de la ventana. Con el
+     `margin-top: auto` del pie (StoreFooter.css), este se queda abajo en una
+     ficha corta en vez de subir a media pantalla. */
+  flex: 1;
 }
 
 :where(.page-product-detail) .back-navigation {
