@@ -1,12 +1,12 @@
 import { useLayoutEffect } from 'react';
 import type { Tenant } from '../types';
-import { aplicarTema, limpiarTema, recordarTema } from '../utils/temaGuardado';
+import { applyTheme, clearTheme, rememberTheme } from '../utils/theme';
 
 /**
  * Aplica los estilos y colores dinámicos del tenant al documento.
  * Maneja la inyección de variables CSS, la tipografía y el modo claro/oscuro.
  *
- * El cómo vive en `utils/temaGuardado`, junto a la semilla que se aplica antes
+ * El cómo vive en `utils/theme`, junto a la semilla que se aplica antes
  * de montar React (UI-2): son la misma operación y separarlas fue justo lo que
  * dejó a la página informativa sin la mitad de su tema en su día.
  *
@@ -20,7 +20,7 @@ export function useTenantTheme(tenant?: Tenant | null) {
   useLayoutEffect(() => {
     if (!tenant) return;
 
-    aplicarTema({
+    applyTheme({
       primary_color: tenant.primary_color,
       accent_color: tenant.theme?.accent_color,
       color_mode: tenant.theme?.color_mode,
@@ -35,11 +35,11 @@ export function useTenantTheme(tenant?: Tenant | null) {
 
     // Para la próxima visita a esta tienda: con esto la semilla ya tiene de
     // dónde tirar y el salto de color desaparece.
-    recordarTema(tenant);
+    rememberTheme(tenant);
 
     // Se devuelven las variables a los valores de index.css: si no, al pasar
     // del catálogo público al panel el dashboard heredaría la fuente y el
     // color de la última tienda visitada.
-    return limpiarTema;
+    return clearTheme;
   }, [tenant]);
 }

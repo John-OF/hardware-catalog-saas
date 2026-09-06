@@ -30,11 +30,11 @@ import { NEUTRAL_CLASSES, neutralClass } from './neutrals';
 import { SHAPE_CLASSES, shapeClasses } from './shape';
 import { loadGoogleFonts, resolveFonts } from './fonts';
 
-const PREFIJO = 'tema:';
+const STORAGE_PREFIX = 'theme:';
 export const FONT_LINK_ID = 'tenant-font';
 
 /** Lo minimo para pintar: nada de textos ni imagenes, solo la piel. */
-export interface TemaAplicable {
+export interface ApplicableTheme {
   primary_color?: string | null;
   accent_color?: string | null;
   color_mode?: string | null;
@@ -51,10 +51,10 @@ export interface TemaAplicable {
  * Primeros segmentos que NO son el slug de una tienda. `product`, `builder` y
  * `p` si lo son en un dominio propio, donde la URL va sin prefijo de tienda.
  */
-const NO_SON_TIENDA = new Set([
+const NON_STORE_SEGMENTS = new Set([
   'login', 'register', 'forgot-password', 'reset-password', 'platform', 'dashboard',
 ]);
-const RUTAS_DE_TIENDA_SIN_SLUG = new Set(['product', 'builder', 'p']);
+const STORE_SEGMENTS_WITHOUT_SLUG = new Set(['product', 'builder', 'p']);
 
 /**
  * Con que clave se recuerda la tienda que hay en pantalla, o null si esto no es
@@ -62,19 +62,19 @@ const RUTAS_DE_TIENDA_SIN_SLUG = new Set(['product', 'builder', 'p']);
  * tiene su propia paleta y sembrarle la de una tienda seria el fallo que la
  * limpieza de `useTenantTheme` viene evitando.
  */
-export function claveDeTienda(
+export function storeThemeKey(
   pathname = window.location.pathname,
   hostname = window.location.hostname
 ): string | null {
-  const enLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-  const primero = pathname.split('/').filter(Boolean)[0] ?? '';
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const firstSegment = pathname.split('/').filter(Boolean)[0] ?? '';
 
-  if (NO_SON_TIENDA.has(primero)) return null;
+  if (NON_STORE_SEGMENTS.has(firstSegment)) return null;
   // Dominio propio: la tienda es el dominio y la URL no lleva slug.
-  if (primero === '' || RUTAS_DE_TIENDA_SIN_SLUG.has(primero)) {
-    return enLocal ? null : `${PREFIJO}dominio:${hostname}`;
+  if (firstSegment === '' || STORE_SEGMENTS_WITHOUT_SLUG.has(firstSegment)) {
+    return isLocalhost ? null : `${STORAGE_PREFIX}domain:${hostname}`;
   }
-  return `${PREFIJO}slug:${primero}`;
+  return `${STORAGE_PREFIX}slug:${firstSegment}`;
 }
 
 /**
@@ -82,12 +82,12 @@ export function claveDeTienda(
  * `useTenantTheme`; vive aqui para que la semilla y el hook no puedan
  * divergir.
  */
-export function aplicarTema(tema: TemaAplicable) {
+export function applyTheme(theme: ApplicableTheme) {
   const root = document.documentElement;
 
-  if (tema.primary_color) {
-    root.style.setProperty('--primary', tema.primary_color);
-    const hex = tema.primary_color.replace('#', '');
+  if (theme.primary_color) {
+    root.style.setProperty('--primary', theme.primary_color);
+    const hex = theme.primary_color.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
@@ -96,25 +96,25 @@ export function aplicarTema(tema: TemaAplicable) {
     }
   }
 
-  if (tema.accent_color) {
-    root.style.setProperty('--accent', tema.accent_color);
+  if (theme.accent_color) {
+    root.style.setProperty('--accent', theme.accent_color);
   }
 
-  const fuentes = resolveFonts(tema as never);
-  root.style.setProperty('--font-sans', fuentes.body.stack);
-  root.style.setProperty('--font-heading', fuentes.heading.stack);
-  loadGoogleFonts(FONT_LINK_ID, [fuentes.heading.google, fuentes.body.google]);
+  const fonts = resolveFonts(theme as never);
+  root.style.setProperty('--font-sans', fonts.body.stack);
+  root.style.setProperty('--font-heading', fonts.heading.stack);
+  loadGoogleFonts(FONT_LINK_ID, [fonts.heading.google, fonts.body.google]);
 
   document.body.classList.remove(...NEUTRAL_CLASSES);
-  document.body.classList.add(neutralClass(tema.neutral));
-  document.body.classList.toggle('light-mode', tema.color_mode === 'light');
+  document.body.classList.add(neutralClass(theme.neutral));
+  document.body.classList.toggle('light-mode', theme.color_mode === 'light');
 
   document.body.classList.remove(...SHAPE_CLASSES);
-  document.body.classList.add(...shapeClasses(tema as never));
+  document.body.classList.add(...shapeClasses(theme as never));
 }
 
 /** Deshace lo de arriba: el panel no debe heredar la piel de una tienda. */
-export function limpiarTema() {
+export function clearTheme() {
   const root = document.documentElement;
   document.body.classList.remove('light-mode');
   document.body.classList.remove(...NEUTRAL_CLASSES);
@@ -127,11 +127,11 @@ export function limpiarTema() {
   document.getElementById(FONT_LINK_ID)?.remove();
 }
 
-export function recordarTema(tenant: Tenant) {
-  const clave = claveDeTienda();
-  if (!clave) return;
+export function rememberTheme(tenant: Tenant) {
+  const key = storeThemeKey();
+  if (!key) return;
 
-  const tema: TemaAplicable = {
+  const theme: ApplicableTheme = {
     primary_color: tenant.primary_color,
     accent_color: tenant.theme?.accent_color,
     color_mode: tenant.theme?.color_mode,
@@ -145,7 +145,7 @@ export function recordarTema(tenant: Tenant) {
   };
 
   try {
-    localStorage.setItem(clave, JSON.stringify(tema));
+    localStorage.setItem(key, JSON.stringify(theme));
   } catch {
     // Ventana privada, almacenamiento lleno o bloqueado: sin cache se vuelve al
     // comportamiento de antes, que es un parpadeo, no un fallo.
@@ -153,14 +153,14 @@ export function recordarTema(tenant: Tenant) {
 }
 
 /** Se llama una vez, antes de montar React. */
-export function sembrarTemaGuardado() {
-  const clave = claveDeTienda();
-  if (!clave) return;
+export function seedStoredTheme() {
+  const key = storeThemeKey();
+  if (!key) return;
 
   try {
-    const guardado = localStorage.getItem(clave);
-    if (!guardado) return;
-    aplicarTema(JSON.parse(guardado) as TemaAplicable);
+    const stored = localStorage.getItem(key);
+    if (!stored) return;
+    applyTheme(JSON.parse(stored) as ApplicableTheme);
   } catch {
     // JSON corrupto o storage inaccesible: mismo caso que arriba.
   }
