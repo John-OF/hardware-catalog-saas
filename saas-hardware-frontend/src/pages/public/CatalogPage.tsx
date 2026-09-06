@@ -1,7 +1,7 @@
 import './CatalogPage.css';
 
-import { useState, useEffect } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -46,25 +46,82 @@ export default function CatalogPage() {
   const isCustomDomain = !slug;
   const currentDomain = window.location.hostname;
 
-  // States
-  // searchInput es lo que se ve en la caja (responde a cada tecla); search es el
-  // valor que llega a la query, retrasado 300ms para no pedir una vez por letra.
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [inStock, setInStock] = useState(false);
-  const [sort, setSort] = useState('');
-  const [page, setPage] = useState(1);
+  // Los filtros viven en la URL, no en estado local (UI-1). Asi un enlace
+  // compartido o un marcador reproducen lo que el remitente estaba viendo,
+  // recargar no lo pierde y el boton "atras" deshace el ultimo filtro, que es
+  // justo lo que un comprador espera al comparar componentes.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const search = searchParams.get('q') ?? '';
+  const selectedCategory = searchParams.get('categoria') ?? '';
+  const inStock = searchParams.get('stock') === '1';
+  const sort = searchParams.get('orden') ?? '';
+  const page = Math.max(1, Number(searchParams.get('pagina')) || 1);
+  const selectedSpecs = useMemo(() => {
+    const specs: Record<string, string> = {};
+    searchParams.forEach((valor, clave) => {
+      if (clave.startsWith('esp.')) specs[clave.slice(4)] = valor;
+    });
+    return specs;
+  }, [searchParams]);
+
+  /**
+   * Unica puerta de escritura de los filtros.
+   *
+   * Cualquier cambio vuelve a la pagina 1 salvo que lo que se cambie sea la
+   * pagina: con el filtro nuevo el listado tiene otro numero de paginas y
+   * quedarse en la 4 puede dejar al comprador mirando un vacio.
+   *
+   * `reemplazar` evita meter una entrada en el historial por cada pulsacion al
+   * teclear; los demas filtros si dejan entrada para que "atras" los deshaga.
+   */
+  const aplicarFiltros = useCallback((
+    cambios: Record<string, string | null>,
+    { reemplazar = false } = {}
+  ) => {
+    setSearchParams((previos) => {
+      const params = new URLSearchParams(previos);
+      for (const [clave, valor] of Object.entries(cambios)) {
+        if (valor === null || valor === '') params.delete(clave);
+        else params.set(clave, valor);
+      }
+      if (!('pagina' in cambios)) params.delete('pagina');
+      return params;
+    }, { replace: reemplazar });
+  }, [setSearchParams]);
+
+  /** Cambiar de categoria descarta las specs: son de la categoria anterior. */
+  const cambiarCategoria = (id: string) => {
+    setSearchParams((previos) => {
+      const params = new URLSearchParams(previos);
+      [...params.keys()].filter((k) => k.startsWith('esp.')).forEach((k) => params.delete(k));
+      if (id) params.set('categoria', id);
+      else params.delete('categoria');
+      params.delete('pagina');
+      return params;
+    });
+  };
+
   const [cartOpen, setCartOpen] = useState(false);
-  const [selectedSpecs, setSelectedSpecs] = useState<Record<string, string>>({});
   // Drawer de filtros en móvil (PUB-6). En escritorio la sidebar es fija y este
   // estado no pinta nada.
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Reset filter when changing category
+  // searchInput es lo que se ve en la caja y responde a cada tecla; `search`
+  // sale de la URL y va 300ms por detras para no pedir una vez por letra.
+  const [searchInput, setSearchInput] = useState(search);
+  // Lo ultimo que escribimos nosotros en la URL. Sirve para distinguir un
+  // cambio propio (el debounce) de uno de fuera (el boton "atras", un enlace
+  // pegado): solo en el segundo caso hay que resembrar la caja, y sin esta
+  // marca resembrarla borraria lo que el comprador esta tecleando.
+  const ultimaBusquedaEscrita = useRef(search);
+
   useEffect(() => {
-    setSelectedSpecs({});
-  }, [selectedCategory]);
+    if (search !== ultimaBusquedaEscrita.current) {
+      ultimaBusquedaEscrita.current = search;
+      setSearchInput(search);
+    }
+  }, [search]);
 
   // Debounce de la búsqueda: mientras el comprador siga tecleando, el timeout
   // anterior se cancela y no se lanza la petición.
@@ -72,12 +129,12 @@ export default function CatalogPage() {
     if (searchInput === search) return;
 
     const timeout = setTimeout(() => {
-      setSearch(searchInput);
-      setPage(1);
+      ultimaBusquedaEscrita.current = searchInput;
+      aplicarFiltros({ q: searchInput || null }, { reemplazar: true });
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [searchInput, search]);
+  }, [searchInput, search, aplicarFiltros]);
 
   // Carrito
   const addItem = useCartStore((s) => s.addItem);
@@ -378,8 +435,7 @@ export default function CatalogPage() {
                       onClick={() => {
                         // Filtra la grilla de abajo, que es justo lo que espera
                         // quien pulsa una categoría destacada.
-                        setSelectedCategory(selectedCategory === cat.id ? '' : cat.id);
-                        setPage(1);
+                        cambiarCategoria(selectedCategory === cat.id ? '' : cat.id);
                       }}
                     >
                       <CategoryIcon slug={cat.icon} size={22} />
@@ -411,7 +467,7 @@ export default function CatalogPage() {
                     <h3>Categorías</h3>
                     <div className="category-filters-list">
                       <button 
-                        onClick={() => { setSelectedCategory(''); setPage(1); }} 
+                        onClick={() => cambiarCategoria('')} 
                         className={`category-filter-btn ${selectedCategory === '' ? 'active' : ''}`}
                       >
                         <span className="category-filter-label"><LayoutGrid size={16} /> Todos</span>
@@ -419,7 +475,7 @@ export default function CatalogPage() {
                       {publicCategories.map((cat) => (
                         <button 
                           key={cat.id} 
-                          onClick={() => { setSelectedCategory(cat.id); setPage(1); }} 
+                          onClick={() => cambiarCategoria(cat.id)} 
                           className={`category-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
                         >
                           <span className="category-filter-label"><CategoryIcon slug={cat.icon} size={16} /> {cat.name}</span>
@@ -434,7 +490,7 @@ export default function CatalogPage() {
                       <input
                         type="checkbox"
                         checked={inStock}
-                        onChange={(e) => { setInStock(e.target.checked); setPage(1); }}
+                        onChange={(e) => aplicarFiltros({ stock: e.target.checked ? '1' : null })}
                         className="custom-checkbox"
                       />
                       <span>Sólo en stock</span>
@@ -449,7 +505,7 @@ export default function CatalogPage() {
                         {Object.keys(selectedSpecs).length > 0 && (
                           <button 
                             type="button" 
-                            onClick={() => { setSelectedSpecs({}); setPage(1); }}
+                            onClick={() => aplicarFiltros(Object.fromEntries(Object.keys(selectedSpecs).map((k) => [`esp.${k}`, null])))}
                             style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                           >
                             Limpiar
@@ -470,16 +526,7 @@ export default function CatalogPage() {
                                     key={val}
                                     type="button"
                                     onClick={() => {
-                                      setSelectedSpecs((prev) => {
-                                        const copy = { ...prev };
-                                        if (isSelected) {
-                                          delete copy[specKey];
-                                        } else {
-                                          copy[specKey] = val;
-                                        }
-                                        return copy;
-                                      });
-                                      setPage(1);
+                                      aplicarFiltros({ [`esp.${specKey}`]: isSelected ? null : val });
                                     }}
                                     className={`spec-pill-btn ${isSelected ? 'active' : ''}`}
                                     style={{
@@ -537,7 +584,7 @@ export default function CatalogPage() {
                       <select
                         id="catalog-sort"
                         value={sort}
-                        onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                        onChange={(e) => aplicarFiltros({ orden: e.target.value || null })}
                         className="premium-input sort-select"
                       >
                         <option value="">Recomendados</option>
@@ -700,7 +747,7 @@ export default function CatalogPage() {
                       {totalPages > 1 && (
                         <div className="pagination-bar">
                           <button 
-                            onClick={() => setPage(page - 1)} 
+                            onClick={() => aplicarFiltros({ pagina: String(page - 1) })} 
                             disabled={page === 1}
                             className="btn-secondary pag-btn"
                           >
@@ -708,7 +755,7 @@ export default function CatalogPage() {
                           </button>
                           <span className="page-indicator">Página {page} de {totalPages}</span>
                           <button 
-                            onClick={() => setPage(page + 1)} 
+                            onClick={() => aplicarFiltros({ pagina: String(page + 1) })} 
                             disabled={page === totalPages}
                             className="btn-secondary pag-btn"
                           >
