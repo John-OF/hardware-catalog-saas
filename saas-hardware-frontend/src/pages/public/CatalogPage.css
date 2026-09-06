@@ -63,44 +63,8 @@
   flex: 1;
 }
 
-/* Header */
-:where(.page-catalog) .catalog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  border-radius: var(--radius-lg);
-}
-
-:where(.page-catalog) .header-logo-area {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-:where(.page-catalog) .store-logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  overflow: hidden;
-}
-
-:where(.page-catalog) .store-logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-:where(.page-catalog) .header-logo-area h2 {
-  font-size: 1.15rem;
-  font-family: var(--font-heading);
-}
+/* Header. La barra, la marca y el hueco entre botones los pone ahora
+   <StoreHeader> (UI-6); aqui solo quedan los botones propios del catalogo. */
 
 :where(.page-catalog) .whatsapp-header-btn {
   padding: 0.5rem 1.25rem;
@@ -700,12 +664,6 @@
 :where(.page-catalog) .card-add-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--border); color: var(--text-muted); background: transparent; }
 :where(.page-catalog) .card-add-btn.added { border-color: var(--success); color: var(--success); background: var(--success-glow); }
 :where(.page-catalog) .card-add-btn.added:hover:not(:disabled) { background: var(--success); color: var(--text-on-primary); }
-
-:where(.page-catalog) .header-contact {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
 
 :where(.page-catalog) .cart-trigger {
   position: relative;

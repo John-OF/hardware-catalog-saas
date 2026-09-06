@@ -27,22 +27,8 @@
   flex: 1;
 }
 
-:where(.page-info) .catalog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  border-radius: var(--radius-lg);
-}
-
-/* Los dos botones de la cabecera (volver al catalogo y contactar) se quedaban
-   pegados: .header-contact solo estaba definida dentro del ambito del catalogo
-   y del armador, no aqui. Mismo valor que usa el catalogo. */
-:where(.page-info) .header-contact {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
+/* La cabecera —barra, marca y hueco entre botones— la pone ahora
+   <StoreHeader> (UI-6), asi que aqui no queda ninguna regla suya. */
 
 /* El sobrante lo absorbe el `margin-top: auto` del pie (StoreFooter.css) y no
    un `flex: 1` en el <main>: asi con una pagina de cuatro lineas la tarjeta

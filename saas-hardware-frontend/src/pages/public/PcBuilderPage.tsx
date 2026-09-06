@@ -29,6 +29,7 @@ import { useCartStore } from '../../stores/cartStore';
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
 import StoreFooter from '../../components/public/StoreFooter';
+import StoreHeader from '../../components/public/StoreHeader';
 import { getPublicPages } from '../../api/pages';
 import type { Tenant, Product, Category, PaginatedResponse, Page } from '../../types';
 
@@ -362,20 +363,23 @@ export default function PcBuilderPage() {
       <AnnouncementBar theme={tenant?.theme} />
 
       {/* Top Header */}
-      <header className="catalog-header glass-card">
-        <Link to={getPublicPath('/')} className="back-catalog-link">
-          <ArrowLeft size={16} /> Volver al Catálogo
-        </Link>
-        <div className="header-title">
-          <Cpu size={24} className="builder-primary-icon" />
-          <h2>Armador de PC compatible</h2>
-        </div>
-        <div className="header-contact">
-          <button onClick={handleWhatsAppOrder} className="btn-primary whatsapp-header-btn" disabled={Object.keys(selections).length === 0}>
-            <MessageCircle size={18} /> Pedir Armado
-          </button>
-        </div>
-      </header>
+      <StoreHeader
+        start={(
+          <>
+            <Link to={getPublicPath('/')} className="back-catalog-link">
+              <ArrowLeft size={16} /> Volver al Catálogo
+            </Link>
+            <div className="header-title">
+              <Cpu size={24} className="builder-primary-icon" />
+              <h2>Armador de PC compatible</h2>
+            </div>
+          </>
+        )}
+      >
+        <button onClick={handleWhatsAppOrder} className="btn-primary whatsapp-header-btn" disabled={Object.keys(selections).length === 0}>
+          <MessageCircle size={18} /> Pedir Armado
+        </button>
+      </StoreHeader>
 
       <div className="builder-layout">
         {/* Left Side: Step Selectors */}

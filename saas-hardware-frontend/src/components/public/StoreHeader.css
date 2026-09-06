@@ -1,0 +1,62 @@
+/* Estilos de <StoreHeader>. Antes vivian repetidos en el CSS de cada pagina
+   publica, y no identicos: el catalogo y la informativa usaban `1rem 2rem` de
+   padding y el armador `1.25rem 2rem`; el hueco entre botones era `0.65rem` en
+   dos y `1rem` en el otro. Ninguna de esas diferencias respondia a nada.
+
+   Peor: la pagina informativa pintaba el logo y el nombre con el mismo marcado
+   que el catalogo pero **sin ninguna regla para ellos** -.header-logo-area y
+   .store-logo solo estaban en CatalogPage.css-, asi que su logo salia sin la
+   caja de 42px ni el borde. Al mover esto al componente deja de poder pasar.
+
+   Sin acotar a proposito, igual que StoreFooter: es un componente que se monta
+   en varias pantallas, asi que su CSS es global. Ojo con UI-5 al tocar esto:
+   una regla `:where(.page-x) .catalog-header` en el CSS de una pagina empataria
+   en especificidad con las de aqui y ganaria la hoja que cargue despues. Eso es
+   justo lo que vigila `npm run check:css`. */
+
+.catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  border-radius: var(--radius-lg);
+}
+
+.header-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.store-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  overflow: hidden;
+  flex: none;
+}
+
+.store-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.header-logo-area h2 {
+  font-size: 1.15rem;
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+.header-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}

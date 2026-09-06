@@ -32,6 +32,7 @@ import CartDrawer from '../../components/public/CartDrawer';
 import CustomerAccountModal from '../../components/public/CustomerAccountModal';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
 import StoreFooter from '../../components/public/StoreFooter';
+import StoreHeader from '../../components/public/StoreHeader';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
@@ -271,18 +272,7 @@ export default function CatalogPage() {
       <AnnouncementBar theme={tenant.theme} />
 
       {/* Header Store */}
-      <header className="catalog-header glass-card">
-        <div className="header-logo-area">
-          <div className="store-logo">
-            {tenant.logo_url ? (
-              <img src={tenant.logo_url} alt={tenant.name} />
-            ) : (
-              <Store size={28} />
-            )}
-          </div>
-          <h2>{tenant.name}</h2>
-        </div>
-        <div className="header-contact">
+      <StoreHeader tenant={tenant}>
           <Link
             to={getPublicPath('/builder')}
             className="btn-secondary builder-header-btn"
@@ -319,8 +309,7 @@ export default function CatalogPage() {
           >
             <MessageCircle size={18} /> Contactar
           </a>
-        </div>
-      </header>
+      </StoreHeader>
 
       {/* Renderizado de secciones editables de la portada */}
       {parsedSections

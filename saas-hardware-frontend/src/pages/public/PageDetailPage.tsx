@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Loader2,
-  Store,
   MessageCircle,
   FileText
 } from 'lucide-react';
@@ -13,6 +12,7 @@ import { getPublicTenant, resolveTenantDomain } from '../../api/public';
 import { getPublicPageDetail, getPublicPages } from '../../api/pages';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
 import StoreFooter from '../../components/public/StoreFooter';
+import StoreHeader from '../../components/public/StoreHeader';
 import type { Tenant, Page } from '../../types';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
@@ -92,18 +92,7 @@ export default function PageDetailPage() {
       <AnnouncementBar theme={tenant.theme} />
 
       {/* Top Header */}
-      <header className="catalog-header glass-card">
-        <div className="header-logo-area">
-          <div className="store-logo">
-            {tenant.logo_url ? (
-              <img src={tenant.logo_url} alt={tenant.name} />
-            ) : (
-              <Store size={28} />
-            )}
-          </div>
-          <h2>{tenant.name}</h2>
-        </div>
-        <div className="header-contact">
+      <StoreHeader tenant={tenant}>
           <Link to={getPublicPath('/')} className="btn-secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ArrowLeft size={16} /> Volver al Catálogo
           </Link>
@@ -115,8 +104,7 @@ export default function PageDetailPage() {
           >
             <MessageCircle size={18} /> Contactar
           </a>
-        </div>
-      </header>
+      </StoreHeader>
 
       {/* Main Content Area */}
       <main className="page-detail-main glass-card animate-fade-in" style={{ padding: '3rem', marginTop: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
