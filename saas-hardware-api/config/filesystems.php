@@ -17,6 +17,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Salida a la guarda de almacenamiento (TEC-10)
+    |--------------------------------------------------------------------------
+    |
+    | En produccion, guardar las imagenes en el disco local no arranca: en un
+    | filesystem efimero se pierden en el siguiente despliegue. Quien de verdad
+    | tenga disco persistente lo pone aqui a true y queda escrito que fue una
+    | decision. Va por config() y no por env() en runtime porque con
+    | config:cache env() devuelve null (mismo motivo que SEC-5).
+    |
+    */
+
+    'allow_local' => env('ALLOW_LOCAL_STORAGE', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

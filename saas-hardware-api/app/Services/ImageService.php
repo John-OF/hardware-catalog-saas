@@ -26,8 +26,8 @@ class ImageService
 
         $mainPath = "{$folder}/{$filename}.webp";
         // En desarrollo, si no está configurado R2, guardar local
-        $disk = config('filesystems.default') === 'r2' ? 'r2' : 'public';
-        Storage::disk($disk)->put($mainPath, $mainImage->toString());
+        $disk = $this->disco();
+        $this->guardar($disk, $mainPath, $mainImage->toString());
 
         // Thumbnail: 400×400 px, recortado centrado
         $thumb = Image::decodePath($file->getRealPath())
@@ -35,7 +35,7 @@ class ImageService
             ->encode(new WebpEncoder(quality: 80));
 
         $thumbPath = "{$folder}/{$filename}_thumb.webp";
-        Storage::disk($disk)->put($thumbPath, $thumb->toString());
+        $this->guardar($disk, $thumbPath, $thumb->toString());
 
         return [
             'image_url'     => Storage::disk($disk)->url($mainPath),
@@ -61,8 +61,8 @@ class ImageService
 
         $path = "branding/{$tenantSlug}/favicon-" . Str::uuid()->toString() . ".{$ext}";
 
-        $disk = config('filesystems.default') === 'r2' ? 'r2' : 'public';
-        Storage::disk($disk)->put($path, file_get_contents($file->getRealPath()));
+        $disk = $this->disco();
+        $this->guardar($disk, $path, file_get_contents($file->getRealPath()));
 
         return Storage::disk($disk)->url($path);
     }
@@ -72,7 +72,7 @@ class ImageService
      */
     public function deleteProductImages(?string $imageUrl, ?string $thumbUrl): void
     {
-        $disk = config('filesystems.default') === 'r2' ? 'r2' : 'public';
+        $disk = $this->disco();
 
         foreach ([$imageUrl, $thumbUrl] as $url) {
             if ($url) {
@@ -84,6 +84,37 @@ class ImageService
                 }
                 Storage::disk($disk)->delete($relativePath);
             }
+        }
+    }
+
+    /**
+     * Disco donde viven las imagenes. Estaba repetido en cada metodo; con la
+     * guarda de TEC-10 el valor ya no puede ser una sorpresa en produccion,
+     * pero en local sigue cayendo al disco publico a proposito.
+     */
+    private function disco(): string
+    {
+        return config('filesystems.default') === 'r2' ? 'r2' : 'public';
+    }
+
+    /**
+     * TEC-10: escribir comprobando el resultado.
+     *
+     * El disco `r2` esta configurado con `'throw' => false` y `'report' => false`,
+     * asi que un `put()` que falla -credenciales mal, bucket que no existe, corte
+     * de red- devuelve `false` sin excepcion y sin dejar rastro en el log. Antes
+     * nadie miraba ese valor: se seguia adelante, se pedia la URL y se devolvia,
+     * y el producto acababa guardado con una `image_url` que apunta a un fichero
+     * que nunca se escribio. El fallo aparecia despues, como una imagen rota en
+     * el catalogo, sin nada que lo relacionase con la subida.
+     */
+    private function guardar(string $disk, string $path, string $contents): void
+    {
+        if (Storage::disk($disk)->put($path, $contents) === false) {
+            throw new \RuntimeException(
+                "No se pudo guardar la imagen en el disco '{$disk}' ({$path}). "
+                .'Revisa las credenciales y el bucket del almacenamiento.'
+            );
         }
     }
 }

@@ -58,6 +58,63 @@ class ConfigGuardsTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
+    | TEC-10 — almacenamiento de imagenes
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_en_produccion_no_se_arranca_guardando_en_disco_local(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        // app.debug a false a proposito: si no, salta antes la guarda de AUD-12
+        // y este test pasaria por el motivo equivocado.
+        config([
+            'filesystems.default' => 'local',
+            'filesystems.allow_local' => false,
+            'app.debug' => false,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/FILESYSTEM_DISK/');
+
+        (new \App\Providers\AppServiceProvider($this->app))->boot();
+    }
+
+    public function test_en_produccion_con_r2_arranca(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        config(['filesystems.default' => 'r2', 'app.debug' => false]);
+
+        (new \App\Providers\AppServiceProvider($this->app))->boot();
+
+        $this->assertSame('r2', config('filesystems.default'));
+    }
+
+    /** La salida para quien de verdad tiene disco persistente, como el `*` de AUD-13. */
+    public function test_la_salida_explicita_permite_el_disco_local_en_produccion(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        config([
+            'filesystems.default' => 'local',
+            'filesystems.allow_local' => true,
+            'app.debug' => false,
+        ]);
+
+        (new \App\Providers\AppServiceProvider($this->app))->boot();
+
+        $this->assertTrue(config('filesystems.allow_local'));
+    }
+
+    public function test_fuera_de_produccion_el_disco_local_no_estorba(): void
+    {
+        config(['filesystems.default' => 'local', 'filesystems.allow_local' => false]);
+
+        (new \App\Providers\AppServiceProvider($this->app))->boot();
+
+        $this->assertFalse($this->app->isProduction());
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | AUD-13 — cerca de IP del panel de plataforma
     |--------------------------------------------------------------------------
     */
