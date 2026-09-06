@@ -1,0 +1,340 @@
+/* Estilos de <ReviewsPage>. Ultimo resto de TEC-6: esta pantalla no tenia
+   <style> embebido sino todo en `style={{...}}` en linea, asi que no se veia
+   rota y se quedo fuera del barrido. El efecto era el mismo de fondo: los
+   colores no salian de la paleta y no habia forma de leer la pantalla de un
+   vistazo.
+
+   Van acotados a `.page-reviews`, que se anade en la raiz del componente, por
+   el mismo motivo que en las paginas hermanas: en un .css importado las reglas
+   son globales y siempre estan cargadas, y hay selectores definidos distinto en
+   varias paginas que sin acotar se pisarian entre ellas.
+
+   Es `:where()` y no `.page-reviews` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas compiten con index.css igual que las demas.
+   Ojo con la leccion de UI-5: si alguna de estas reglas apuntara a una clase de
+   un componente con CSS global, empataria con la suya y ganaria la que cargue
+   despues. Aqui todas las clases son de esta pantalla. */
+
+:where(.page-reviews).reviews-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-reviews) .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+:where(.page-reviews) .page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  font-family: var(--font-heading);
+}
+
+:where(.page-reviews) .page-description {
+  color: var(--text-muted);
+  margin: 0.25rem 0 0 0;
+  font-size: 0.9rem;
+}
+
+/* Filtros */
+
+:where(.page-reviews) .filters-bar {
+  padding: 1.25rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+:where(.page-reviews) .search-box {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+}
+
+:where(.page-reviews) .search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .search-input,
+:where(.page-reviews) .filter-select {
+  width: 100%;
+  padding: 0.6rem;
+  background: rgba(var(--overlay-mix), 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+:where(.page-reviews) .search-input {
+  padding-left: 2.25rem;
+}
+
+:where(.page-reviews) .filter-select {
+  cursor: pointer;
+}
+
+:where(.page-reviews) .filter-select option {
+  background: var(--bg-select-option);
+}
+
+:where(.page-reviews) .filter-estado { width: 160px; }
+:where(.page-reviews) .filter-rating { width: 150px; }
+
+/* Estados de carga y vacio */
+
+:where(.page-reviews) .state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .state-card p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+:where(.page-reviews) .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+/* Tabla */
+
+:where(.page-reviews) .table-card {
+  overflow: hidden;
+}
+
+:where(.page-reviews) .table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+:where(.page-reviews) .dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+:where(.page-reviews) .dashboard-table th,
+:where(.page-reviews) .dashboard-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-reviews) .dashboard-table th {
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .dashboard-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+:where(.page-reviews) .product-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+:where(.page-reviews) .product-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  background: rgba(var(--overlay-mix), 0.03);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex: none;
+}
+
+/* Mismo hueco que la miniatura para que la columna no baile cuando el producto
+   se quedo sin imagen o lo borraron. */
+:where(.page-reviews) .product-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .product-name {
+  font-weight: 500;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.page-reviews) .customer-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+:where(.page-reviews) .customer-name {
+  font-weight: 600;
+}
+
+:where(.page-reviews) .customer-email {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Las estrellas salen de --warning y no de un ambar fijo: el token ya tiene su
+   version clara y su version oscura, y un #fbbf24 quemado se leia mal sobre el
+   fondo blanco del panel en modo claro. */
+:where(.page-reviews) .rating-stars {
+  display: flex;
+  color: var(--warning);
+  gap: 0.1rem;
+}
+
+:where(.page-reviews) .comment-cell {
+  max-width: 300px;
+}
+
+:where(.page-reviews) .comment-cell p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.page-reviews) .comment-empty {
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .date-cell {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Acciones */
+
+:where(.page-reviews) .badge-btn {
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+:where(.page-reviews) .badge-btn.is-public {
+  background: var(--success-glow);
+  color: var(--success);
+}
+
+:where(.page-reviews) .badge-btn.is-hidden {
+  background: rgba(var(--overlay-mix), 0.06);
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .actions-header,
+:where(.page-reviews) .actions-cell {
+  text-align: right;
+}
+
+:where(.page-reviews) .action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+:where(.page-reviews) .btn-action {
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 0.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+:where(.page-reviews) .btn-action:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.page-reviews) .btn-action-danger {
+  background: var(--danger-glow);
+  border-color: var(--danger-glow);
+  color: var(--danger);
+}
+
+:where(.page-reviews) .btn-action-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-glow);
+}
+
+/* Paginacion */
+
+:where(.page-reviews) .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:where(.page-reviews) .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-reviews) .pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-reviews) .page-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-reviews) .page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-reviews) .page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  :where(.page-reviews) .filter-estado,
+  :where(.page-reviews) .filter-rating {
+    width: 100%;
+  }
+}
