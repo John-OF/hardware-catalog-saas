@@ -11,7 +11,13 @@
    especificidad: asi estas reglas siguen compitiendo con index.css
    exactamente igual que cuando estaban embebidas. */
 
-:where(.page-settings).settings-page { max-width: 820px; display: flex; flex-direction: column; gap: 1.5rem; }
+/* Sigue habiendo tope de ancho a proposito: un formulario estirado a todo un
+   monitor ancho es ilegible, porque la etiqueta y su campo acaban a medio
+   metro. Pero eran 820px SIN `margin-inline: auto`, asi que la columna se
+   quedaba pegada a la izquierda y dejaba media pantalla muerta a la derecha.
+   Centrada y a 1100px los campos de `.settings-grid` pasan de ~390px a ~530px,
+   que se sigue leyendo bien, y el hueco lateral se reparte. */
+:where(.page-settings).settings-page { max-width: 1100px; margin-inline: auto; display: flex; flex-direction: column; gap: 1.5rem; }
 :where(.page-settings) .settings-loading,
 :where(.page-settings).settings-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 4rem; color: var(--text-secondary); }
 :where(.page-settings) .settings-card { padding: 1.75rem; border-radius: var(--radius-lg); }
