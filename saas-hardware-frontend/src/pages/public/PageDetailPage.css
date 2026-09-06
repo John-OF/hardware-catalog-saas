@@ -19,7 +19,14 @@
   flex-direction: column;
   gap: 1.5rem;
   width: 100%;
+  /* #root ya es un flex column de min-height 100vh y este contenedor es su
+     hijo directo (la ruta solo interpone <Suspense><Outlet/>, que no pintan
+     nada), asi que con esto ocupa el alto libre de la ventana. Junto al
+     `margin-top: auto` del pie (StoreFooter.css) lo mantiene abajo aunque la
+     pagina traiga cuatro lineas de texto. */
+  flex: 1;
 }
+
 :where(.page-info) .catalog-header {
   display: flex;
   justify-content: space-between;
@@ -27,3 +34,17 @@
   padding: 1rem 2rem;
   border-radius: var(--radius-lg);
 }
+
+/* Los dos botones de la cabecera (volver al catalogo y contactar) se quedaban
+   pegados: .header-contact solo estaba definida dentro del ambito del catalogo
+   y del armador, no aqui. Mismo valor que usa el catalogo. */
+:where(.page-info) .header-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* El sobrante lo absorbe el `margin-top: auto` del pie (StoreFooter.css) y no
+   un `flex: 1` en el <main>: asi con una pagina de cuatro lineas la tarjeta
+   conserva su alto natural en vez de estirarse dejando un hueco enorme
+   dentro. */

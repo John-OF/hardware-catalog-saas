@@ -5,9 +5,20 @@
    estan prefijadas y no chocan con las de ninguna pagina (comprobado con
    el analisis de colisiones). */
 
+/* `margin-top: auto` y no una separacion fija: los dos contenedores que montan
+   este pie son flex column que ocupan el alto de la ventana, asi que el auto se
+   come el sobrante y el pie se queda abajo aunque la pagina traiga cuatro
+   lineas —una informativa corta, un catalogo sin resultados—. Con contenido
+   largo el sobrante es cero y el pie va detras del contenido, como siempre; la
+   separacion la sigue dando el `padding` de aqui abajo.
+
+   Va en el componente y no en cada pagina a proposito: puesto ahi empataba en
+   especificidad con esta misma regla (`:where()` no suma) y el desempate lo
+   decidia el orden de carga de los chunks, asi que salia bien en una pagina y
+   mal en la otra. */
 .catalog-footer {
   display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
-  padding: 3rem 0; margin-top: 3rem;
+  padding: 3rem 0; margin-top: auto;
   border-top: 1px solid var(--border);
   font-size: 0.85rem;
 }

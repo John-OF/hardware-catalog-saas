@@ -55,6 +55,12 @@
   flex-direction: column;
   gap: 1.5rem;
   width: 100%;
+  /* #root ya es un flex column de min-height 100vh y este contenedor es su
+     hijo directo, asi que con esto ocupa el alto libre de la ventana. Con el
+     `margin-top: auto` del pie, este no sube cuando hay poco que mostrar: una
+     tienda recien creada, una categoria con dos productos o una busqueda sin
+     resultados. */
+  flex: 1;
 }
 
 /* Header */
