@@ -14,6 +14,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { router } from './router';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import { sembrarTemaGuardado } from './utils/temaGuardado';
+
+// UI-2: la paleta de la tienda se aplicaba en un efecto, o sea despues de que
+// resolviera la peticion del tenant, asi que el primer frame salia con los
+// valores por defecto de :root -los oscuros- y saltaba al tema real al llegar
+// los datos. Aqui se aplica el de la ultima visita a esa tienda antes de montar
+// React, cuando lo hay. Va antes del render a proposito: en cuanto React pinta,
+// ya es tarde.
+sembrarTemaGuardado();
 
 // AUD-2: con el rate limit del catálogo público ya en el servidor, los
 // reintentos por defecto de react-query (3, con backoff) se vuelven un tiro en

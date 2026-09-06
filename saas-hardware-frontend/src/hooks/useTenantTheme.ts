@@ -1,77 +1,45 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import type { Tenant } from '../types';
-import { NEUTRAL_CLASSES, neutralClass } from '../utils/neutrals';
-import { SHAPE_CLASSES, shapeClasses } from '../utils/shape';
-import { loadGoogleFonts, resolveFonts } from '../utils/fonts';
-
-const FONT_LINK_ID = 'tenant-font';
+import { aplicarTema, limpiarTema, recordarTema } from '../utils/temaGuardado';
 
 /**
  * Aplica los estilos y colores dinámicos del tenant al documento.
  * Maneja la inyección de variables CSS, la tipografía y el modo claro/oscuro.
+ *
+ * El cómo vive en `utils/temaGuardado`, junto a la semilla que se aplica antes
+ * de montar React (UI-2): son la misma operación y separarlas fue justo lo que
+ * dejó a la página informativa sin la mitad de su tema en su día.
+ *
+ * `useLayoutEffect` y no `useEffect`: al navegar entre pantallas de la misma
+ * tienda el tenant ya está en la caché de react-query, así que el componente
+ * monta con los datos y con `useEffect` se colaba un frame con el tema
+ * anterior. No arregla la carga en frío —ahí lo que se espera es la red, y de
+ * eso se encarga la semilla—, pero sí el salto al navegar.
  */
 export function useTenantTheme(tenant?: Tenant | null) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!tenant) return;
 
-    const root = document.documentElement;
+    aplicarTema({
+      primary_color: tenant.primary_color,
+      accent_color: tenant.theme?.accent_color,
+      color_mode: tenant.theme?.color_mode,
+      neutral: tenant.theme?.neutral,
+      radius: tenant.theme?.radius,
+      card_style: tenant.theme?.card_style,
+      density: tenant.theme?.density,
+      font: tenant.theme?.font,
+      font_heading: tenant.theme?.font_heading,
+      font_body: tenant.theme?.font_body,
+    });
 
-    if (tenant.primary_color) {
-      root.style.setProperty('--primary', tenant.primary_color);
-      // Generar un glow rgb a partir de hexadecimal
-      const hex = tenant.primary_color.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      root.style.setProperty('--primary-glow', `rgba(${r}, ${g}, ${b}, 0.15)`);
-    }
+    // Para la próxima visita a esta tienda: con esto la semilla ya tiene de
+    // dónde tirar y el salto de color desaparece.
+    recordarTema(tenant);
 
-    if (tenant.theme?.accent_color) {
-      root.style.setProperty('--accent', tenant.theme.accent_color);
-    }
-
-    // Tipografía: se inyecta como variable para que la hereden TODAS las vistas
-    // públicas y, sobre todo, los encabezados (PERS-6). Desde 10.3 son dos
-    // familias independientes, así que la tienda puede llevar una display en
-    // los títulos y otra legible en el texto.
-    const fonts = resolveFonts(tenant.theme);
-    root.style.setProperty('--font-sans', fonts.body.stack);
-    root.style.setProperty('--font-heading', fonts.heading.stack);
-    loadGoogleFonts(FONT_LINK_ID, [fonts.heading.google, fonts.body.google]);
-
-    // Tono neutral (PERS-2) y modo claro/oscuro: los dos van como clase en el
-    // <body>, que es lo que abarca todo el viewport. La paleta estructural sale
-    // de la combinación de ambas (`.neutral-stone.light-mode`, etc.), así que
-    // tienen que aplicarse juntas y no por separado.
-    //
-    // Se hace con clases y no inyectando variables como el color o la fuente
-    // porque son 13 tokens por tono: en CSS quedan al lado de `:root` y
-    // `.light-mode`, que es donde alguien va a buscarlos.
-    document.body.classList.remove(...NEUTRAL_CLASSES);
-    document.body.classList.add(neutralClass(tenant.theme?.neutral));
-
-    const isLight = tenant.theme?.color_mode === 'light';
-    document.body.classList.toggle('light-mode', isLight);
-
-    // Forma (PERS-4): radio de bordes, estilo de tarjeta y densidad. Van por el
-    // mismo camino que el tono y por el mismo motivo, y son independientes
-    // entre si: cualquier combinacion de las tres es valida.
-    document.body.classList.remove(...SHAPE_CLASSES);
-    document.body.classList.add(...shapeClasses(tenant.theme));
-
-    return () => {
-      document.body.classList.remove('light-mode');
-      document.body.classList.remove(...NEUTRAL_CLASSES);
-      document.body.classList.remove(...SHAPE_CLASSES);
-      // Se devuelven las variables a los valores de index.css: si no, al pasar
-      // del catálogo público al panel el dashboard heredaría la fuente y el
-      // color de la última tienda visitada.
-      root.style.removeProperty('--font-sans');
-      root.style.removeProperty('--font-heading');
-      root.style.removeProperty('--primary');
-      root.style.removeProperty('--primary-glow');
-      root.style.removeProperty('--accent');
-      document.getElementById(FONT_LINK_ID)?.remove();
-    };
+    // Se devuelven las variables a los valores de index.css: si no, al pasar
+    // del catálogo público al panel el dashboard heredaría la fuente y el
+    // color de la última tienda visitada.
+    return limpiarTema;
   }, [tenant]);
 }
