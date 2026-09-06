@@ -31,6 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform.ip' => \App\Http\Middleware\RestrictPlatformIp::class,
         ]);
 
+        // TEC-9: withMiddleware() instala por defecto un redirect de invitados
+        // a la ruta con nombre `login`, que aqui no existe —el backend es solo
+        // API y la pantalla de acceso vive en el SPA—. Sin esto, cualquier ruta
+        // privada llamada sin token, o con uno caducado, respondia 500 con
+        // `Route [login] not defined` en vez de 401: el cliente no podia
+        // distinguir "no estas autenticado" de "el servidor se rompio", y algo
+        // tan corriente como una sesion vencida llenaba de 500 los logs justo
+        // donde luego hay que mirar. Con null, Authenticate lanza
+        // AuthenticationException y el handler la convierte en 401 (en JSON
+        // para `api/*`, por el shouldRenderJsonWhen de mas abajo).
+        $middleware->redirectGuestsTo(null);
+
         // El tenant debe resolverse ANTES de SubstituteBindings para que el
         // global scope de BelongsToTenant filtre el route-model binding y así
         // un recurso de otro tenant devuelva 404 (cierra el IDOR, SEC-2).
