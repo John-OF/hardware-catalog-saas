@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText,
@@ -11,6 +12,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { getPages, createPage, updatePage, deletePage } from '../../api/pages';
 import type { Page } from '../../types';
+import './PagesPage.css';
 
 export default function PagesPage() {
   const queryClient = useQueryClient();
@@ -137,7 +139,7 @@ export default function PagesPage() {
   };
 
   return (
-    <div className="dashboard-content animate-fade-in">
+    <div className="pages-page animate-fade-in page-pages">
       {/* Header section */}
       <div className="content-header">
         <div>
@@ -218,10 +220,15 @@ export default function PagesPage() {
         </div>
       )}
 
-      {/* Editor Modal Drawer */}
-      {isOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="drawer-container glass-card" onClick={(e) => e.stopPropagation()}>
+      {/* Editor Modal. Va por portal para escapar del contexto de apilamiento
+          que crea la animacion de .dashboard-content, que dejaba la topbar del
+          panel por encima. El destino es .dashboard-layout y no <body> porque
+          la paleta del panel (clara y oscura) se define en ese elemento, no en
+          :root: colgarlo del body lo sacaba del tema del admin y le metia los
+          colores por defecto, que son los de la tienda. */}
+      {isOpen && createPortal(
+        <div className="pages-modal-overlay" onClick={closeModal}>
+          <div className="pages-modal glass-card" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
               <h3>{editingPage ? 'Editar Página' : 'Nueva Página Informativa'}</h3>
               <button onClick={closeModal} className="drawer-close">
@@ -369,7 +376,8 @@ export default function PagesPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.querySelector('.dashboard-layout') ?? document.body
       )}
     </div>
   );

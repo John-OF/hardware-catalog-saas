@@ -1,0 +1,331 @@
+/* Estilos de <PagesPage>. La pagina se quedo sin hoja propia en TEC-6: usaba
+   clases (.dashboard-table, .table-container, .drawer-*, .btn-icon...) que solo
+   existen dentro del ambito de otras paginas, asi que aqui no aplicaba ninguna
+   y la tabla salia sin padding en las celdas.
+
+   Van acotados a `.page-pages`, que se anade en la raiz del componente, por el
+   mismo motivo que en las paginas hermanas: en un .css importado las reglas son
+   globales y siempre estan cargadas, y hay selectores (.modal-overlay,
+   .form-group, .spinner...) definidos distinto en varias paginas que sin acotar
+   se pisarian entre ellas.
+
+   Es `:where()` y no `.page-pages` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas compiten con index.css igual que las de las
+   demas paginas. */
+
+:where(.page-pages).pages-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-pages) .content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+:where(.page-pages) .content-header h2 {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+:where(.page-pages) .content-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  max-width: 600px;
+  margin-top: 0.35rem;
+}
+
+:where(.page-pages) .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 5rem 2rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-pages) .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 5rem 2rem;
+  gap: 1rem;
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+:where(.page-pages) .empty-icon {
+  color: var(--text-muted);
+}
+
+:where(.page-pages) .empty-state h3 {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+:where(.page-pages) .empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  max-width: 400px;
+}
+
+/* Tabla */
+
+:where(.page-pages) .table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  padding: 0.25rem;
+}
+
+:where(.page-pages) .dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+:where(.page-pages) .dashboard-table th,
+:where(.page-pages) .dashboard-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-pages) .dashboard-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+:where(.page-pages) .dashboard-table tr:last-child td {
+  border-bottom: none;
+}
+
+:where(.page-pages) .dashboard-table tbody tr:hover {
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+:where(.page-pages) .dashboard-table strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-pages) .slug-badge {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+}
+
+:where(.page-pages) .actions-cell {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+:where(.page-pages) .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-pages) .btn-icon:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.page-pages) .btn-icon.text-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-glow);
+}
+
+/* Modal de edicion.
+
+   Va acotado a `.pages-modal-overlay` y no a `.page-pages` porque el modal se
+   monta con un portal, asi que queda fuera del arbol de la pagina: un selector
+   descendente de .page-pages no lo alcanzaria. El portal hace falta porque
+   .dashboard-content lleva `animation: fadeIn ... forwards`, que crea un
+   contexto de apilamiento; dentro de el, el z-index del overlay solo compite
+   con sus hermanos y la topbar del panel (z-index 10) le quedaba encima.
+
+   El portal apunta a `.dashboard-layout`, no a <body>: la paleta del panel
+   —clara y oscura— se define en ese elemento (index.css, "ADMIN PANEL"), no en
+   :root, asi que colgarlo del body lo dejaba sin tema del admin. Por eso aqui
+   solo se usan tokens (--bg-*, --text-*, --border, --primary...): los heredan
+   del layout y siguen al modo claro/oscuro del panel, sin tocar nada de la
+   personalizacion de la tienda. */
+
+:where(.pages-modal-overlay) {
+  position: fixed;
+  inset: 0;
+  /* El velo es el mismo en claro y en oscuro a proposito: atenua lo que hay
+     detras, no es una superficie del tema. Mismo valor que el resto de modales
+     del panel. */
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+:where(.pages-modal-overlay) .pages-modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  overflow-y: auto;
+}
+
+:where(.pages-modal-overlay) .drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+:where(.pages-modal-overlay) .drawer-header h3 {
+  font-size: 1.35rem;
+  font-family: var(--font-heading);
+}
+
+:where(.pages-modal-overlay) .drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: var(--transition);
+}
+
+:where(.pages-modal-overlay) .drawer-close:hover {
+  color: var(--text-primary);
+}
+
+:where(.pages-modal-overlay) .drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.pages-modal-overlay) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:where(.pages-modal-overlay) .form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+:where(.pages-modal-overlay) .helper-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+:where(.pages-modal-overlay) .rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+:where(.pages-modal-overlay) .rich-toolbar button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.pages-modal-overlay) .rich-toolbar button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.pages-modal-overlay) .checkbox-group .switch-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+:where(.pages-modal-overlay) .switch-container input {
+  margin-top: 0.2rem;
+  cursor: pointer;
+}
+
+:where(.pages-modal-overlay) .switch-label {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+:where(.pages-modal-overlay) .drawer-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+:where(.pages-modal-overlay) .drawer-actions button {
+  flex: 1;
+  justify-content: center;
+}
+
+:where(.page-pages) .spinner,
+:where(.pages-modal-overlay) .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 768px) {
+  :where(.page-pages) .content-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  :where(.page-pages) .content-header button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  :where(.pages-modal-overlay) {
+    padding: 1rem;
+  }
+
+  :where(.pages-modal-overlay) .pages-modal {
+    padding: 1.5rem;
+    max-height: 95vh;
+  }
+}
