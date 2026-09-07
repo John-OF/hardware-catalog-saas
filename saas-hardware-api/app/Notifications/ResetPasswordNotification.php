@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Spatie\Multitenancy\Jobs\NotTenantAware;
 
 /**
  * Correo de recuperacion de contrasenia del panel (SAAS-2).
@@ -20,9 +21,29 @@ use Illuminate\Notifications\Notification;
  * formulario colgado. Solo lleva el token, un string: nada que restaurar en el
  * worker, asi que no le afecta que alli no haya tienda resuelta (AUD-4).
  *
+ * **`NotTenantAware` no es decorativo: sin el, este correo NO SE ENVIA NUNCA.**
+ * `config/multitenancy.php` trae `queues_are_tenant_aware_by_default => true`, asi
+ * que spatie exige que todo trabajo encolado lleve un `tenantId` en su payload y lo
+ * hace fallar si no lo tiene. Y esta notificacion sale de
+ * `POST /api/auth/forgot-password`, que **a proposito no lleva middleware de
+ * tenant**: quien la usa es justamente quien no puede entrar. Resultado: payload sin
+ * `tenantId` y el trabajo revienta en el worker.
+ *
+ * Lo grave era como fallaba. El trabajo se borraba **sin llegar a `failed_jobs`**: el
+ * dueno veia "te enviamos un correo", no le llegaba nada, y en la bandeja de fallidos
+ * no habia rastro; solo quedaba una linea de ERROR en el log. Se descubrio el
+ * 2026-09-07 al levantar por fin el worker —el pendiente de verificacion local de
+ * `mejoras_propuestas.md`— y no antes, porque con `QUEUE_CONNECTION=sync` el correo
+ * sale bien: sin cola no hay payload que rellenar. Fallaba solo en la configuracion
+ * de produccion.
+ *
+ * Que no sea tenant aware es ademas lo correcto de fondo: manda un enlace con un
+ * token a un usuario concreto y no consulta nada scopeado. `User` es justo el modelo
+ * que puede leerse sin tienda resuelta, y el porque esta escrito en el modelo.
+ *
  * Requiere un worker corriendo (`php artisan queue:work`); ver `.env.example`.
  */
-class ResetPasswordNotification extends Notification implements ShouldQueue
+class ResetPasswordNotification extends Notification implements ShouldQueue, NotTenantAware
 {
     use Queueable;
 
