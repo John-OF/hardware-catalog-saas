@@ -174,9 +174,17 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  /**
+   * Correlativo de la tienda (FUN-3). Es el identificador que se le enseña a la
+   * gente: el UUID no se puede dictar por teléfono. Cada tienda lleva su propia
+   * serie desde 1, así que NO es único en toda la plataforma — para eso está `id`.
+   */
+  number: number;
   customer_name: string;
   /** Opcional desde 7.5: una venta de mostrador puede no tener teléfono. */
   customer_phone: string | null;
+  /** Opcional (FUN-2): sin él no se le puede avisar por correo de nada. */
+  customer_email: string | null;
   customer_note: string | null;
   status: 'pending' | 'processing' | 'attended' | 'cancelled';
   total: number;

@@ -4,6 +4,8 @@ import type { Tenant, Product, PaginatedResponse, Order, Review } from '../types
 export interface CreateOrderPayload {
   customer_name: string;
   customer_phone: string;
+  /** Opcional (FUN-2): si lo deja, recibe confirmacion y avisos de estado. */
+  customer_email?: string;
   customer_note?: string;
   items: { product_id: string; quantity: number }[];
 }

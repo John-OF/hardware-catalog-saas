@@ -31,6 +31,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<'attended' | 'pending'>('attended');
   const [lines, setLines] = useState<Line[]>([]);
@@ -84,6 +85,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
       createOrder({
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim() || null,
+        customer_email: customerEmail.trim() || null,
         customer_note: note.trim() || null,
         status,
         items: lines.map((line) => ({ product_id: line.product.id, quantity: line.quantity })),
@@ -231,6 +233,23 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="Para avisarle por WhatsApp"
                   maxLength={30}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="order-email">Correo (opcional)</label>
+                {/*
+                  FUN-2: una venta de mostrador no manda correo de confirmacion
+                  —el cliente esta delante—, pero si se apunta aqui, el aviso de
+                  "ya esta listo" sale solo cuando el encargo cambie de estado.
+                */}
+                <input
+                  id="order-email"
+                  className="premium-input"
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="Para avisarle cuando este listo"
+                  maxLength={200}
                 />
               </div>
               <div className="form-group full">

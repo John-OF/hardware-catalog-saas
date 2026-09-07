@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class OrderController extends Controller
 {
@@ -27,12 +30,24 @@ class OrderController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Búsqueda por cliente
+        // Búsqueda por cliente o por número de pedido
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
+
+            // FUN-3: el número solo sirve si se puede buscar por él, que es lo
+            // que hace el dueño cuando el cliente le dice "mi pedido es el 1042".
+            // Se acepta con y sin almohadilla porque es como está escrito en el
+            // mensaje de WhatsApp que el propio cliente reenvía.
+            $numero = ltrim(trim($search), '#');
+            $esNumero = ctype_digit($numero) && $numero !== '';
+
+            $query->where(function ($q) use ($search, $numero, $esNumero) {
                 $q->where('customer_name', 'like', "%{$search}%")
                   ->orWhere('customer_phone', 'like', "%{$search}%");
+
+                if ($esNumero) {
+                    $q->orWhere('number', (int) $numero);
+                }
             });
         }
 
@@ -59,6 +74,12 @@ class OrderController extends Controller
             // Opcional, al revés que en el checkout público: en el mostrador el
             // cliente paga y se va, y a menudo no deja teléfono.
             'customer_phone' => 'nullable|string|max:30',
+            // FUN-2: también opcional aquí. La venta de mostrador NO manda correo
+            // de confirmación —el cliente estaba delante y ya se lleva lo suyo,
+            // así que un "recibimos tu pedido" sobra—, pero guardar el correo sirve
+            // para lo que viene después: un encargo que se deja pendiente avisa
+            // solo cuando pasa a listo.
+            'customer_email' => 'nullable|email|max:200',
             'customer_note'  => 'nullable|string|max:1000',
             // 'cancelled' no tiene sentido al crear.
             'status'              => 'required|string|in:pending,processing,attended',
@@ -80,6 +101,7 @@ class OrderController extends Controller
                 'tenant_id'      => $tenant->id,
                 'customer_name'  => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
+                'customer_email' => $data['customer_email'] ?? null,
                 'customer_note'  => $data['customer_note'] ?? null,
                 'status'         => $data['status'],
                 'total'          => $total,
@@ -137,6 +159,10 @@ class OrderController extends Controller
                     $this->applyStockDelta($order, decrement: false);
                 }
             });
+
+            // Fuera de la transacción a propósito: el cambio de estado ya está
+            // guardado y no puede deshacerse porque falle un correo.
+            $this->notifyCustomerOfStatusChange($order);
         }
 
         return response()->json($order->load('items'));
@@ -155,6 +181,49 @@ class OrderController extends Controller
         });
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Avisa al comprador de que su pedido cambió de estado (FUN-2).
+     *
+     * Tres condiciones, y ninguna es un detalle:
+     *
+     * 1. **Que haya dejado correo**, que es opcional en el checkout.
+     * 2. **Que el estado sea de los que se avisan.** Volver a "pendiente" es una
+     *    corrección interna del dueño; avisar de eso le diría al cliente que su
+     *    pedido, que ya estaba listo, vuelve a estar pendiente.
+     * 3. **Que el fallo no rompa nada.** El estado ya está guardado, así que un
+     *    mailer caído no puede devolverle un error al dueño ni hacerle creer que
+     *    el cambio no se aplicó. Mismo criterio que el aviso de pedido nuevo.
+     */
+    private function notifyCustomerOfStatusChange(Order $order): void
+    {
+        if (blank($order->customer_email)) {
+            return;
+        }
+
+        $avisable = OrderStatusChangedNotification::mensajePorEstado(
+            $order->status,
+            '#'.$order->number,
+            (string) ($order->tenant?->name ?? ''),
+            (string) $order->total,
+        );
+
+        if ($avisable === null) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $order->customer_email)
+                ->notify(new OrderStatusChangedNotification($order));
+        } catch (\Throwable $e) {
+            Log::error('No se pudo avisar al comprador del cambio de estado', [
+                'order_id'  => $order->id,
+                'tenant_id' => $order->tenant_id,
+                'estado'    => $order->status,
+                'error'     => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

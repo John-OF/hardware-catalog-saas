@@ -17,6 +17,7 @@ export const getOrders = async (params?: GetOrdersParams): Promise<PaginatedResp
 export interface CreateOrderPayload {
   customer_name: string;
   customer_phone?: string | null;
+  customer_email?: string | null;
   customer_note?: string | null;
   status: 'pending' | 'processing' | 'attended';
   items: { product_id: string; quantity: number }[];

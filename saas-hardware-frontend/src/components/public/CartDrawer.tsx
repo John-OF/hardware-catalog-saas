@@ -33,6 +33,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   // resuelve al leer, para no depender de un efecto que espere al tenant.
   const [countryCodeOverride, setCountryCodeOverride] = useState<string | null>(null);
   const countryCode = countryCodeOverride ?? deriveCountryCode(tenant?.whatsapp_number);
+  const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -46,10 +47,14 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         setCountryCodeOverride(parsed.code);
         setPhone(parsed.number);
       }
+      // FUN-2: quien tiene cuenta ya nos dio su correo al registrarse; pedirselo
+      // otra vez es friccion gratis. Sigue siendo editable por si quiere que la
+      // confirmacion le llegue a otra direccion.
+      if (user.email) setEmail(user.email);
     }
   }, [isCustomerAuthenticated, user, open]);
 
-  const buildWhatsappMessage = (orderId: string) => {
+  const buildWhatsappMessage = (orderNumber: number) => {
     const lines = items.map((i) => {
       const price = i.product.sale_price !== null && i.product.sale_price !== undefined
         ? Number(i.product.sale_price)
@@ -62,7 +67,9 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       `*Total: ${money(totalAmount)}*\n\n` +
       `Nombre: ${name}\n` +
       (note ? `Nota: ${note}\n` : '') +
-      `\n(Pedido #${orderId.slice(-8)})`
+      // FUN-3: el correlativo de la tienda. Antes iba un trozo del UUID, que ni
+      // el comprador podía leer en voz alta ni el dueño buscar en el panel.
+      `\n(Pedido #${orderNumber})`
     );
   };
 
@@ -76,11 +83,12 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       const order = await createPublicOrder(slug, {
         customer_name: name,
         customer_phone: submittedPhone,
+        customer_email: email.trim() || undefined,
         customer_note: note || undefined,
         items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
       });
 
-      const text = encodeURIComponent(buildWhatsappMessage(order.id));
+      const text = encodeURIComponent(buildWhatsappMessage(order.number));
       const cleanPhone = tenant.whatsapp_number.replace(/[^0-9]/g, '');
       window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
 
@@ -88,6 +96,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       clear();
       setName('');
       setPhone('');
+      setEmail('');
       setNote('');
       onClose();
     } catch (err: any) {
@@ -180,6 +189,22 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                   style={{ flex: 1, margin: 0 }}
                 />
               </div>
+              {/*
+                FUN-2: opcional a proposito. Obligarlo aseguraria que la
+                confirmacion llegue siempre, pero este es el unico paso donde de
+                verdad se pierden ventas. El texto de ayuda dice que se gana al
+                dejarlo, que es lo que hace que la gente lo escriba.
+              */}
+              <input
+                className="premium-input"
+                type="email"
+                placeholder="Tu correo (opcional)"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                maxLength={200}
+                autoComplete="email"
+              />
+              <p className="cart-field-hint">Si lo dejas, te enviamos la confirmacion y te avisamos cuando tu pedido este listo.</p>
               <textarea className="premium-input" placeholder="Nota (opcional): forma de entrega, dudas..." value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} />
               <button type="submit" className="btn-primary cart-submit" disabled={sending}>
                 {sending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}

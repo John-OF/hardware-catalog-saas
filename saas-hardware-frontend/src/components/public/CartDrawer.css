@@ -38,5 +38,8 @@
 .cart-total span { color: var(--text-secondary); font-size: 0.9rem; }
 .cart-total strong { color: var(--text-primary); font-size: 1.35rem; font-weight: 800; }
 .cart-checkout textarea.premium-input { resize: vertical; font-family: var(--font-sans); }
+/* Ayuda del correo opcional (FUN-2): va pegada a su campo, por eso el gap
+   de .cart-checkout se anula con el margen negativo. */
+.cart-field-hint { margin: -0.35rem 0 0; font-size: 0.75rem; line-height: 1.35; color: var(--text-muted); }
 .cart-submit { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.25rem; }
 .spin { animation: spin 0.8s linear infinite; }

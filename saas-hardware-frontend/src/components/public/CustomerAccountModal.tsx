@@ -386,7 +386,7 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pedido #{ord.id.substring(0, 8)}</span>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pedido #{ord.number}</span>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                   {new Date(ord.created_at!).toLocaleDateString()}
                                 </div>

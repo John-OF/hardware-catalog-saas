@@ -47,9 +47,11 @@ class NewOrderNotification extends Notification implements ShouldQueue
         $moneda = $order->tenant?->currency;
 
         $this->pedido = [
-            // Mismo identificador corto que muestra el panel (OrdersPage), para que
-            // el dueño pueda casar el correo con la fila de la tabla.
-            'referencia' => '#'.substr($order->id, -8),
+            // FUN-3: el correlativo de la tienda, que es el mismo que enseña el
+            // panel y el que el cliente lleva en su mensaje de WhatsApp. Antes era
+            // un trozo del UUID: casaba con la tabla del panel, pero no había forma
+            // de decirlo en voz alta ni de buscarlo.
+            'referencia' => '#'.$order->number,
             'cliente'    => $order->customer_name,
             'telefono'   => $order->customer_phone,
             'nota'       => $order->customer_note,

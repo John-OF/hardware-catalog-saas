@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
+use App\Notifications\OrderPlacedNotification;
 use App\Services\OrderPricing;
 use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
@@ -740,6 +741,10 @@ class PublicCatalogController extends Controller
         $data = $request->validate([
             'customer_name'      => 'required|string|max:200',
             'customer_phone'     => 'required|string|max:30',
+            // FUN-2: opcional. Obligarlo garantizaría la confirmación pero añade
+            // fricción en el único paso donde se pierden ventas; quien lo deja
+            // recibe correo y quien no, se queda como estaba.
+            'customer_email'     => 'nullable|email|max:200',
             'customer_note'      => 'nullable|string|max:1000',
             'items'              => 'required|array|min:1|max:100',
             'items.*.product_id' => 'required|uuid',
@@ -759,6 +764,7 @@ class PublicCatalogController extends Controller
                 'user_id'        => $userId,
                 'customer_name'  => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'],
+                'customer_email' => $data['customer_email'] ?? null,
                 'customer_note'  => $data['customer_note'] ?? null,
                 'status'         => 'pending',
                 'total'          => $total,
@@ -772,6 +778,7 @@ class PublicCatalogController extends Controller
         $order->load('items');
 
         $this->notifyOwnerOfNewOrder($tenant, $order);
+        $this->notifyCustomerOfNewOrder($order);
 
         return response()->json($order, 201);
     }
@@ -801,6 +808,34 @@ class PublicCatalogController extends Controller
             Log::error('No se pudo avisar del pedido nuevo', [
                 'order_id'  => $order->id,
                 'tenant_id' => $tenant->id,
+                'error'     => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Confirmar al comprador que su pedido entro (FUN-2).
+     *
+     * `routes('mail')` y no `Notification::send($user)`: el checkout no exige
+     * cuenta, asi que el caso normal es que no haya ningun `User` detras de este
+     * correo. Se envia a la direccion que dejo, exista o no cuenta de cliente.
+     *
+     * Mismo criterio que el aviso al dueno: fuera de la transaccion y con el
+     * fallo tragado. El pedido ya esta guardado y no depende de este correo.
+     */
+    private function notifyCustomerOfNewOrder(Order $order): void
+    {
+        if (blank($order->customer_email)) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $order->customer_email)
+                ->notify(new OrderPlacedNotification($order));
+        } catch (\Throwable $e) {
+            Log::error('No se pudo confirmar el pedido al comprador', [
+                'order_id'  => $order->id,
+                'tenant_id' => $order->tenant_id,
                 'error'     => $e->getMessage(),
             ]);
         }

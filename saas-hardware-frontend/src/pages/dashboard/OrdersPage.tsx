@@ -110,19 +110,24 @@ export default function OrdersPage() {
       ? order.items.map(item => `${item.quantity}x ${item.product_name}`).join(', ')
       : 'productos';
     
+    // FUN-3: el número va en todos los mensajes porque es el que el cliente ya
+    // tiene —se lo llevó en el mensaje de WhatsApp al pedir— y el que el dueño
+    // puede buscar en esta misma pantalla cuando el cliente lo repita.
+    const ref = `#${order.number}`;
+
     if (type === 'general') {
-      return `Hola ${order.customer_name}, te contacto de la tienda ${tenantName} por tu pedido de: ${itemsDescription}.`;
+      return `Hola ${order.customer_name}, te contacto de la tienda ${tenantName} por tu pedido ${ref} (${itemsDescription}).`;
     }
 
     switch (order.status) {
       case 'processing':
-        return `Hola ${order.customer_name}, tu pedido de: ${itemsDescription} ya se encuentra en preparación en ${tenantName}. Te avisaremos apenas esté listo.`;
+        return `Hola ${order.customer_name}, tu pedido ${ref} (${itemsDescription}) ya se encuentra en preparación en ${tenantName}. Te avisaremos apenas esté listo.`;
       case 'attended':
-        return `¡Hola ${order.customer_name}! Tu pedido de: ${itemsDescription} por un total de ${totalFormatted} ya está listo en ${tenantName} para ser retirado o entregado. ¡Muchas gracias por tu compra!`;
+        return `¡Hola ${order.customer_name}! Tu pedido ${ref} (${itemsDescription}) por un total de ${totalFormatted} ya está listo en ${tenantName} para ser retirado o entregado. ¡Muchas gracias por tu compra!`;
       case 'cancelled':
-        return `Hola ${order.customer_name}, tu pedido de: ${itemsDescription} ha sido cancelado en ${tenantName}. Si tienes alguna duda o consulta, por favor escríbenos por aquí.`;
+        return `Hola ${order.customer_name}, tu pedido ${ref} (${itemsDescription}) ha sido cancelado en ${tenantName}. Si tienes alguna duda o consulta, por favor escríbenos por aquí.`;
       default:
-        return `Hola ${order.customer_name}, hemos recibido tu pedido de: ${itemsDescription} en ${tenantName} por un total de ${totalFormatted}. Pronto iniciaremos su preparación.`;
+        return `Hola ${order.customer_name}, hemos recibido tu pedido ${ref} (${itemsDescription}) en ${tenantName} por un total de ${totalFormatted}. Pronto iniciaremos su preparación.`;
     }
   };
 
@@ -165,7 +170,7 @@ export default function OrdersPage() {
           <input
             type="text"
             className="premium-input search-input"
-            placeholder="Buscar por cliente o teléfono..."
+            placeholder="Buscar por número, cliente o teléfono..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -220,7 +225,7 @@ export default function OrdersPage() {
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id}>
-                  <td className="code-cell">#{order.id.slice(-8)}</td>
+                  <td className="code-cell">#{order.number}</td>
                   <td className="name-cell">{order.customer_name}</td>
                   <td className="phone-cell">{order.customer_phone || <span className="muted-cell">Mostrador</span>}</td>
                   <td className="date-cell">
@@ -335,7 +340,7 @@ export default function OrdersPage() {
           <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
               <div>
-                <h3>Detalle del Pedido #{selectedOrder.id.slice(-8)}</h3>
+                <h3>Detalle del Pedido #{selectedOrder.number}</h3>
                 <span className={`badge ${getStatusBadgeClass(selectedOrder.status)}`}>
                   {getStatusText(selectedOrder.status)}
                 </span>
@@ -372,6 +377,17 @@ export default function OrdersPage() {
                         </>
                       )}
                     </div>
+                  </div>
+                  <div>
+                    <label>Correo:</label>
+                    {/*
+                      FUN-2: se dice tambien cuando NO hay, porque cambia lo que
+                      pasa al mover el estado: con correo el aviso sale solo, sin
+                      correo hay que escribir por WhatsApp.
+                    */}
+                    <p>
+                      {selectedOrder.customer_email || <span className="muted-cell">Sin correo (no recibe avisos)</span>}
+                    </p>
                   </div>
                   <div>
                     <label>Fecha de Pedido:</label>
