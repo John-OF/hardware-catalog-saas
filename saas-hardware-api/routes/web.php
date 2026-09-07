@@ -91,7 +91,14 @@ Route::get('/{slug}/product/{productId}', function ($slug, $productId) {
 });
 
 // Ruta para página informativa (Open Graph Crawler Check)
-Route::get('/{slug}/page/{pageSlug}', function ($slug, $pageSlug) {
+//
+// FUN-7: el path es `/p/` y no `/page/` porque tiene que ser EL MISMO que la
+// aplicación pone en el enlace (`StoreFooter.tsx`, buildPath(`/p/${slug}`)); si
+// no coinciden, esta ruta no la pide nadie y compartir una página informativa se
+// queda sin vista previa. Estuvo así desde que se añadió el Open Graph y no se
+// notó porque el test la pedía por el path equivocado, el mismo que registraba
+// esta línea. Al tocar la URL pública de una página hay que cambiar las dos.
+Route::get('/{slug}/p/{pageSlug}', function ($slug, $pageSlug) {
     if (isCrawler()) {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
         if (!$tenant) {
@@ -121,7 +128,10 @@ Route::get('/{slug}/page/{pageSlug}', function ($slug, $pageSlug) {
 });
 
 // Ruta para armador de PC (Open Graph Crawler Check)
-Route::get('/{slug}/pc-builder', function ($slug) {
+//
+// FUN-7, mismo caso que la de arriba: la aplicación enlaza `/builder`
+// (`CatalogPage.tsx`, getPublicPath('/builder')), no `/pc-builder`.
+Route::get('/{slug}/builder', function ($slug) {
     if (isCrawler()) {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
         if (!$tenant) {

@@ -88,9 +88,17 @@ class SeoCrawlerTest extends TestCase
         $page->tenant_id = $this->tenant->id;
         $page->save();
 
+        // FUN-7: los paths de estos tests son los que la aplicación pone en el
+        // enlace, no los que a uno le salen de escribir. Antes se pedía
+        // `/page/quienes-somos` y `/pc-builder`, que era justo lo que registraba
+        // `web.php`: el test pasaba en verde mientras compartir una página o el
+        // armador no daba vista previa a nadie, porque la aplicación enlaza `/p/`
+        // (StoreFooter.tsx) y `/builder` (CatalogPage.tsx). Un test que copia el
+        // error del código no es una red. Al mover una URL pública hay que
+        // cambiar las tres: router del frontend, `web.php` y esto.
         $response = $this->withHeaders([
             'User-Agent' => 'googlebot'
-        ])->get("/tiendademo/page/quienes-somos");
+        ])->get("/tiendademo/p/quienes-somos");
 
         $response->assertStatus(200);
         $response->assertViewIs('catalog_og');
@@ -103,7 +111,7 @@ class SeoCrawlerTest extends TestCase
     {
         $response = $this->withHeaders([
             'User-Agent' => 'discordbot'
-        ])->get('/tiendademo/pc-builder');
+        ])->get('/tiendademo/builder');
 
         $response->assertStatus(200);
         $response->assertViewIs('catalog_og');
@@ -114,10 +122,10 @@ class SeoCrawlerTest extends TestCase
 
     public function test_non_crawler_is_redirected_to_spa(): void
     {
-        $response = $this->get('/tiendademo/pc-builder');
+        $response = $this->get('/tiendademo/builder');
 
         $response->assertStatus(302);
-        // Debe redirigir al frontend URL (por defecto http://localhost:5173/tiendademo/pc-builder)
-        $response->assertRedirect('http://localhost:5173/tiendademo/pc-builder');
+        // Debe redirigir al frontend URL (por defecto http://localhost:5173/tiendademo/builder)
+        $response->assertRedirect('http://localhost:5173/tiendademo/builder');
     }
 }
