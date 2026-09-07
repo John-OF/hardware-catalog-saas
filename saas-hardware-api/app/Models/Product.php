@@ -61,28 +61,35 @@ class Product extends Model
     }
 
     /**
-     * Notifica a los clientes en lista de espera que el producto volvió a estar disponible
-     * y marca sus avisos como enviados. Sin infraestructura de correo (fase 7), el envío se
-     * simula por log; al cablear el mailer bastará con reemplazar el bloque de Log por el envío real.
+     * Avisa a los clientes en lista de espera de que el producto volvió a estar disponible.
+     *
+     * **FUN-1a (2026-09-07): todavía no envía nada, y justo por eso ya no marca
+     * `notified_at`.** Antes lo marcaba: escribía un log "simulado" y daba por avisada
+     * a toda la lista. El aviso no es que no se enviara — es que se CONSUMÍA: cada
+     * reposición dejaba las filas fuera de lo pendiente sin que a nadie le llegara
+     * nada, así que al cablear el envío de verdad (FUN-1b, paso 3 de
+     * `docs/pendientes.md`) esa gente ya no lo habría recibido nunca. Dejarlas
+     * pendientes es lo que hace que el arreglo futuro las alcance.
+     *
+     * El log se conserva porque mientras tanto es lo único que dice cuánta gente
+     * está esperando; el disparador (`booted`) sigue igual.
+     *
+     * **Al cablear el envío (FUN-1b):** encolar la notificación y marcar `notified_at`
+     * SOLO después de encolar, nunca antes. Y hay que decidir el canal primero:
+     * `customer_contact` es un campo libre que admite teléfono o correo indistintamente.
      */
     public function notifyStockSubscribers(): int
     {
         $pending = $this->stockNotifications()->whereNull('notified_at')->get();
 
         foreach ($pending as $subscription) {
-            \Illuminate\Support\Facades\Log::info('Aviso de reposición de stock (simulado)', [
+            \Illuminate\Support\Facades\Log::info('Reposición de stock: aviso pendiente de enviar', [
                 'tenant_id'   => $this->tenant_id,
                 'product_id'  => $this->id,
                 'product'     => $this->name,
                 'to_name'     => $subscription->customer_name,
                 'to_contact'  => $subscription->customer_contact,
             ]);
-        }
-
-        if ($pending->isNotEmpty()) {
-            $this->stockNotifications()
-                ->whereNull('notified_at')
-                ->update(['notified_at' => now()]);
         }
 
         return $pending->count();

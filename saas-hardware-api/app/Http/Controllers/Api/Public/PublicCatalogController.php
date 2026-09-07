@@ -662,7 +662,11 @@ class PublicCatalogController extends Controller
 
     /**
      * "Avísame cuando llegue": el cliente deja su contacto para un producto agotado.
-     * Al reponer stock, el modelo Product notifica a los interesados.
+     *
+     * OJO (FUN-1a): al reponer stock **todavía no se avisa a nadie**. El disparador
+     * existe y el interés se registra, pero `Product::notifyStockSubscribers()` sólo
+     * deja rastro en el log; el envío es FUN-1b. Este comentario decía lo contrario
+     * y describía algo que nunca ocurrió.
      */
     public function storeStockNotification(Request $request, string $slug, string $productId): JsonResponse
     {
