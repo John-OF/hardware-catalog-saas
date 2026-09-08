@@ -27,6 +27,17 @@ export const resetPassword = async (data: {
   return response.data;
 };
 
+/**
+ * Reenvia el correo de verificacion del alta (FUN-5).
+ *
+ * No lleva parametros a proposito: el backend solo reenvia a la direccion del
+ * usuario autenticado, asi que no hay ningun correo que pasarle.
+ */
+export const resendVerificationEmail = async (): Promise<{ message: string; verified: boolean }> => {
+  const response = await api.post<{ message: string; verified: boolean }>('/auth/email/resend');
+  return response.data;
+};
+
 export const logoutUser = async (): Promise<void> => {
   await api.post('/auth/logout');
 };

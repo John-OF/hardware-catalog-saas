@@ -1,7 +1,7 @@
 import './LoginPage.css';
 
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
 import { loginUser } from '../../api/auth';
@@ -14,6 +14,8 @@ export default function LoginPage() {
   const setTenant = useTenantStore((s) => s.setTenant);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +27,34 @@ export default function LoginPage() {
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  /**
+   * Resultado de la verificación del correo (FUN-5).
+   *
+   * Aterriza aquí porque el enlace lo abre la API —es ella quien comprueba la
+   * firma— y luego redirige al panel con este parámetro. Se avisa con un toast y
+   * no con un cartel en la página a propósito: el efecto de arriba puede mandar
+   * al dueño directo al dashboard si ya tenía sesión abierta en este navegador,
+   * y el toast vive en la raíz de la app, así que sobrevive al salto.
+   *
+   * El parámetro se borra de la URL después de leerlo para que un refresco no
+   * repita el mensaje.
+   */
+  useEffect(() => {
+    const resultado = searchParams.get('verificacion');
+    if (!resultado) return;
+
+    if (resultado === 'ok') {
+      toast.success('¡Correo confirmado! Tu tienda ya es pública.');
+    } else if (resultado === 'caducada') {
+      toast.error('Ese enlace ya caducó. Entra al panel y pide uno nuevo.');
+    } else {
+      toast.error('No pudimos confirmar el correo con ese enlace. Pide uno nuevo desde el panel.');
+    }
+
+    searchParams.delete('verificacion');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

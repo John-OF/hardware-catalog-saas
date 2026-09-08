@@ -1,0 +1,82 @@
+/* Estilos de <VerifyEmailBanner> (FUN-5).
+
+   Sin acotar con `:where(.page-x)`: es un componente, no una pantalla, y se monta
+   encima de cualquier página del panel (TEC-6). Sus clases van todas prefijadas
+   con `verify-email-banner`, así que no compiten con ninguna hoja de página.
+
+   UI-5: por eso mismo, si alguna página necesitara retocarlo, la regla iría en
+   ESTE fichero y no en la de la página — `:where(.page-x) .verify-email-banner`
+   empata en especificidad con lo de aquí y el desempate lo decidiría el orden de
+   carga de los chunks. */
+
+.verify-email-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--warning);
+  border-radius: 12px;
+  background: var(--warning-glow);
+}
+
+.verify-email-banner-icon {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
+.verify-email-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.verify-email-banner-text strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.verify-email-banner-text span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.verify-email-banner-text b {
+  color: var(--text-primary);
+  /* El correo puede ser largo y aquí no hay sitio para que rompa el ancho de la
+     página; que corte por donde pueda. */
+  word-break: break-word;
+}
+
+.verify-email-banner-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.verify-email-banner-spin {
+  animation: verify-email-banner-rotate 1s linear infinite;
+}
+
+@keyframes verify-email-banner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .verify-email-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .verify-email-banner-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -128,4 +128,25 @@ return [
 
     'password_uncompromised' => env('PASSWORD_UNCOMPROMISED', true),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Verificacion del correo del alta (FUN-5)
+    |--------------------------------------------------------------------------
+    |
+    | Minutos que vive el enlace firmado que se manda al registrar una tienda.
+    |
+    | Es mucho mas largo que el de recuperacion (60 min) a proposito, y no por
+    | descuido: son dos cosas distintas. El de recuperacion es una llave viva a
+    | la cuenta —quien lo tenga entra— y por eso dura poco. Este solo confirma
+    | que una direccion existe; detras ya hay una contrasenia que el enlace no
+    | cambia ni saltea. Lo que si hace un plazo corto aqui es fastidiar al dueno
+    | que se registra de noche y abre el correo por la maniana, y encima con su
+    | catalogo sin publicar mientras tanto.
+    |
+    */
+
+    'verification' => [
+        'expire' => env('AUTH_VERIFICATION_EXPIRE', 1440),
+    ],
+
 ];

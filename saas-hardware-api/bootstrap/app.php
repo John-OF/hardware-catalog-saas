@@ -63,4 +63,27 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // FUN-5: el enlace de verificacion caducado tiene que acabar en una
+        // pantalla, no en un JSON.
+        //
+        // Es el mismo desajuste que TEC-9, por el otro lado: el backend es solo
+        // API y la linea de arriba convierte en JSON todo lo que cuelgue de
+        // `api/*`, que es lo correcto para el SPA. Pero esta ruta concreta la abre
+        // una PERSONA desde su cliente de correo, asi que un enlace de hace dos
+        // dias le mostraria `{"message":"Invalid signature."}` a pantalla completa
+        // y ahi se acaba el alta de la tienda.
+        //
+        // Va atado al NOMBRE de la ruta y no a la excepcion a secas para no
+        // cambiarle la respuesta a ninguna ruta firmada futura sin querer.
+        $exceptions->render(function (
+            \Illuminate\Routing\Exceptions\InvalidSignatureException $e,
+            Request $request,
+        ) {
+            if ($request->route()?->getName() !== 'verificacion.correo') {
+                return null;
+            }
+
+            return redirect(rtrim((string) config('app.frontend_url'), '/').'/login?verificacion=caducada');
+        });
     })->create();

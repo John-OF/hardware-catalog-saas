@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -9,7 +10,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Concerns\BelongsToTenant;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable, HasUuids, BelongsToTenant;
 
@@ -66,6 +67,27 @@ class User extends Authenticatable
     public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
     {
         $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
+
+    /**
+     * Enviar el correo de verificacion del alta (FUN-5).
+     *
+     * Mismo motivo que arriba para no usar la nativa de Laravel, y ademas la suya
+     * no es `NotTenantAware`, que aqui es literalmente la diferencia entre enviar
+     * y no enviar; el porque esta escrito en la notificacion.
+     *
+     * **`MustVerifyEmail` esta en la clase, pero solo se le envia a los admins.**
+     * `users` guarda tambien a los clientes de cada tienda, que se registran en el
+     * catalogo publico (`PublicAuthController`) para guardar favoritos y ver sus
+     * pedidos; a esos no se les pide verificar nada, porque el correo no les abre
+     * ninguna puerta y la friccion se pagaria en ventas. El contrato no los afecta
+     * por si solo: nadie dispara el evento `Registered` en este proyecto, asi que
+     * el listener automatico de Laravel no llega a correr nunca y el unico envio
+     * es la llamada explicita de `AuthController::register`.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new \App\Notifications\VerifyEmailNotification());
     }
 
     public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany

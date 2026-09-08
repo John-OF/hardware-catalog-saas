@@ -31,6 +31,11 @@ class UserResource extends JsonResource
             // El panel los usa para decidir qué mostrar.
             'role'      => $this->role,
             'is_active' => $this->is_active,
+            // FUN-5: el booleano, no la fecha. Al panel solo le hace falta saber
+            // si enseña el aviso de "confirma tu correo"; `email_verified_at` es
+            // un dato interno y publicarlo sería volver a la fuga que este
+            // recurso vino a cerrar.
+            'email_verified' => $this->hasVerifiedEmail(),
         ];
     }
 }

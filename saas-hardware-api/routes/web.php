@@ -45,10 +45,17 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// FUN-5: las cuatro rutas de crawler resuelven la tienda con `Tenant::publica()`,
+// que es "activa Y publicada". Antes ponian `where('is_active', true)` a mano, y
+// con la verificacion del correo esa condicion pasa a ser dos: si aqui se hubiera
+// quedado la mitad, una tienda sin verificar seguiria generando vista previa al
+// compartirla en WhatsApp mientras su catalogo devuelve 404. La regla vive entera
+// en el scope del modelo justamente para que no se pueda copiar a medias.
+
 // Ruta para producto (Open Graph Crawler Check)
 Route::get('/{slug}/product/{productId}', function ($slug, $productId) {
     if (isCrawler()) {
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        $tenant = Tenant::publica()->where('slug', $slug)->first();
         if (!$tenant) {
             abort(404);
         }
@@ -100,7 +107,7 @@ Route::get('/{slug}/product/{productId}', function ($slug, $productId) {
 // esta línea. Al tocar la URL pública de una página hay que cambiar las dos.
 Route::get('/{slug}/p/{pageSlug}', function ($slug, $pageSlug) {
     if (isCrawler()) {
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        $tenant = Tenant::publica()->where('slug', $slug)->first();
         if (!$tenant) {
             abort(404);
         }
@@ -133,7 +140,7 @@ Route::get('/{slug}/p/{pageSlug}', function ($slug, $pageSlug) {
 // (`CatalogPage.tsx`, getPublicPath('/builder')), no `/pc-builder`.
 Route::get('/{slug}/builder', function ($slug) {
     if (isCrawler()) {
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        $tenant = Tenant::publica()->where('slug', $slug)->first();
         if (!$tenant) {
             abort(404);
         }
@@ -152,7 +159,7 @@ Route::get('/{slug}/builder', function ($slug) {
 // Ruta para catálogo de tienda (Open Graph Crawler Check)
 Route::get('/{slug}', function ($slug) {
     if (isCrawler()) {
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        $tenant = Tenant::publica()->where('slug', $slug)->first();
         if (!$tenant) {
             abort(404);
         }

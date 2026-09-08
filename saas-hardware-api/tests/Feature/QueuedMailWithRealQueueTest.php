@@ -37,6 +37,9 @@ use Tests\TestCase;
  *    arregle el punto 1 marcandolo todo como `NotTenantAware`.
  * 3. Un correo disparado desde un HOOK DEL MODELO y no desde el controlador (el
  *    aviso de reposicion, FUN-1b), que es el tercer camino por el que se encola.
+ * 4. El correo de verificacion del alta (FUN-5), que es el otro sin tienda
+ *    resuelta y ademas el que se manda en el momento exacto en que la tienda
+ *    acaba de nacer.
  *
  * Al anadir un correo nuevo, anadir aqui su caso: la suite normal no lo cubre.
  */
@@ -164,6 +167,42 @@ class QueuedMailWithRealQueueTest extends TestCase
         $mensajes = $this->correosEnviados();
         $this->assertCount(1, $mensajes);
         $this->assertStringContainsString('Ya llego', $mensajes[0]->getOriginalMessage()->getSubject());
+    }
+
+    public function test_el_correo_de_verificacion_del_alta_sale_por_la_cola(): void
+    {
+        // FUN-5 es el cuarto camino, y el que mas se parece al que fallaba: sale
+        // de `POST /api/auth/register`, que NO lleva middleware de tenant. La
+        // tienda se crea dentro de ese mismo metodo, pero nadie la hace
+        // `current()`, asi que el payload del trabajo va sin `tenantId` — el
+        // escenario exacto que dejo la recuperacion de contrasenia sin enviar
+        // durante meses. Si alguien quita el `NotTenantAware` de la notificacion,
+        // este test es lo unico que lo cazaria: con `sync` el correo sale igual.
+        $this->postJson('/api/auth/register', [
+            'store_name'            => 'Tienda Recien Nacida',
+            'slug'                  => 'tienda-recien-nacida',
+            'whatsapp'              => '51777666555',
+            'name'                  => 'Duenia',
+            'email'                 => 'duenia@tienda-recien-nacida.com',
+            'password'              => 'Contrasenia-larga-1',
+            'password_confirmation' => 'Contrasenia-larga-1',
+        ])->assertCreated();
+
+        $this->assertSame(1, DB::table('jobs')->count(), 'El correo de verificacion no llego a la cola.');
+
+        $this->trabajarLaCola();
+
+        $this->assertSame(0, DB::table('jobs')->count());
+        $this->assertSame(0, DB::table('failed_jobs')->count(), 'El correo de verificacion fallo en el worker.');
+
+        $mensajes = $this->correosEnviados();
+
+        $this->assertCount(1, $mensajes, 'El worker no envio el correo de verificacion.');
+        $this->assertStringContainsString(
+            'duenia@tienda-recien-nacida.com',
+            $mensajes[0]->getEnvelope()->getRecipients()[0]->getAddress(),
+        );
+        $this->assertSame('Confirma tu correo y publica tu tienda', $mensajes[0]->getOriginalMessage()->getSubject());
     }
 
     /**

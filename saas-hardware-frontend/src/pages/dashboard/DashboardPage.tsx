@@ -23,6 +23,7 @@ import {
   Moon
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
+import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
@@ -50,6 +51,10 @@ export default function DashboardPage() {
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+
+  // `=== false` y no `!user?.email_verified`: mientras getMe() no ha respondido
+  // el campo vale undefined, y ahi el boton todavia no debe apagarse.
+  const esperandoVerificacion = user?.email_verified === false;
 
   useEffect(() => {
     // Si no hay token, redirigir al login
@@ -267,21 +272,40 @@ export default function DashboardPage() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             {tenant?.slug && (
-              <a 
-                href={`/${tenant.slug}`} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="btn-secondary storefront-btn"
-              >
-                <ExternalLink size={16} />
-                <span>Ver Tienda Pública</span>
-              </a>
+              /* FUN-5: sin verificar el correo el catalogo publico responde 404,
+                 asi que este boton llevaria a una pantalla de "tienda no
+                 encontrada" sobre la tienda de uno mismo. Se deshabilita en vez
+                 de esconderse: que siga ahi, apagado y con su motivo, dice mas
+                 que si desapareciera. El aviso de arriba explica el resto. */
+              esperandoVerificacion ? (
+                <span
+                  className="btn-secondary storefront-btn is-disabled"
+                  aria-disabled="true"
+                  title="Tu tienda no es publica hasta que confirmes tu correo."
+                >
+                  <ExternalLink size={16} />
+                  <span>Ver Tienda Pública</span>
+                </span>
+              ) : (
+                <a
+                  href={`/${tenant.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary storefront-btn"
+                >
+                  <ExternalLink size={16} />
+                  <span>Ver Tienda Pública</span>
+                </a>
+              )
             )}
           </div>
         </header>
 
         {/* Pagina Interna */}
         <main className="dashboard-content animate-fade-in">
+          {/* FUN-5: encima del Outlet y no dentro de una pantalla concreta, para
+              que el aviso salga se este donde se este dentro del panel. */}
+          <VerifyEmailBanner />
           <Outlet />
         </main>
       </div>

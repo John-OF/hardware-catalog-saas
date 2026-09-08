@@ -250,6 +250,17 @@
   border-radius: var(--radius-md);
 }
 
+/* FUN-5: el mismo boton apagado mientras la tienda no esta publicada. Es un
+   <span>, no un <a>, asi que basta con quitarle el puntero y bajarle el tono;
+   no hay navegacion que bloquear. */
+:where(.page-dashboard) .storefront-btn.is-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 :where(.page-dashboard) .theme-toggle-btn {
   display: flex;
   align-items: center;

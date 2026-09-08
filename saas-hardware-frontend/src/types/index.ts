@@ -110,6 +110,14 @@ export interface User {
   phone?: string;
   role: 'admin' | 'staff' | 'customer' | 'superadmin';
   is_active: boolean;
+  /**
+   * FUN-5. El backend manda el booleano, no la fecha: al panel solo le hace
+   * falta saber si ensena el aviso de "confirma tu correo".
+   *
+   * Opcional porque el mismo tipo lo usa el cliente del catalogo publico, al
+   * que no se le pide verificar nada.
+   */
+  email_verified?: boolean;
 }
 
 export interface Category {

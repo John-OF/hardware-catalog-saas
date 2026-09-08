@@ -43,8 +43,12 @@ class PublicCatalogController extends Controller
         // cualquiera podía ver qué plan tienes contratado y cuánto tráfico
         // mueves. El frontend usa esta respuesta y la de `tenant()` para lo
         // mismo, así que además de tapar la fuga las deja coherentes.
-        $tenant = Tenant::where('custom_domain', $domain)
-            ->where('is_active', true)
+        // FUN-5: `publica()` en vez de `is_active` a secas. Este endpoint es la
+        // otra puerta de entrada al catalogo (la del dominio propio), asi que sin
+        // esto una tienda sin verificar seguiria abierta por su dominio aunque el
+        // slug la cerrara.
+        $tenant = Tenant::publica()
+            ->where('custom_domain', $domain)
             ->select(self::COLUMNAS_PUBLICAS_TENANT)
             ->first();
 

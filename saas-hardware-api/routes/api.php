@@ -34,6 +34,18 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,1');
 
+// Verificacion del correo del alta (FUN-5). Sin `auth:sanctum`: el enlace se
+// abre desde el correo, muchas veces en otro navegador o en el movil, donde no
+// hay sesion del panel. Lo que autentica es `signed`, que comprueba la firma que
+// puso `URL::temporarySignedRoute`.
+//
+// El nombre de la ruta ('verificacion.correo') NO es decorativo: la notificacion
+// genera el enlace con `route()`, asi que si se renombra aqui hay que renombrarlo
+// alli el mismo dia o el alta empieza a mandar correos con un enlace roto.
+Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware(['signed', 'throttle:6,1'])
+    ->name('verificacion.correo');
+
 // Catálogo público (consultado por el frontend sin login)
 //
 // AUD-2: 'throttle:catalogo_publico' va en TODO el grupo, no ruta a ruta. Antes
@@ -125,6 +137,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me',      [AuthController::class, 'me']);
+
+    // Reenviar el correo de verificacion (FUN-5). Aqui dentro porque solo reenvia
+    // al correo del usuario autenticado: no acepta direcciones sueltas, asi que
+    // no vale ni para sondear altas ni para mandarle correo a un tercero.
+    Route::post('/auth/email/resend', [AuthController::class, 'resendVerificationEmail'])
+        ->middleware('throttle:3,1');
 
     // Estadísticas
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);

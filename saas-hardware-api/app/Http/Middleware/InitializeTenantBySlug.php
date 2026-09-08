@@ -35,7 +35,11 @@ class InitializeTenantBySlug
             abort(404, 'Tienda no encontrada.');
         }
 
-        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+        // FUN-5: `publica()` es "activa Y publicada", no solo activa. Una tienda
+        // recien registrada cuyo dueno no ha confirmado el correo todavia no se
+        // ve desde fuera, y el scope esta en el modelo para que esa regla no se
+        // vuelva a repartir a mano por seis sitios.
+        $tenant = Tenant::publica()->where('slug', $slug)->first();
 
         if (!$tenant) {
             abort(404, 'Tienda no encontrada o inactiva.');

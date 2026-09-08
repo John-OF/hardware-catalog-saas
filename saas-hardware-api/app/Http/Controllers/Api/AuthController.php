@@ -8,6 +8,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
@@ -71,10 +72,16 @@ class AuthController extends Controller
         ]);
 
         // No pasar 'id' manualmente — HasUuids + newUniqueId() genera UUID v7 automáticamente
+        //
+        // FUN-5: nace SIN publicar. Es el unico sitio del proyecto que crea una
+        // tienda invisible; el resto (seeders, panel de plataforma, tests) se queda
+        // con el `default(true)` de la columna. El catalogo se abre al publico
+        // cuando el dueno pincha el enlace del correo, en `verifyEmail()`.
         $tenant = Tenant::create([
             'slug'           => $data['slug'],
             'name'           => $data['store_name'],
             'whatsapp_number'=> $data['whatsapp'],
+            'is_published'   => false,
         ]);
 
         // tenant_id se asigna explícitamente (está en $guarded, no en $fillable)
@@ -87,6 +94,11 @@ class AuthController extends Controller
         ]);
         $user->tenant_id = $tenant->id;
         $user->save();
+
+        // Se envia DESPUES de guardar y por cola, asi que un SMTP caido no tumba
+        // un alta que ya esta en la base: la tienda existe, el dueno entra, y si
+        // el correo no llego tiene el boton de reenviar en el panel.
+        $user->sendEmailVerificationNotification();
 
         $token = $user->createToken('spa-token', ['admin'], now()->addDays(7));
 
@@ -227,6 +239,87 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Contraseña actualizada. Ya puedes entrar con la nueva.',
         ]);
+    }
+
+    /**
+     * Confirmar el correo del alta desde el enlace firmado (FUN-5).
+     *
+     * La ruta va SIN `auth:sanctum` a propósito: el enlace se abre en el correo,
+     * y ese clic puede pasar en otro navegador, en el móvil o tres días después,
+     * donde no hay ninguna sesión del panel. Lo que autentica aquí es la firma de
+     * la URL —la pone `URL::temporarySignedRoute` y la comprueba el middleware
+     * `signed`—, más el hash del correo, que invalida el enlace si la dirección
+     * cambió después de mandarlo.
+     *
+     * Responde con un **redirect al SPA y no con JSON** porque quien llega aquí
+     * es una persona con un navegador abierto, no el frontend haciendo `fetch`.
+     * Un JSON de "ok" a pantalla completa sería el final del alta de tienda.
+     */
+    public function verifyEmail(Request $request, string $id, string $hash): RedirectResponse
+    {
+        // `withoutTenant()` porque esta ruta no resuelve ninguna tienda y el
+        // usuario se busca por id suelto. En `User` da igual —es la excepción al
+        // fallo en cerrado de AUD-4— pero dejarlo escrito evita que el día que
+        // esa excepción se revise, esto falle en silencio.
+        $user = User::withoutTenant()->find($id);
+
+        if (!$user || !hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+            return redirect($this->urlDelPanel('/login?verificacion=invalida'));
+        }
+
+        // Un enlace usado dos veces (el segundo clic, el prefetch del cliente de
+        // correo) no es un error: la cuenta ya está verificada, así que se manda
+        // al mismo sitio que el primero en vez de a una pantalla de fallo.
+        if (!$user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+
+            // La tienda se publica aquí, y solo aquí. No se toca `is_active`: si
+            // la plataforma la había suspendido, sigue suspendida — son dos
+            // preguntas distintas y está explicado en la migración.
+            $user->tenant?->update(['is_published' => true]);
+        }
+
+        return redirect($this->urlDelPanel('/login?verificacion=ok'));
+    }
+
+    /**
+     * Reenviar el correo de verificación desde el panel (FUN-5).
+     *
+     * Va detrás de `auth:sanctum` porque el dueño ya está dentro: sin verificar
+     * se entra y se configura, lo único cerrado es el catálogo público. Eso hace
+     * que el endpoint no acepte correos arbitrarios —solo reenvía al del usuario
+     * autenticado—, así que no sirve para sondear qué direcciones existen ni para
+     * mandarle correo a nadie más.
+     */
+    public function resendVerificationEmail(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Tu correo ya está verificado.',
+                'verified' => true,
+            ]);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'message' => 'Te reenviamos el correo de verificación. Revisa tu bandeja de entrada y la carpeta de spam.',
+            'verified' => false,
+        ]);
+    }
+
+    /**
+     * URL del panel para los redirects de la verificación.
+     *
+     * `config()` y no `env()`: con `config:cache` activo `env()` devuelve null en
+     * runtime y el dueño acabaría redirigido a la nada. Es el mismo motivo que
+     * está escrito en `fallbackToSpa()` de `routes/web.php`.
+     */
+    private function urlDelPanel(string $path): string
+    {
+        return rtrim((string) config('app.frontend_url'), '/').$path;
     }
 
     /**
