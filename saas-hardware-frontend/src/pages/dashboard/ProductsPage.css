@@ -200,6 +200,13 @@
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   width: fit-content;
+  /* Desde FUN-1b es un enlace a la lista de espera, no solo un contador. */
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+:where(.page-products) .waitlist-badge:hover {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 :where(.page-products) .table-actions {

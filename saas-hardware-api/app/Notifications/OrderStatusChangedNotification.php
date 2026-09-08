@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\StoreUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -44,7 +45,7 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
             'tienda'     => $tenant?->name ?? 'la tienda',
             'estado'     => $order->status,
             'whatsapp'   => $tenant?->whatsapp_number,
-            'url'        => OrderPlacedNotification::urlDeLaTienda($tenant),
+            'url'        => StoreUrl::forTenant($tenant),
             'total'      => Money::format($order->total, $tenant?->currency),
         ];
     }

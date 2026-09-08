@@ -1,5 +1,6 @@
 import './ProductsPage.css';
 
+import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
@@ -725,9 +726,17 @@ export default function ProductsPage() {
                             )}
                           </span>
                           {product.stock === 0 && (product.waitlist_count ?? 0) > 0 && (
-                            <span className="waitlist-badge" title="Clientes esperando reposición">
+                            /* FUN-1b: la insignia ya existia pero era un numero muerto.
+                               Ahora lleva a la lista de espera filtrada por este
+                               producto, que es lo que el dueno quiere ver al leerla:
+                               quienes son y a quien hay que escribirle. */
+                            <Link
+                              to={`/dashboard/waitlist?product=${product.id}&status=pending`}
+                              className="waitlist-badge"
+                              title="Ver quién espera este producto"
+                            >
                               <Bell size={11} /> {product.waitlist_count} en espera
-                            </span>
+                            </Link>
                           )}
                         </div>
                       </td>

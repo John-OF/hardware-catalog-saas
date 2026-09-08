@@ -18,6 +18,7 @@ import {
   FileText,
   BarChart3,
   MessageSquare,
+  Bell,
   Sun,
   Moon
 } from 'lucide-react';
@@ -109,6 +110,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
     if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
     if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
+    if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
     return 'Dashboard';
   };
 
@@ -206,6 +208,16 @@ export default function DashboardPage() {
           >
             <MessageSquare size={20} />
             <span>Reseñas</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink
+            to="/dashboard/waitlist"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <Bell size={20} />
+            <span>Lista de espera</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

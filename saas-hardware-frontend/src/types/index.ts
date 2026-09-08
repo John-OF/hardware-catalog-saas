@@ -193,6 +193,25 @@ export interface Order {
   created_at: string;
 }
 
+/**
+ * Una espera de "avisame cuando llegue" (FUN-1b).
+ *
+ * `customer_contact` es un campo libre: el cliente escribe un telefono o un
+ * correo, como le parece. A los correos les llega el aviso automatico al reponer
+ * stock; a los telefonos no, y por eso siguen pendientes hasta que el dueno les
+ * escriba por WhatsApp y los marque desde el panel.
+ */
+export interface StockNotification {
+  id: string;
+  product_id: string;
+  customer_name: string;
+  customer_contact: string;
+  /** null mientras siga esperando. */
+  notified_at: string | null;
+  created_at: string;
+  product?: Pick<Product, 'id' | 'name' | 'stock' | 'price' | 'sale_price' | 'thumbnail_url'>;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

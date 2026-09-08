@@ -1,0 +1,373 @@
+/* Estilos de <WaitlistPage> (FUN-1b).
+
+   Acotados a `.page-waitlist`, que se anade en la raiz del componente, por lo
+   mismo que en las paginas hermanas: en un .css importado las reglas son
+   globales y siempre estan cargadas, asi que sin acotar se pisarian con las de
+   otras pantallas que usan estos mismos nombres (.page-header, .state-card,
+   .dashboard-table... estan definidos en media docena de ficheros).
+
+   Es `:where()` y no `.page-waitlist` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas compiten con index.css igual que las demas.
+
+   Ojo con UI-5: ninguna de estas reglas apunta a una clase de un componente con
+   CSS global. `.badge` y `.glass-card` SI son del sistema de diseno (index.css)
+   y por eso no se redefinen aqui; `.badge-warning` no existe alli, asi que esta
+   pantalla trae la suya, igual que hacen Pedidos y Productos. */
+
+:where(.page-waitlist).waitlist-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-waitlist) .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+:where(.page-waitlist) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-waitlist) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+/* Filtros */
+
+:where(.page-waitlist) .filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Solo medidas: el fondo, el borde y el color los pone `.premium-input` del
+   sistema de diseno, que es lo que usan Productos y Pedidos en sus filtros.
+   Antes esta regla traia su propio `background: var(--bg-input)`, y ese token
+   vale rgba(0,0,0,.2) —una capa negra pensada para el tema de la tienda—, asi
+   que el desplegable salia oscuro en modo claro y mas oscuro que su tarjeta en
+   modo oscuro. Al panel lo viste el `.dashboard-layout`, que ya resuelve las dos
+   variantes. */
+:where(.page-waitlist) .filter-select {
+  width: 220px;
+  cursor: pointer;
+}
+
+:where(.page-waitlist) .filter-select option {
+  background-color: var(--bg-select-option);
+  color: var(--text-primary);
+}
+
+/* Aviso de que la lista viene filtrada desde la insignia de Productos. Es un
+   boton y no un texto porque su unico trabajo es poder quitarse. */
+:where(.page-waitlist) .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  background: var(--primary-glow);
+  border: 1px solid var(--primary);
+  border-radius: 50px;
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-waitlist) .filter-chip:hover {
+  filter: brightness(1.1);
+}
+
+/* Estados vacio y de carga */
+
+:where(.page-waitlist) .state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+:where(.page-waitlist) .state-card h3 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-waitlist) .state-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 46ch;
+}
+
+:where(.page-waitlist) .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+/* Tabla */
+
+:where(.page-waitlist) .table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+:where(.page-waitlist) .table-wrapper {
+  overflow-x: auto;
+}
+
+:where(.page-waitlist) .dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+:where(.page-waitlist) .dashboard-table th,
+:where(.page-waitlist) .dashboard-table td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+:where(.page-waitlist) .dashboard-table th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:where(.page-waitlist) .dashboard-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+:where(.page-waitlist) .product-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 220px;
+}
+
+:where(.page-waitlist) .product-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+:where(.page-waitlist) .product-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--overlay-mix), 0.04);
+  color: var(--text-muted);
+}
+
+:where(.page-waitlist) .product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+:where(.page-waitlist) .product-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+/* Si el producto sigue agotado, la espera no se ha resuelto sola: es el dato
+   que dice si toca hacer algo o solo esperar al proximo reabastecimiento. */
+:where(.page-waitlist) .product-stock {
+  font-size: 0.75rem;
+}
+
+:where(.page-waitlist) .product-stock.in {
+  color: var(--success);
+}
+
+:where(.page-waitlist) .product-stock.out {
+  color: var(--text-muted);
+}
+
+:where(.page-waitlist) .name-cell {
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:where(.page-waitlist) .contact-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+:where(.page-waitlist) .date-cell {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+:where(.page-waitlist) .badge-warning {
+  background: var(--warning-glow);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  white-space: nowrap;
+}
+
+/* Acciones */
+
+/* Lleva `th` en el selector, y no `.actions-header` a secas, porque la regla de
+   arriba es `.dashboard-table th` (0,1,1) y le ganaba a una clase suelta (0,1,0):
+   la cabecera se quedaba alineada a la izquierda mientras sus botones iban a la
+   derecha. Es el empate de especificidad de UI-5 dentro de la propia hoja. */
+:where(.page-waitlist) .dashboard-table th.actions-header {
+  text-align: right;
+}
+
+:where(.page-waitlist) .action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+:where(.page-waitlist) .btn-action {
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 0.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+:where(.page-waitlist) .btn-action:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.page-waitlist) .btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:where(.page-waitlist) .btn-action-approve:hover:not(:disabled) {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-glow);
+}
+
+:where(.page-waitlist) .btn-action-danger {
+  background: var(--danger-glow);
+  border-color: var(--danger-glow);
+  color: var(--danger);
+}
+
+:where(.page-waitlist) .btn-action-danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+:where(.page-waitlist) .btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  background: rgba(37, 211, 102, 0.1);
+  border: 1px solid rgba(37, 211, 102, 0.3);
+  border-radius: 4px;
+  color: #25d366;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+:where(.page-waitlist) .btn-whatsapp:hover {
+  background: rgba(37, 211, 102, 0.18);
+}
+
+/* Paginacion */
+
+:where(.page-waitlist) .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:where(.page-waitlist) .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-waitlist) .pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-waitlist) .page-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-waitlist) .page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-waitlist) .page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  :where(.page-waitlist) .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  :where(.page-waitlist) .filter-select {
+    width: 100%;
+  }
+}

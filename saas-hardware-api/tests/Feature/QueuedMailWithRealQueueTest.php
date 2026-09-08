@@ -28,13 +28,17 @@ use Tests\TestCase;
  * que no habia ni correo ni rastro en la bandeja de fallidos, solo una linea de
  * ERROR en el log. Se descubrio el 2026-09-07 al levantar el worker a mano.
  *
- * Por eso estos dos tests cambian la conexion de cola a `database` y **corren el
- * worker de verdad**: es la unica forma de que el fallo aparezca. Cubren las dos
- * mitades del contrato, que es lo que importa mantener:
+ * Por eso estos tests cambian la conexion de cola a `database` y **corren el worker
+ * de verdad**: es la unica forma de que el fallo aparezca. Cubren un camino de cada
+ * clase, que es lo que importa mantener:
  *
  * 1. Un correo SIN tienda (reset) tiene que salir igual.
  * 2. Un correo CON tienda (pedido nuevo) tiene que seguir saliendo, para que nadie
  *    arregle el punto 1 marcandolo todo como `NotTenantAware`.
+ * 3. Un correo disparado desde un HOOK DEL MODELO y no desde el controlador (el
+ *    aviso de reposicion, FUN-1b), que es el tercer camino por el que se encola.
+ *
+ * Al anadir un correo nuevo, anadir aqui su caso: la suite normal no lo cubre.
  */
 class QueuedMailWithRealQueueTest extends TestCase
 {
@@ -121,6 +125,45 @@ class QueuedMailWithRealQueueTest extends TestCase
 
         $this->assertSame(0, DB::table('failed_jobs')->count(), 'Un correo del pedido fallo en el worker.');
         $this->assertCount(2, $this->correosEnviados());
+    }
+
+    public function test_el_aviso_de_reposicion_de_stock_sale_por_la_cola(): void
+    {
+        // FUN-1b se dispara desde el hook `updated` del modelo, o sea desde el
+        // guardado de un producto en el panel: un camino distinto a los otros dos
+        // correos, y por tanto uno mas que comprobar contra la cola de verdad.
+        $agotado = new Product([
+            'name'      => 'RTX 5090',
+            'price'     => 3000,
+            'stock'     => 0,
+            'status'    => 'published',
+            'is_active' => true,
+        ]);
+        $agotado->tenant_id = $this->tenant->id;
+        $agotado->save();
+
+        $this->postJson("/api/public/{$this->tenant->slug}/products/{$agotado->id}/notify-me", [
+            'customer_name'    => 'Ana',
+            'customer_contact' => 'ana@ejemplo.com',
+        ])->assertCreated();
+
+        $token = $this->admin->createToken('test', ['admin'])->plainTextToken;
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'X-Tenant'      => $this->tenant->slug,
+        ])->putJson("/api/products/{$agotado->id}", ['stock' => 4])
+            ->assertOk();
+
+        $this->assertSame(1, DB::table('jobs')->count(), 'El aviso de reposicion no llego a la cola.');
+
+        $this->trabajarLaCola();
+
+        $this->assertSame(0, DB::table('failed_jobs')->count(), 'El aviso de reposicion fallo en el worker.');
+
+        $mensajes = $this->correosEnviados();
+        $this->assertCount(1, $mensajes);
+        $this->assertStringContainsString('Ya llego', $mensajes[0]->getOriginalMessage()->getSubject());
     }
 
     /**

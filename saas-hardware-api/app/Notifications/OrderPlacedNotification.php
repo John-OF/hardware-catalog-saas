@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\StoreUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -47,7 +48,7 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
             'cliente'    => $order->customer_name,
             'tienda'     => $tenant?->name ?? 'la tienda',
             'whatsapp'   => $tenant?->whatsapp_number,
-            'url'        => self::urlDeLaTienda($tenant),
+            'url'        => StoreUrl::forTenant($tenant),
             'total'      => Money::format($order->total, $moneda),
             'lineas'     => $order->items->map(fn ($item) => [
                 'cantidad' => $item->quantity,
@@ -55,26 +56,6 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
                 'subtotal' => Money::format($item->subtotal, $moneda),
             ])->all(),
         ];
-    }
-
-    /**
-     * Enlace publico de la tienda, que es el unico sitio al que tiene sentido
-     * mandar al comprador desde el correo.
-     *
-     * Con dominio propio se usa ese; si no, la URL con slug del frontend. Es la
-     * misma pareja que resuelve el frontend al arrancar.
-     */
-    public static function urlDeLaTienda(?\App\Models\Tenant $tenant): ?string
-    {
-        if (! $tenant) {
-            return null;
-        }
-
-        if (filled($tenant->custom_domain)) {
-            return 'https://'.$tenant->custom_domain;
-        }
-
-        return rtrim((string) config('app.frontend_url'), '/').'/'.$tenant->slug;
     }
 
     /**

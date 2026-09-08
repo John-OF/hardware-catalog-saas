@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Concerns\BelongsToTenant;
+use App\Notifications\BackInStockNotification;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class Product extends Model
 {
@@ -63,36 +66,67 @@ class Product extends Model
     /**
      * Avisa a los clientes en lista de espera de que el producto volvió a estar disponible.
      *
-     * **FUN-1a (2026-09-07): todavía no envía nada, y justo por eso ya no marca
-     * `notified_at`.** Antes lo marcaba: escribía un log "simulado" y daba por avisada
-     * a toda la lista. El aviso no es que no se enviara — es que se CONSUMÍA: cada
-     * reposición dejaba las filas fuera de lo pendiente sin que a nadie le llegara
-     * nada, así que al cablear el envío de verdad (FUN-1b, paso 3 de
-     * `docs/pendientes.md`) esa gente ya no lo habría recibido nunca. Dejarlas
-     * pendientes es lo que hace que el arreglo futuro las alcance.
+     * **Solo se avisa por correo a quien dejó un correo (FUN-1b).** `customer_contact`
+     * es un campo libre en el que el cliente escribe un teléfono o un email, como le
+     * parece. Los teléfonos **se quedan pendientes a propósito**: aparecen en la lista
+     * de espera del panel para que el dueño escriba por WhatsApp, que en este rubro es
+     * lo que va a hacer de todas formas. La alternativa —partir la columna en dos con
+     * una migración que reparta lo existente mirando si tiene arroba— es más trabajo
+     * para el mismo resultado, y adivinando sobre datos que ya escribió el cliente.
      *
-     * El log se conserva porque mientras tanto es lo único que dice cuánta gente
-     * está esperando; el disparador (`booted`) sigue igual.
+     * **`notified_at` se marca fila a fila y SOLO después de encolar**, que es la regla
+     * que dejó escrita FUN-1a. Antes se marcaba la lista entera antes de enviar nada, y
+     * cada reposición la consumía sin que a nadie le llegara un aviso.
      *
-     * **Al cablear el envío (FUN-1b):** encolar la notificación y marcar `notified_at`
-     * SOLO después de encolar, nunca antes. Y hay que decidir el canal primero:
-     * `customer_contact` es un campo libre que admite teléfono o correo indistintamente.
+     * Devuelve cuántos avisos se encolaron; los pendientes por teléfono no cuentan.
      */
     public function notifyStockSubscribers(): int
     {
-        $pending = $this->stockNotifications()->whereNull('notified_at')->get();
+        // `withoutTenant()` con el filtro escrito a mano, y no la relación normal, por
+        // el fallo en cerrado de AUD-4: quien repone stock hoy siempre tiene tienda
+        // resuelta (panel y devolución de un pedido cancelado), pero el día que esto
+        // se dispare desde un comando, un seeder o un job —una importación CSV
+        // encolada, por ejemplo— la relación devolvería CERO filas y nadie se
+        // enteraría de nada. Sería el mismo fallo silencioso de FUN-1a y FUN-10 por
+        // tercera vez. El aislamiento no se pierde: el `tenant_id` del producto se
+        // filtra aquí explícitamente.
+        $pending = StockNotification::withoutTenant()
+            ->where('tenant_id', $this->tenant_id)
+            ->where('product_id', $this->id)
+            ->whereNull('notified_at')
+            ->get();
+
+        $enviados = 0;
 
         foreach ($pending as $subscription) {
-            \Illuminate\Support\Facades\Log::info('Reposición de stock: aviso pendiente de enviar', [
-                'tenant_id'   => $this->tenant_id,
-                'product_id'  => $this->id,
-                'product'     => $this->name,
-                'to_name'     => $subscription->customer_name,
-                'to_contact'  => $subscription->customer_contact,
-            ]);
+            $contacto = trim((string) $subscription->customer_contact);
+
+            if (! filter_var($contacto, FILTER_VALIDATE_EMAIL)) {
+                // Teléfono: sigue esperando, y el dueño lo ve en el panel.
+                continue;
+            }
+
+            try {
+                Notification::route('mail', $contacto)
+                    ->notify(new BackInStockNotification($this, $subscription->customer_name));
+
+                // Dentro del try y por fila: si el correo de uno falla, los demás
+                // siguen avisados y ese sigue pendiente para el próximo intento.
+                $subscription->update(['notified_at' => now()]);
+                $enviados++;
+            } catch (\Throwable $e) {
+                // El stock ya está repuesto y guardado. Un mailer caído no puede
+                // devolverle un error al dueño, que lo único que hizo fue editar un
+                // producto. Mismo criterio que el aviso de pedido nuevo.
+                Log::error('No se pudo avisar de la reposición de stock', [
+                    'tenant_id'  => $this->tenant_id,
+                    'product_id' => $this->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
         }
 
-        return $pending->count();
+        return $enviados;
     }
 
     public function category(): BelongsTo

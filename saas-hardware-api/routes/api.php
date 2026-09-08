@@ -154,6 +154,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
     // Reseñas/Calificaciones
     Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)->only(['index', 'update', 'destroy']);
 
+    // Lista de espera de "avisame cuando llegue" (FUN-1b). Sin `store`: las filas
+    // las crea el catalogo publico, no el panel.
+    Route::apiResource('stock-notifications', \App\Http\Controllers\Api\StockNotificationController::class)
+        ->only(['index', 'update', 'destroy']);
+
     // Páginas informativas privadas
     Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
 });
