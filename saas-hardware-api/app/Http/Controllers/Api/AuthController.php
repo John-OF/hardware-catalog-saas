@@ -147,7 +147,13 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->update(['last_login_at' => now()]);
+        // `forceFill` y no `update`: `last_login_at` NO esta en `$fillable` -es un
+        // campo de sistema, no algo que nadie deba poder fijar desde una
+        // peticion- asi que la asignacion masiva lo descartaba **en silencio** y
+        // la columna llevaba desde la migracion inicial sin escribirse nunca.
+        // No se notaba porque nadie la leia; se descubrio al pintar quien no ha
+        // entrado todavia en la pantalla de equipo (FUN-4).
+        $user->forceFill(['last_login_at' => now()])->save();
 
         // Revocar tokens anteriores (una sesión activa por usuario)
         $user->tokens()->delete();

@@ -56,7 +56,9 @@ class PlatformController extends Controller
             ]);
         }
 
-        $user->update(['last_login_at' => now()]);
+        // Mismo motivo que en el login de tiendas: `last_login_at` no es
+        // fillable, asi que `update()` lo tiraba sin decir nada.
+        $user->forceFill(['last_login_at' => now()])->save();
         $user->tokens()->delete();
 
         $token = $user->createToken('platform-token', ['superadmin'], now()->addDay());
