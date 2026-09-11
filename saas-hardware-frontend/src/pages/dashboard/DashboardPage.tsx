@@ -52,9 +52,15 @@ export default function DashboardPage() {
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
-  // `=== false` y no `!user?.email_verified`: mientras getMe() no ha respondido
+  // Lo que apaga el boton de "Ver Tienda Publica" es que la tienda este CERRADA,
+  // no que falte verificar el correo. No es lo mismo: `tenants.is_published`
+  // nace en `true`, asi que una tienda anterior a FUN-5 es publica aunque su
+  // dueno no haya verificado nunca — y a esa persona el boton se le apagaba
+  // sobre una tienda que cualquiera podia visitar.
+  //
+  // `=== false` y no `!tenant?.is_published`: mientras getMe() no ha respondido
   // el campo vale undefined, y ahi el boton todavia no debe apagarse.
-  const esperandoVerificacion = user?.email_verified === false;
+  const tiendaCerrada = tenant?.is_published === false;
 
   useEffect(() => {
     // Si no hay token, redirigir al login
@@ -272,12 +278,12 @@ export default function DashboardPage() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             {tenant?.slug && (
-              /* FUN-5: sin verificar el correo el catalogo publico responde 404,
-                 asi que este boton llevaria a una pantalla de "tienda no
+              /* FUN-5: mientras la tienda no este publicada el catalogo responde
+                 404, asi que este boton llevaria a una pantalla de "tienda no
                  encontrada" sobre la tienda de uno mismo. Se deshabilita en vez
                  de esconderse: que siga ahi, apagado y con su motivo, dice mas
                  que si desapareciera. El aviso de arriba explica el resto. */
-              esperandoVerificacion ? (
+              tiendaCerrada ? (
                 <span
                   className="btn-secondary storefront-btn is-disabled"
                   aria-disabled="true"

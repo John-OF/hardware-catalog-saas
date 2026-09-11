@@ -5,20 +5,35 @@ import { toast } from 'react-hot-toast';
 import { MailWarning, Loader2 } from 'lucide-react';
 import { resendVerificationEmail } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
+import { useTenantStore } from '../../stores/tenantStore';
 
 /**
  * Aviso de "confirma tu correo" del panel (FUN-5).
  *
- * Existe porque sin verificar el catálogo público no se ve, y esa es una
- * consecuencia que el dueño no puede adivinar: por dentro el panel funciona
- * entero —productos, categorías, personalización— así que sin este aviso la
- * única señal sería que su enlace da 404 cuando se lo pasa a un cliente.
+ * Existe porque para una tienda nueva el catálogo público no se ve hasta
+ * verificar, y esa es una consecuencia que el dueño no puede adivinar: por
+ * dentro el panel funciona entero —productos, categorías, personalización— así
+ * que sin este aviso la única señal sería que su enlace da 404 cuando se lo pasa
+ * a un cliente.
+ *
+ * **Pero el aviso NO puede deducir eso del correo, y durante un tiempo lo hizo.**
+ * `tenants.is_published` nace en `true` a propósito (ver la migración de FUN-5):
+ * de lo contrario, aplicarla habría apagado todas las tiendas que ya existían.
+ * O sea que una tienda anterior a FUN-5 **es pública aunque su dueño no haya
+ * verificado nunca**, y a esa persona este aviso le decía que su catálogo no se
+ * veía mientras cualquiera podía entrar en él. Un aviso que miente sobre lo más
+ * importante —si tu tienda está abierta o cerrada— es peor que no tenerlo.
+ *
+ * Por eso hay dos textos: quien sí está cerrado necesita saber cómo abrir, y
+ * quien está abierto necesita saber para qué sirve verificar de todas formas.
+ * La pregunta "¿mi tienda se ve?" la contesta `is_published`, y sólo esa.
  *
  * Se pinta encima de todas las pantallas del panel y no solo del resumen: quien
  * está subiendo productos no vuelve al inicio a mirar si hay algo pendiente.
  */
 export default function VerifyEmailBanner() {
   const user = useAuthStore((s) => s.user);
+  const tenant = useTenantStore((s) => s.tenant);
   const setAuth = useAuthStore((s) => s.setAuth);
   const token = useAuthStore((s) => s.token);
 
@@ -56,16 +71,33 @@ export default function VerifyEmailBanner() {
     }
   };
 
+  // `=== false` otra vez, y por lo mismo: mientras el tenant no ha llegado no se
+  // puede afirmar que la tienda esté cerrada.
+  const tiendaCerrada = tenant?.is_published === false;
+
   return (
     <div className="verify-email-banner" role="status">
       <MailWarning size={20} className="verify-email-banner-icon" />
 
       <div className="verify-email-banner-text">
-        <strong>Confirma tu correo para publicar la tienda.</strong>
-        <span>
-          Te enviamos un enlace a <b>{user.email}</b>. Hasta que lo abras, tu catálogo no es visible
-          para el público — pero puedes seguir configurándolo todo desde aquí.
-        </span>
+        {tiendaCerrada ? (
+          <>
+            <strong>Confirma tu correo para publicar la tienda.</strong>
+            <span>
+              Te enviamos un enlace a <b>{user.email}</b>. Hasta que lo abras, tu catálogo no es
+              visible para el público — pero puedes seguir configurándolo todo desde aquí.
+            </span>
+          </>
+        ) : (
+          <>
+            <strong>Confirma tu correo.</strong>
+            <span>
+              Te enviamos un enlace a <b>{user.email}</b>. Tu tienda ya es pública, pero sin
+              confirmarlo no podemos asegurarte los avisos de pedidos ni devolverte el acceso si
+              pierdes la contraseña.
+            </span>
+          </>
+        )}
       </div>
 
       <button

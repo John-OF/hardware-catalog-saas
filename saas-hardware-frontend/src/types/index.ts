@@ -80,6 +80,13 @@ export interface Tenant {
   whatsapp_number: string;
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;
+  /**
+   * Si el catalogo publico se ve (FUN-5). NO es lo mismo que tener el correo
+   * verificado: la columna nace en `true`, asi que las tiendas anteriores a
+   * FUN-5 son publicas aunque su dueno nunca haya confirmado nada. Preguntar por
+   * el correo para saber si la tienda se ve era, justamente, el fallo.
+   */
+  is_published: boolean;
   custom_domain: string | null;
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
