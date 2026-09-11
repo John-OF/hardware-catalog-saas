@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   ChevronLeft,
   ChevronRight,
+  HelpCircle,
   X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -31,23 +32,51 @@ import AnnouncementBar from '../../components/public/AnnouncementBar';
 import StoreFooter from '../../components/public/StoreFooter';
 import StoreHeader from '../../components/public/StoreHeader';
 import { getPublicPages } from '../../api/pages';
-import type { Tenant, Product, Category, PaginatedResponse, Page } from '../../types';
+import type { Tenant, Product, Category, ComponentType, PaginatedResponse, Page } from '../../types';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
-// Pasos predefinidos para armar la PC
-const BUILDER_STEPS = [
-  { id: 1, key: 'cpu', name: 'Procesador (CPU)', iconSlug: 'cpu', searchName: 'procesador' },
-  { id: 2, key: 'motherboard', name: 'Placa Madre (Motherboard)', iconSlug: 'motherboard', searchName: 'placa' },
-  { id: 3, key: 'ram', name: 'Memoria RAM', iconSlug: 'ram', searchName: 'memoria' },
-  { id: 4, key: 'gpu', name: 'Tarjeta de Video (GPU)', iconSlug: 'gpu', searchName: 'tarjeta' },
-  { id: 5, key: 'ssd', name: 'Almacenamiento (SSD/HDD)', iconSlug: 'ssd', searchName: 'almacenamiento' },
-  { id: 6, key: 'power', name: 'Fuente de Poder', iconSlug: 'power', searchName: 'fuente' },
-  { id: 7, key: 'cooling', name: 'Enfriamiento / Disipadores', iconSlug: 'cooling', searchName: 'enfriamiento' },
-  { id: 8, key: 'case', name: 'Gabinete / Chasis', iconSlug: 'case', searchName: 'gabinete' },
+/**
+ * Pasos predefinidos para armar la PC.
+ *
+ * `key` es el `component_type` de la categoria (FUN-8) y tambien el slug de su
+ * icono. Hasta aqui cada paso buscaba su categoria por un trozo del NOMBRE
+ * ('procesador', 'placa', 'tarjeta'...): una tienda que dijera "CPU" o
+ * "Graficas" se quedaba sin armador y sin ningun aviso, con el paso vacio como
+ * si no hubiera stock. Ahora lo dice la categoria y el nombre da igual.
+ */
+const BUILDER_STEPS: { id: number; key: ComponentType; name: string }[] = [
+  { id: 1, key: 'cpu', name: 'Procesador (CPU)' },
+  { id: 2, key: 'motherboard', name: 'Placa Madre (Motherboard)' },
+  { id: 3, key: 'ram', name: 'Memoria RAM' },
+  { id: 4, key: 'gpu', name: 'Tarjeta de Video (GPU)' },
+  { id: 5, key: 'ssd', name: 'Almacenamiento (SSD/HDD)' },
+  { id: 6, key: 'power', name: 'Fuente de Poder' },
+  { id: 7, key: 'cooling', name: 'Enfriamiento / Disipadores' },
+  { id: 8, key: 'case', name: 'Gabinete / Chasis' },
 ];
 
+/**
+ * Una incidencia del armado.
+ *
+ * `unknown` es el estado que faltaba y el motivo de este cambio: hasta aqui, si
+ * la spec no estaba escrita con el nombre que el codigo espera —"Zoc." en vez de
+ * "Socket"—, el chequeo no encontraba el dato, no decia nada, y el producto
+ * salia etiquetado como **Compatible**. Un visto verde por falta de informacion,
+ * no por comprobacion. Ahora eso se dice: "no podemos comprobarlo".
+ *
+ * Es un parche honesto, no el arreglo: el arreglo es pedir las specs con nombre
+ * fijo (Fase 13 de `mejoras_propuestas.md`, la mitad abierta de FUN-8).
+ */
 interface CompatibilityIssue {
-  type: 'error' | 'warning';
+  type: 'error' | 'warning' | 'unknown';
   message: string;
+}
+
+/** Lo que sale de evaluar un armado: qué falla y cuántas comprobaciones se pudieron hacer. */
+interface CompatibilityResult {
+  issues: CompatibilityIssue[];
+  /** Comprobaciones que se ejecutaron de verdad (con sus dos datos delante). */
+  comprobadas: number;
 }
 
 export default function PcBuilderPage() {
@@ -61,6 +90,9 @@ export default function PcBuilderPage() {
   
   // Paso actualmente activo para seleccionar (expandido en la lista)
   const [activeStepId, setActiveStepId] = useState<number | null>(null);
+
+  // UI-9: con el cajon de componentes abierto, el armado de detras no se mueve.
+  useBloqueoDeScroll(activeStepId !== null);
   const [searchQuery, setSearchQuery] = useState('');
   const [productPage, setProductPage] = useState(1);
 
@@ -107,23 +139,26 @@ export default function PcBuilderPage() {
     enabled: !!resolvedSlug,
   });
 
-  // Encontrar la categoría real correspondiente al paso activo
   const activeStep = BUILDER_STEPS.find(s => s.id === activeStepId);
-  const matchedCategory = activeStep && categories.find(cat => 
-    cat.icon === activeStep.iconSlug || 
-    cat.name.toLowerCase().includes(activeStep.searchName)
-  );
 
-  // Fetch Products de la categoría seleccionada para el paso activo
+  /**
+   * Si la tienda vende esa pieza. No se busca UNA categoria: la tienda puede
+   * tener los procesadores partidos en dos ("Intel" y "AMD") y las dos son el
+   * mismo paso, asi que el filtro va por tipo y el servidor las junta.
+   */
+  const tieneComponente = (type: ComponentType) =>
+    categories.some(cat => cat.component_type === type);
+
+  // Fetch Products del tipo de componente del paso activo
   const { data: paginatedProducts, isLoading: isLoadingProducts } = useQuery<PaginatedResponse<Product>>({
-    queryKey: ['builderProducts', resolvedSlug, matchedCategory?.id, searchQuery, productPage],
+    queryKey: ['builderProducts', resolvedSlug, activeStep?.key, searchQuery, productPage],
     queryFn: () => getPublicProducts(resolvedSlug!, {
-      category_id: matchedCategory?.id,
+      component_type: activeStep!.key,
       search: searchQuery || undefined,
       in_stock: true,
       page: productPage,
     }),
-    enabled: !!resolvedSlug && !!matchedCategory,
+    enabled: !!resolvedSlug && !!activeStep,
   });
 
   const availableProducts = paginatedProducts?.data || [];
@@ -193,51 +228,97 @@ export default function PcBuilderPage() {
 
   let cpuTdp = 65;
   let gpuTdp = 120;
-  if (cpu?.specs) {
-    const val = parseTdp(cpu.specs);
+  // Si la pieza no dice su TDP se usa un valor tipico, que es razonable para
+  // estimar pero NO es un dato de la tienda. Se marca para poder decirlo en vez
+  // de presentar el consumo como si estuviera medido.
+  let tdpAsumido = false;
+  if (cpu) {
+    const val = cpu.specs ? parseTdp(cpu.specs) : null;
     if (val) cpuTdp = val;
+    else tdpAsumido = true;
   }
-  if (gpu?.specs) {
-    const val = parseTdp(gpu.specs);
+  if (gpu) {
+    const val = gpu.specs ? parseTdp(gpu.specs) : null;
     if (val) gpuTdp = val;
+    else tdpAsumido = true;
   }
   const estimatedPower = (cpu ? cpuTdp : 0) + (gpu ? gpuTdp : 0) + (Object.keys(selections).length > 0 ? 100 : 0);
   const recommendedWatts = Math.round(estimatedPower * 1.25 + 50);
 
-  // Chequeo dinámico de compatibilidad
-  const checkSelectionCompatibility = (selectionsMap: Record<string, Product>): CompatibilityIssue[] => {
+  /**
+   * Evalúa un armado: qué falla, qué no se pudo comprobar y cuántas
+   * comprobaciones llegaron a ejecutarse.
+   *
+   * Las tres reglas necesitan que la spec exista en las DOS piezas. Cuando falta
+   * en alguna, antes no pasaba nada —y el silencio se leía como "todo bien"—;
+   * ahora sale una incidencia de tipo `unknown` que dice qué falta y en qué
+   * producto, para que el comprador sepa que ahí no se comprobó nada.
+   */
+  const evaluarCompatibilidad = (selectionsMap: Record<string, Product>): CompatibilityResult => {
     const issues: CompatibilityIssue[] = [];
+    let comprobadas = 0;
+
     const cpuSel = selectionsMap['cpu'];
     const gpuSel = selectionsMap['gpu'];
     const mbSel = selectionsMap['motherboard'];
     const ramSel = selectionsMap['ram'];
     const psuSel = selectionsMap['power'];
 
+    const normalizar = (valor: string) => valor.toLowerCase().replace(/\s+/g, '');
+
     if (cpuSel && mbSel) {
       const cpuSocket = getSocket(cpuSel);
       const mbSocket = getSocket(mbSel);
-      if (cpuSocket && mbSocket && cpuSocket.toLowerCase().replace(/\s+/g, '') !== mbSocket.toLowerCase().replace(/\s+/g, '')) {
+
+      if (!cpuSocket || !mbSocket) {
+        const faltan = [!cpuSocket ? cpuSel.name : null, !mbSocket ? mbSel.name : null].filter(Boolean);
         issues.push({
-          type: 'error',
-          message: `Incompatibilidad de Socket: CPU usa (${cpuSocket}) pero Placa Madre usa (${mbSocket}).`,
+          type: 'unknown',
+          message: `No podemos comprobar el socket: falta esa especificación en ${faltan.join(' y ')}.`,
         });
+      } else {
+        comprobadas++;
+        if (normalizar(cpuSocket) !== normalizar(mbSocket)) {
+          issues.push({
+            type: 'error',
+            message: `Incompatibilidad de Socket: CPU usa (${cpuSocket}) pero Placa Madre usa (${mbSocket}).`,
+          });
+        }
       }
     }
 
     if (ramSel && mbSel) {
       const ramType = getRamType(ramSel);
       const mbRamType = getRamType(mbSel);
-      if (ramType && mbRamType && ramType !== mbRamType) {
+
+      if (!ramType || !mbRamType) {
+        const faltan = [!ramType ? ramSel.name : null, !mbRamType ? mbSel.name : null].filter(Boolean);
         issues.push({
-          type: 'error',
-          message: `Incompatibilidad de RAM: Memoria es ${ramType.toUpperCase()} pero Placa Madre requiere ${mbRamType.toUpperCase()}.`,
+          type: 'unknown',
+          message: `No podemos comprobar el tipo de memoria: falta esa especificación en ${faltan.join(' y ')}.`,
         });
+      } else {
+        comprobadas++;
+        if (ramType !== mbRamType) {
+          issues.push({
+            type: 'error',
+            message: `Incompatibilidad de RAM: Memoria es ${ramType.toUpperCase()} pero Placa Madre requiere ${mbRamType.toUpperCase()}.`,
+          });
+        }
       }
     }
 
     if (psuSel && (cpuSel || gpuSel)) {
       const psuWatts = parseWatts(psuSel);
-      if (psuWatts) {
+
+      if (!psuWatts) {
+        issues.push({
+          type: 'unknown',
+          message: `No podemos comprobar la potencia: ${psuSel.name} no dice cuántos vatios entrega.`,
+        });
+      } else {
+        comprobadas++;
+
         if (psuWatts < estimatedPower) {
           issues.push({
             type: 'error',
@@ -249,15 +330,45 @@ export default function PcBuilderPage() {
             message: `Fuente al Límite: Se recomienda una fuente de al menos ${recommendedWatts}W (seleccionada: ${psuWatts}W).`,
           });
         }
+
+        // La comparacion de arriba es contra un consumo estimado; si alguna
+        // pieza no dijo su TDP, ese numero lleva dentro un valor supuesto y hay
+        // que decirlo, porque de el depende el veredicto de la fuente.
+        if (tdpAsumido) {
+          issues.push({
+            type: 'unknown',
+            message: 'El consumo es una estimación: alguna pieza no indica su TDP y se usó un valor típico.',
+          });
+        }
       }
     }
 
-    return issues;
+    return { issues, comprobadas };
   };
 
-  const compatibilityIssues = checkSelectionCompatibility(selections);
+  const { issues: compatibilityIssues, comprobadas } = evaluarCompatibilidad(selections);
   const hasErrors = compatibilityIssues.some(i => i.type === 'error');
   const hasWarnings = compatibilityIssues.some(i => i.type === 'warning');
+  const hasUnknowns = compatibilityIssues.some(i => i.type === 'unknown');
+
+  /**
+   * Lo que aporta ESTE producto al armado, sin heredar lo que ya fallaba.
+   *
+   * Se compara contra el armado sin la pieza de ese paso: si la CPU y la placa
+   * ya se llevaban mal, antes TODOS los candidatos de todos los pasos salian
+   * marcados como "Incompatible" —la etiqueta describia el armado entero, no al
+   * producto que estabas mirando— y el comprador se quedaba sin saber cual
+   * elegir.
+   */
+  const incidenciasDelCandidato = (stepKey: string, product: Product): CompatibilityIssue[] => {
+    const sinEstePaso = { ...selections };
+    delete sinEstePaso[stepKey];
+
+    const previas = evaluarCompatibilidad(sinEstePaso).issues.map(i => i.message);
+    const conProducto = evaluarCompatibilidad({ ...selections, [stepKey]: product }).issues;
+
+    return conProducto.filter(i => !previas.includes(i.message));
+  };
 
   // Suma total de precios
   const totalPrice = Object.values(selections).reduce((acc, prod) => {
@@ -266,10 +377,11 @@ export default function PcBuilderPage() {
   }, 0);
 
   const handleSelectProduct = (stepKey: string, product: Product) => {
-    // Probar si esta selección generará un error crítico de compatibilidad
     const tempSelections = { ...selections, [stepKey]: product };
-    const tempIssues = checkSelectionCompatibility(tempSelections);
-    const tempErrors = tempIssues.filter(i => i.type === 'error');
+    // Solo los errores que APORTA esta pieza: preguntar por un conflicto que ya
+    // existia entre otras dos seria echarle la culpa a quien no la tiene.
+    // Las incidencias de tipo `unknown` no preguntan nada: avisan, no estorban.
+    const tempErrors = incidenciasDelCandidato(stepKey, product).filter(i => i.type === 'error');
 
     if (tempErrors.length > 0) {
       if (!window.confirm(`⚠️ Advertencia de Compatibilidad:\n\n${tempErrors.map(e => e.message).join('\n')}\n\n¿Deseas agregar este componente de todas formas?`)) {
@@ -329,24 +441,30 @@ export default function PcBuilderPage() {
     window.open(url, '_blank');
   };
 
-  // Ayudante de compatibilidad en la lista para un producto de opción
-  const getProductCompatibilityClass = (stepKey: string, product: Product) => {
-    const tempSelections = { ...selections, [stepKey]: product };
-    const tempIssues = checkSelectionCompatibility(tempSelections);
-    if (tempIssues.some(i => i.type === 'error')) return 'badge-danger';
-    if (tempIssues.some(i => i.type === 'warning')) return 'badge-warning';
-    return 'badge-success';
-  };
+  /**
+   * La etiqueta de un producto del cajón.
+   *
+   * Cuatro estados, no tres. "Sin datos" es el que faltaba: antes, un producto
+   * cuya spec no se encontraba salia como **Compatible** —verde por ignorancia—
+   * y ese es justo el aviso que no sirve. Solo se dice "Compatible" cuando algo
+   * se comprobo de verdad.
+   */
+  const estadoDelCandidato = (stepKey: string, product: Product): { clase: string; etiqueta: string } => {
+    const nuevas = incidenciasDelCandidato(stepKey, product);
 
-  const getProductCompatibilityLabel = (stepKey: string, product: Product) => {
-    const tempSelections = { ...selections, [stepKey]: product };
-    const tempIssues = checkSelectionCompatibility(tempSelections);
-    const errors = tempIssues.filter(i => i.type === 'error');
-    const warnings = tempIssues.filter(i => i.type === 'warning');
+    if (nuevas.some(i => i.type === 'error')) return { clase: 'badge-danger', etiqueta: 'Incompatible' };
+    if (nuevas.some(i => i.type === 'warning')) return { clase: 'badge-warning', etiqueta: 'Advertencia' };
+    if (nuevas.some(i => i.type === 'unknown')) return { clase: 'badge-unknown', etiqueta: 'Sin datos' };
 
-    if (errors.length > 0) return 'Incompatible';
-    if (warnings.length > 0) return 'Advertencia';
-    return 'Compatible';
+    // Sin incidencias puede significar dos cosas distintas: que se comprobo y
+    // salio bien, o que no habia nada que comprobar todavia (esta es la primera
+    // pieza del armado). Decir "Compatible" en el segundo caso es prometer una
+    // revision que no ha ocurrido.
+    const conProducto = evaluarCompatibilidad({ ...selections, [stepKey]: product });
+
+    return conProducto.comprobadas > 0
+      ? { clase: 'badge-success', etiqueta: 'Compatible' }
+      : { clase: 'badge-unknown', etiqueta: 'Sin comprobar' };
   };
 
   if (isLoadingTenant) {
@@ -386,21 +504,25 @@ export default function PcBuilderPage() {
         <div className="builder-steps-column">
           {BUILDER_STEPS.map((step) => {
             const selectedProduct = selections[step.key];
-            const hasCategory = categories.some(cat => 
-              cat.icon === step.iconSlug || 
-              cat.name.toLowerCase().includes(step.searchName)
-            );
+            const hasCategory = tieneComponente(step.key);
 
             return (
               <div key={step.id} className="builder-step-card glass-card">
                 <div className="step-header">
                   <div className="step-num">0{step.id}</div>
                   <div className="step-icon-wrapper">
-                    <CategoryIcon slug={step.iconSlug} size={20} />
+                    <CategoryIcon slug={step.key} size={20} />
                   </div>
                   <div className="step-title-box">
                     <h4>{step.name}</h4>
-                    {!hasCategory && <span className="no-cat-label">Sin Stock/Categoría</span>}
+                    {!hasCategory && (
+                      <span
+                        className="no-cat-label"
+                        title="Esta tienda todavía no tiene ninguna categoría marcada como este tipo de componente."
+                      >
+                        No disponible en esta tienda
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -488,6 +610,11 @@ export default function PcBuilderPage() {
                   <span>Fuente recomendada:</span>
                   <span>{recommendedWatts} W</span>
                 </div>
+                {tdpAsumido && (
+                  <p className="tdp-nota">
+                    Alguna pieza no indica su consumo: se usó un valor típico para estimarlo.
+                  </p>
+                )}
               </div>
             )}
 
@@ -514,10 +641,29 @@ export default function PcBuilderPage() {
                     <p>Tu armado funcionará, pero hay sugerencias de potencia.</p>
                   </div>
                 </div>
+              ) : hasUnknowns ? (
+                /* El aviso que faltaba. Antes, no encontrar el dato se pintaba
+                   igual que haberlo comprobado: verde y "100% compatible". */
+                <div className="status-banner unknown">
+                  <HelpCircle size={18} />
+                  <div>
+                    <strong>No podemos comprobarlo todo</strong>
+                    <p>Faltan datos en algunos productos. Abajo dice cuáles.</p>
+                  </div>
+                </div>
+              ) : comprobadas === 0 ? (
+                <div className="status-banner empty">
+                  <HelpCircle size={16} />
+                  <span>Todavía no hay nada que comprobar: elige piezas que se relacionen entre sí.</span>
+                </div>
               ) : (
                 <div className="status-banner success">
                   <CheckCircle size={18} />
-                  <span>¡Tu armado es 100% compatible!</span>
+                  <span>
+                    {comprobadas === 1
+                      ? 'La comprobación que se pudo hacer salió bien.'
+                      : `Las ${comprobadas} comprobaciones que se pudieron hacer salieron bien.`}
+                  </span>
                 </div>
               )}
 
@@ -526,7 +672,9 @@ export default function PcBuilderPage() {
                 <div className="issues-list">
                   {compatibilityIssues.map((issue, idx) => (
                     <div key={idx} className={`issue-item ${issue.type}`}>
-                      <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      {issue.type === 'unknown'
+                        ? <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                        : <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />}
                       <span>{issue.message}</span>
                     </div>
                   ))}
@@ -555,7 +703,7 @@ export default function PcBuilderPage() {
       </div>
 
       {/* Component Selection Modal Overlay */}
-      {activeStepId !== null && matchedCategory && (
+      {activeStepId !== null && activeStep && (
         <div className="modal-overlay" onClick={() => setActiveStepId(null)}>
           <div className="modal-drawer glass-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
@@ -597,8 +745,7 @@ export default function PcBuilderPage() {
                 <div className="drawer-products-grid">
                   {availableProducts.map((product) => {
                     const price = product.sale_price !== null ? product.sale_price : product.price;
-                    const compClass = getProductCompatibilityClass(activeStep!.key, product);
-                    const compLabel = getProductCompatibilityLabel(activeStep!.key, product);
+                    const { clase: compClass, etiqueta: compLabel } = estadoDelCandidato(activeStep!.key, product);
                     
                     return (
                       <div key={product.id} className="drawer-product-card glass-card">

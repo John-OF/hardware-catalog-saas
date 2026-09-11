@@ -589,3 +589,43 @@
 }
 
 :where(.page-pc-builder) .spinner { animation: spin 1s linear infinite; }
+
+/*
+ * El cuarto estado del armador: "no podemos comprobarlo" (mitad abierta de
+ * FUN-8). Hasta aqui solo habia verde, ambar y rojo, asi que la falta de dato
+ * se pintaba de verde. Este es el color de "no lo se", que no es un fallo del
+ * armado sino de la informacion del catalogo: por eso va en el gris azulado de
+ * --info y no en el ambar de advertencia, con el que se confundiria.
+ *
+ * `.badge-warning` y `.badge-unknown` se definen aqui y no en index.css porque
+ * el sistema de diseno solo trae `.badge-success` y `.badge-danger`; es la misma
+ * decision que ya tomaron OrdersPage.css y WaitlistPage.css, y esta escrito alli.
+ */
+:where(.page-pc-builder) .badge-warning {
+  background: var(--warning-glow);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+:where(.page-pc-builder) .badge-unknown {
+  background: rgba(6, 182, 212, 0.10);
+  color: var(--info);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+:where(.page-pc-builder) .status-banner.unknown {
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  color: var(--info);
+}
+
+:where(.page-pc-builder) .issue-item.unknown {
+  color: var(--info);
+}
+
+:where(.page-pc-builder) .tdp-nota {
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}

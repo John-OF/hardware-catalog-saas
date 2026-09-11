@@ -120,11 +120,34 @@ export interface User {
   email_verified?: boolean;
 }
 
+/**
+ * Que pieza de PC vende una categoria (FUN-8). Espejo de
+ * `App\Enums\ComponentType`; las etiquetas estan en `utils/componentTypes`.
+ */
+export type ComponentType =
+  | 'cpu'
+  | 'motherboard'
+  | 'ram'
+  | 'gpu'
+  | 'ssd'
+  | 'power'
+  | 'cooling'
+  | 'case'
+  | 'monitor'
+  | 'peripheral'
+  | 'other';
+
 export interface Category {
   id: string;
   tenant_id: string;
   name: string;
   icon: string | null;
+  /**
+   * Lo que empareja la categoria con los pasos del armador. Antes se adivinaba
+   * por un trozo del nombre, asi que una tienda que dijera "CPU" en vez de
+   * "Procesadores" se quedaba sin armador y sin aviso.
+   */
+  component_type: ComponentType;
   sort_order: number;
   is_active: boolean;
 }

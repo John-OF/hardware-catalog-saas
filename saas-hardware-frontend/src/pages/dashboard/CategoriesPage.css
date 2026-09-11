@@ -331,3 +331,38 @@
     width: 100%;
   }
 }
+
+/*
+ * FUN-8: el select de "que vende esta categoria" con su icono al lado. El icono
+ * ya no se elige, se deduce del tipo, asi que el recuadro de la izquierda es una
+ * vista previa y no un control.
+ */
+:where(.page-categories) .category-type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+:where(.page-categories) .category-type-row .select-input {
+  flex: 1;
+  min-width: 0;
+}
+
+:where(.page-categories) .category-type-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  color: var(--primary);
+}
+
+:where(.page-categories) .form-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}

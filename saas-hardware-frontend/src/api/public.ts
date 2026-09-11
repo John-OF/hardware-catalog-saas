@@ -19,6 +19,12 @@ export const getPublicProducts = async (
   slug: string,
   params?: {
     category_id?: string;
+    /**
+     * Filtra por lo que vende la categoria y no por una categoria concreta
+     * (FUN-8): el armador pide "procesadores" y una tienda puede tenerlos
+     * partidos en dos categorias por marca.
+     */
+    component_type?: string;
     search?: string;
     in_stock?: boolean;
     specs?: Record<string, string>;

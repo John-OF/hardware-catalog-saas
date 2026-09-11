@@ -37,7 +37,16 @@ class CategoryController extends Controller
 
     public function update(StoreCategoryRequest $request, Category $category): JsonResponse
     {
-        $category->update($request->validated());
+        $datos = $request->validated();
+
+        // FUN-8: un `component_type` vacio es "no me lo preguntes", no
+        // "borralo". La columna es NOT NULL y al editar dejaria la categoria
+        // sin tipo —fuera del armador— por no haber tocado ese campo.
+        if (array_key_exists('component_type', $datos) && $datos['component_type'] === null) {
+            unset($datos['component_type']);
+        }
+
+        $category->update($datos);
         return response()->json($category);
     }
 

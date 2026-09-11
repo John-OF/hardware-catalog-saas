@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Public;
 
+use App\Enums\ComponentType;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -94,9 +95,21 @@ class PublicCatalogController extends Controller
         $criterios = $request->only(['category_id', 'search', 'in_stock', 'page', 'sort']);
         $criterios['specs'] = $specs;
 
+        // FUN-8: el armador pide "procesadores", no "la categoria tal". Se
+        // filtra por el tipo de la categoria y no por su id porque una tienda
+        // puede tener dos categorias del mismo tipo ("Procesadores Intel" y
+        // "Procesadores AMD"): con un solo `category_id` la mitad del stock se
+        // quedaba fuera del paso sin que el comprador lo supiera.
+        //
+        // Se normaliza contra el enum antes de tocar la clave de cache: un
+        // valor libre aqui seria una entrada de cache nueva por cada cadena
+        // inventada, la misma fuga que AUD-7 tapo en el filtro de specs.
+        $componentType = ComponentType::tryFrom((string) $request->query('component_type'));
+        $criterios['component_type'] = $componentType?->value;
+
         $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($criterios));
 
-        $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request, $specs) {
+        $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request, $specs, $componentType) {
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->where('status', 'published')
@@ -104,6 +117,10 @@ class PublicCatalogController extends Controller
                 ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
                 ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
+                ->when($componentType, fn($q) => $q->whereHas(
+                    'category',
+                    fn($c) => $c->where('component_type', $componentType->value)
+                ))
                 // El comprador busca tanto por modelo como por marca ("Kingston"),
                 // asi que el termino se prueba contra name, brand y sku.
                 // Los OR van agrupados en su propio closure a proposito: sueltos se
@@ -369,55 +386,52 @@ class PublicCatalogController extends Controller
             ->where('status', 'published')
             ->with(['category', 'images']);
 
-        $categoryName = strtolower($product->category?->name ?? '');
+        // FUN-8: los complementarios salen del TIPO de la categoría, no de su
+        // nombre. Antes esto era `str_contains($categoryName, 'procesador')` y
+        // una lista de nombres esperados, así que una tienda que llamara "CPU" a
+        // sus procesadores se quedaba sin cross-selling y sin ningún aviso — el
+        // mismo fallo silencioso que el enum cerró en el armador.
+        $tipo = $product->category?->component_type;
+        $tiposComplementarios = $tipo ? $tipo->complementarios() : [];
 
-        // Identificar palabras clave en el nombre o specs para compatibilidad
+        $complementaryProducts = collect();
+
+        if ($tiposComplementarios !== []) {
+            $valores = array_map(fn (ComponentType $t) => $t->value, $tiposComplementarios);
+
+            $complementaryProducts = (clone $relatedQuery)
+                ->whereHas('category', fn ($q) => $q->whereIn('component_type', $valores))
+                // Con tope: antes esta consulta se traía TODOS los productos de
+                // las categorías complementarias -un catálogo entero de placas y
+                // memorias- para acabar quedándose con seis. El orden por
+                // afinidad de abajo se hace en PHP, así que necesita un montón
+                // de candidatos, no el catálogo: 24 da de sobra para llenar los
+                // seis huecos.
+                ->orderByDesc('views_count')
+                ->limit(24)
+                ->get();
+        }
+
+        // Ordenar al inicio los que comparten socket o tipo de memoria.
+        //
+        // OJO: esto sigue leyendo el nombre y las specs con una expresión
+        // regular, que es la mitad de FUN-8 que sigue abierta. Se deja porque
+        // aquí sólo REORDENA una lista que ya está bien elegida: si no encuentra
+        // el dato, las sugerencias siguen siendo las correctas, sólo que sin
+        // priorizar. No decide qué se enseña, a diferencia de lo de arriba.
         $specsString = json_encode($product->specs ?? []);
         $productString = strtolower($product->name . ' ' . $specsString);
 
         $socket = null;
-        if (preg_match('/\b(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)\b/i', $productString, $matches)) {
+        if (preg_match('/(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)/i', $productString, $matches)) {
             $socket = $matches[1];
         }
 
         $ramType = null;
-        if (preg_match('/\b(ddr5|ddr4)\b/i', $productString, $matches)) {
+        if (preg_match('/(ddr5|ddr4)/i', $productString, $matches)) {
             $ramType = $matches[1];
         }
 
-        // Definir categorías sugeridas complementarias según el tipo de producto
-        $targetCategoryNames = [];
-        if (str_contains($categoryName, 'procesador') || str_contains($categoryName, 'processor')) {
-            $targetCategoryNames = ['placas madre', 'memoria ram'];
-        } elseif (str_contains($categoryName, 'placa') || str_contains($categoryName, 'madre') || str_contains($categoryName, 'motherboard')) {
-            $targetCategoryNames = ['procesadores', 'memoria ram'];
-        } elseif (str_contains($categoryName, 'tarjeta') || str_contains($categoryName, 'video') || str_contains($categoryName, 'gpu')) {
-            $targetCategoryNames = ['fuentes de poder', 'gabinetes'];
-        } elseif (str_contains($categoryName, 'fuente') || str_contains($categoryName, 'poder') || str_contains($categoryName, 'power')) {
-            $targetCategoryNames = ['tarjetas de video', 'procesadores'];
-        } elseif (str_contains($categoryName, 'gabinete') || str_contains($categoryName, 'case')) {
-            $targetCategoryNames = ['fuentes de poder', 'enfriamiento'];
-        } elseif (str_contains($categoryName, 'ram') || str_contains($categoryName, 'memoria')) {
-            $targetCategoryNames = ['placas madre', 'procesadores'];
-        } elseif (str_contains($categoryName, 'almacenamiento') || str_contains($categoryName, 'ssd') || str_contains($categoryName, 'disco')) {
-            $targetCategoryNames = ['placas madre', 'procesadores'];
-        }
-
-        // Obtener sugerencias complementarias
-        $complementaryProducts = collect();
-        if (!empty($targetCategoryNames)) {
-            $complementaryProducts = (clone $relatedQuery)
-                ->whereHas('category', function ($q) use ($targetCategoryNames) {
-                    $q->where(function ($sub) use ($targetCategoryNames) {
-                        foreach ($targetCategoryNames as $name) {
-                            $sub->orWhere('name', 'like', "%{$name}%");
-                        }
-                    });
-                })
-                ->get();
-        }
-
-        // Ordenar complementarios que compartan socket o tipo de memoria al inicio
         if ($socket || $ramType) {
             $complementaryProducts = $complementaryProducts->sortByDesc(function ($p) use ($socket, $ramType) {
                 $pSpecs = json_encode($p->specs ?? []);
@@ -668,10 +682,11 @@ class PublicCatalogController extends Controller
     /**
      * "Avísame cuando llegue": el cliente deja su contacto para un producto agotado.
      *
-     * OJO (FUN-1a): al reponer stock **todavía no se avisa a nadie**. El disparador
-     * existe y el interés se registra, pero `Product::notifyStockSubscribers()` sólo
-     * deja rastro en el log; el envío es FUN-1b. Este comentario decía lo contrario
-     * y describía algo que nunca ocurrió.
+     * El aviso al reponer stock ya se envía (FUN-1b, cerrado el 2026-09-07), pero
+     * **sólo por correo y sólo a quien dejó un correo**: `customer_contact` es un
+     * campo libre y los teléfonos se quedan esperando a propósito, para que el dueño
+     * escriba por WhatsApp desde la lista de espera del panel. El porqué está en
+     * `Product::notifyStockSubscribers()`.
      */
     public function storeStockNotification(Request $request, string $slug, string $productId): JsonResponse
     {

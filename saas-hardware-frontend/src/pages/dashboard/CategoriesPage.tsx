@@ -13,7 +13,8 @@ import {
   Eye, 
   EyeOff, 
   Loader2,
-  GripVertical
+  GripVertical,
+  Cpu
 } from 'lucide-react';
 import {
   getCategories,
@@ -23,16 +24,28 @@ import {
   reorderCategories
 } from '../../api/categories';
 import CategoryIcon from '../../components/ui/CategoryIcon';
-import type { Category } from '../../types';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import { COMPONENT_TYPES, iconOfComponentType } from '../../utils/componentTypes';
+import type { Category, ComponentType } from '../../types';
+
+/** Etiqueta legible del tipo; una categoria vieja sin tipo cae en "Otros". */
+const labelDeTipo = (tipo: ComponentType | null) =>
+  COMPONENT_TYPES.find((t) => t.value === tipo)?.label ?? 'Otros / No es pieza de PC';
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
+  // UI-9: con la ventana abierta la pagina de detras no se mueve.
+  useBloqueoDeScroll(isModalOpen);
+
   // Form states
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('folder');
+  // FUN-8: lo que se elige ya no es el dibujo sino QUE se vende. El icono sale
+  // de aqui: eran la misma lista, pero como icono era opcional y nadie sabia
+  // que el armador dependia de ella.
+  const [componentType, setComponentType] = useState<ComponentType>('other');
   const [sortOrder, setSortOrder] = useState('0');
   const [isActive, setIsActive] = useState(true);
 
@@ -139,7 +152,7 @@ export default function CategoriesPage() {
   const openCreateModal = () => {
     setEditingCategory(null);
     setName('');
-    setIcon('folder');
+    setComponentType('other');
     setSortOrder('0');
     setIsActive(true);
     setIsModalOpen(true);
@@ -148,7 +161,7 @@ export default function CategoriesPage() {
   const openEditModal = (category: Category) => {
     setEditingCategory(category);
     setName(category.name);
-    setIcon(category.icon || 'folder');
+    setComponentType(category.component_type || 'other');
     setSortOrder(category.sort_order.toString());
     setIsActive(category.is_active);
     setIsModalOpen(true);
@@ -168,7 +181,11 @@ export default function CategoriesPage() {
 
     const payload = {
       name,
-      icon: icon || 'folder',
+      component_type: componentType,
+      // El icono va detras del tipo y no al reves. Se manda ya resuelto porque
+      // el backend solo lo deduce al crear: sin esto, cambiar el tipo de una
+      // categoria existente dejaria el dibujo antiguo.
+      icon: iconOfComponentType(componentType),
       sort_order: parseInt(sortOrder) || 0,
       is_active: isActive
     };
@@ -249,6 +266,10 @@ export default function CategoriesPage() {
                     <Sliders size={14} />
                     <span>Orden: {category.sort_order}</span>
                   </div>
+                  <div className="meta-item">
+                    <Cpu size={14} />
+                    <span>{labelDeTipo(category.component_type)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -291,43 +312,27 @@ export default function CategoriesPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="cat-icon">Icono Relacionado</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '42px',
-                      height: '42px',
-                      flexShrink: 0,
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--primary)',
-                    }}
-                  >
-                    <CategoryIcon slug={icon} size={20} />
+                <label htmlFor="cat-type">¿Qué vende esta categoría?</label>
+                <div className="category-type-row">
+                  <span className="category-type-preview">
+                    <CategoryIcon slug={iconOfComponentType(componentType)} size={20} />
                   </span>
                   <select
-                    id="cat-icon"
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
+                    id="cat-type"
+                    value={componentType}
+                    onChange={(e) => setComponentType(e.target.value as ComponentType)}
                     className="premium-input select-input"
-                    style={{ flex: 1 }}
                   >
-                    <option value="cpu">Procesadores (CPU)</option>
-                    <option value="gpu">Tarjetas de Video (GPU)</option>
-                    <option value="ram">Memorias RAM</option>
-                    <option value="motherboard">Placas Madre (Motherboard)</option>
-                    <option value="ssd">Almacenamiento (SSD/HDD)</option>
-                    <option value="power">Fuentes de Poder</option>
-                    <option value="case">Gabinetes / Chasis</option>
-                    <option value="cooling">Enfriamiento / Disipadores</option>
-                    <option value="monitor">Monitores</option>
-                    <option value="peripheral">Periféricos (Teclado/Mouse)</option>
-                    <option value="folder">Genérico / Otros</option>
+                    {COMPONENT_TYPES.map((tipo) => (
+                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                    ))}
                   </select>
                 </div>
+                <p className="form-hint">
+                  El armador de PC usa esto para saber qué ofrecer en cada paso, así que puedes
+                  ponerle a la categoría el nombre que quieras. El icono se elige solo, según lo
+                  que vendas.
+                </p>
               </div>
 
               <div className="form-row">
