@@ -28,6 +28,7 @@ import {
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import { getPlan } from '../../api/plan';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatMoney } from '../../utils/money';
@@ -68,6 +69,9 @@ export default function ProductsPage() {
   // Bulk selection states
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
+
+  // UI-9: con un modal abierto la pagina de detras no se mueve.
+  useBloqueoDeScroll(isModalOpen || isImportModalOpen || isPriceAdjustModalOpen);
   const [bulkPriceAdjustment, setBulkPriceAdjustment] = useState('');
 
   // Form inputs

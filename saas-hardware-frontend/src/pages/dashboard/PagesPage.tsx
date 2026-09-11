@@ -13,12 +13,16 @@ import { toast } from 'react-hot-toast';
 import { getPages, createPage, updatePage, deletePage } from '../../api/pages';
 import type { Page } from '../../types';
 import './PagesPage.css';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
 export default function PagesPage() {
   const queryClient = useQueryClient();
 
   // Modals & Forms State
   const [isOpen, setIsOpen] = useState(false);
+
+  // UI-9: con la ventana abierta la pagina de detras no se mueve.
+  useBloqueoDeScroll(isOpen);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
   
   const [title, setTitle] = useState('');

@@ -40,6 +40,7 @@ import { heroStyleOf } from '../../utils/hero';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -151,6 +152,9 @@ export default function CatalogPage() {
   // Comparador de productos
   const [comparedProducts, setComparedProducts] = useState<Product[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  // UI-9: con el comparador abierto el catalogo de detras no se mueve.
+  useBloqueoDeScroll(isCompareModalOpen);
 
   // Customer Auth
   const [accountModalOpen, setAccountModalOpen] = useState(false);

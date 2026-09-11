@@ -39,6 +39,20 @@
 }
 
 /* Sidebar Styles */
+/* UI-10: la barra lateral se queda quieta al bajar por el contenido.
+
+   Antes era un hijo normal del flex, asi que en las paginas largas -Productos y
+   Configuracion- el scroll de la ventana se la llevaba hacia arriba y el menu
+   desaparecia justo cuando mas falta hace: al final de una lista larga. Un menu
+   no es contenido de la pagina.
+
+   `sticky` y no `fixed` porque asi sigue ocupando su columna en el flex y no hay
+   que compensar el ancho con un margen en el contenido. `height: 100vh` mas su
+   propio `overflow-y` para que, en pantallas bajas, lo que se desplace sea el
+   menu por dentro en vez de quedarse recortado.
+
+   En movil la consulta de abajo la vuelve `absolute` y se abre como cajon, que
+   es lo que ya hacia. */
 :where(.page-dashboard) .dashboard-sidebar {
   width: 280px;
   background-color: var(--bg-sidebar);
@@ -47,6 +61,11 @@
   flex-direction: column;
   z-index: 50;
   transition: transform 0.3s ease;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 :where(.page-dashboard) .sidebar-brand {

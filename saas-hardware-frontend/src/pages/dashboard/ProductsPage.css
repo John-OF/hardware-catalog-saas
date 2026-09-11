@@ -338,6 +338,8 @@
   flex: 1;
   overflow-y: auto;
   padding-right: 0.5rem;
+  /* UI-9: al llegar al final, la rueda no sigue moviendo la pagina de detras. */
+  overscroll-behavior: contain;
 }
 
 :where(.page-products) .form-group {

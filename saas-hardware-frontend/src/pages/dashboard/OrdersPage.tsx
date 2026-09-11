@@ -23,6 +23,7 @@ import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatMoney } from '../../utils/money';
+import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
@@ -32,6 +33,9 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // UI-9: con el detalle abierto la lista de detras no se mueve.
+  useBloqueoDeScroll(selectedOrder !== null);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   // Fetch orders

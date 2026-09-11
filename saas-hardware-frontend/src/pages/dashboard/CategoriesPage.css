@@ -169,6 +169,17 @@
 }
 
 /* Modal / Drawer Overlay */
+/* UI-7: esta ventana era la unica del panel que salia pegada al borde derecho y
+   a toda altura, mientras Productos, Pedidos y Paginas la centran. No era una
+   decision de diseno sino un resto de cuando se penso como "drawer": el TSX ya
+   la llama `modal-drawer` en todas partes, y las demas paginas se apartaron de
+   ese patron sin que esta lo hiciera.
+
+   Y el `z-index: 100` la dejaba POR DEBAJO del aviso de "confirma tu correo",
+   que se pinta encima de cualquier pantalla del panel: la ventana salia con la
+   esquina superior tapada. Productos ya usaba 200 con el comentario de que era
+   para quedar encima de todo; aqui se hace lo mismo en vez de inventar otro
+   numero. */
 :where(.page-categories) .modal-overlay {
   position: fixed;
   top: 0;
@@ -176,22 +187,28 @@
   right: 0;
   bottom: 0;
   background: rgba(15, 23, 42, 0.4);
-  z-index: 100;
+  z-index: 200;
   display: flex;
-  justify-content: flex-end; /* Drawer slide-in from right */
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
 }
 
 :where(.page-categories) .modal-drawer {
   width: 100%;
   max-width: 480px;
-  height: 100%;
-  border-radius: 0;
-  border-left: 1px solid var(--border);
-  padding: 2.5rem;
+  /* Acotada al alto de la ventana y con scroll dentro: en un portatil bajo, a
+     toda altura se comia los botones de guardar. */
+  max-height: calc(100vh - 4rem);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
   overflow-y: auto;
+  /* UI-9: al llegar al final, la rueda no sigue moviendo la pagina de detras. */
+  overscroll-behavior: contain;
 }
 
 :where(.page-categories) .drawer-header {
