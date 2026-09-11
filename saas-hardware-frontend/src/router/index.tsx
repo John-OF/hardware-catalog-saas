@@ -52,6 +52,7 @@ const OrdersPage = lazy(() => import('../pages/dashboard/OrdersPage'));
 const PagesPage = lazy(() => import('../pages/dashboard/PagesPage'));
 const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
 const WaitlistPage = lazy(() => import('../pages/dashboard/WaitlistPage'));
+const UsersPage = lazy(() => import('../pages/dashboard/UsersPage'));
 
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
       { path: 'pages',      element: <PagesPage /> },
       { path: 'reviews',    element: <ReviewsPage /> },
       { path: 'waitlist',   element: <WaitlistPage /> },
+      { path: 'users',      element: <UsersPage /> },
     ],
   },
 

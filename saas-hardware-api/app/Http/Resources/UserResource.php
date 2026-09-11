@@ -36,6 +36,12 @@ class UserResource extends JsonResource
             // un dato interno y publicarlo sería volver a la fuga que este
             // recurso vino a cerrar.
             'email_verified' => $this->hasVerifiedEmail(),
+            // FUN-4: quién todavía no ha entrado nunca. Es lo que distingue una
+            // invitación pendiente de un compañero que ya trabaja, y sin esto la
+            // pantalla de equipo no puede ofrecer "reenviar invitación" solo a
+            // quien le hace falta. Booleano y no la fecha, por el mismo criterio
+            // que la línea de arriba.
+            'invitation_pending' => $this->last_login_at === null,
         ];
     }
 }

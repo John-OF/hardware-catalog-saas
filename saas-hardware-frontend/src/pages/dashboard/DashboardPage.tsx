@@ -10,6 +10,7 @@ import {
   ExternalLink, 
   Store,
   User as UserIcon,
+  Users as UsersIcon,
   Menu,
   X,
   ChevronRight,
@@ -229,6 +230,16 @@ export default function DashboardPage() {
           >
             <Bell size={20} />
             <span>Lista de espera</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          <NavLink
+            to="/dashboard/users"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <UsersIcon size={20} />
+            <span>Equipo</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

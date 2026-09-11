@@ -6,6 +6,7 @@ use App\Exceptions\PlanLimitException;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Product;
+use App\Models\User;
 
 /**
  * Aplica los limites del plan de la tienda actual (SAAS-3 — paso 7.7a).
@@ -38,6 +39,7 @@ class PlanGate
         'products'           => 'productos',
         'categories'         => 'categorías',
         'pages'              => 'páginas informativas',
+        'users'              => 'usuarios del panel',
         'images_per_product' => 'imágenes por producto',
         'custom_domain'      => 'El dominio propio',
         'csv_import'         => 'La importación por CSV',
@@ -106,6 +108,10 @@ class PlanGate
         foreach (array_keys(self::CONTADORES) as $recurso) {
             $uso[$recurso] = self::actual($recurso);
         }
+
+        // `users` no esta en CONTADORES -se cuenta aparte, ver actual()- pero el
+        // panel tiene que poder pintar "1 / 3" igual que con los demas.
+        $uso['users'] = self::actual('users');
 
         return $uso;
     }
@@ -188,6 +194,25 @@ class PlanGate
 
     private static function actual(string $recurso): int
     {
+        // `users` no se puede contar como los demas, por dos motivos (FUN-4):
+        //
+        // 1. `User` es la EXCEPCION al fallo en cerrado de AUD-4 -su global
+        //    scope esta desactivado a proposito, el porque esta en el modelo-,
+        //    asi que un `User::count()` contaria a los usuarios de TODAS las
+        //    tiendas. Justo el tipo de suposicion tacita que AUD-4 saco a la luz.
+        // 2. Solo cuentan los del PANEL. Los clientes del catalogo viven en esta
+        //    misma tabla con rol `customer`, y una tienda con 500 compradores
+        //    registrados se quedaria sin poder invitar a su vendedor.
+        if ($recurso === 'users') {
+            if (! app()->bound('currentTenant')) {
+                return 0;
+            }
+
+            return User::where('tenant_id', app('currentTenant')->id)
+                ->whereIn('role', ['admin', 'staff'])
+                ->count();
+        }
+
         $modelo = self::CONTADORES[$recurso] ?? null;
 
         return $modelo ? $modelo::count() : 0;

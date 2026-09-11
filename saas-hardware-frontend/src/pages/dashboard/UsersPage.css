@@ -1,0 +1,316 @@
+/* Estilos de <UsersPage> — el equipo de la tienda (FUN-4).
+
+   Acotados a `.page-users`, que se pone en la raíz del componente, y con
+   `:where()` para que valgan 0 de especificidad: así compiten con index.css
+   igual que el resto de hojas de página del panel. El porqué largo está en la
+   cabecera de CategoriesPage.css. */
+
+:where(.page-users).users-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-users) .page-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-users) .page-description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  max-width: 640px;
+  margin: 0;
+}
+
+/* El aviso de que todavía no hay permisos limitados. */
+:where(.page-users) .team-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+
+:where(.page-users) .team-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+:where(.page-users) .team-notice p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+:where(.page-users) .team-quota {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+:where(.page-users) .team-quota.agotada {
+  color: var(--warning);
+}
+
+:where(.page-users) .team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+:where(.page-users) .team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Quien no tiene acceso se ve apagado, pero legible: sigue siendo alguien del
+   equipo al que hay que poder reactivar. */
+:where(.page-users) .team-card.inactivo {
+  opacity: 0.65;
+}
+
+:where(.page-users) .team-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+:where(.page-users) .team-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-glow, rgba(249, 115, 22, 0.12));
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+:where(.page-users) .team-identity {
+  min-width: 0;
+}
+
+:where(.page-users) .team-identity h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.page-users) .team-yo {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 50px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+:where(.page-users) .team-email {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+:where(.page-users) .team-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+:where(.page-users) .team-badges .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+}
+
+/* `badge-pendiente` y `badge-neutro` no existen en el sistema de diseño
+   (index.css solo trae success y danger), así que se definen aquí, igual que
+   hicieron OrdersPage y WaitlistPage con `badge-warning`. */
+:where(.page-users) .badge-pendiente {
+  background: var(--warning-glow);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+:where(.page-users) .badge-neutro {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+:where(.page-users) .team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+:where(.page-users) .team-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+:where(.page-users) .team-btn-danger {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--danger);
+}
+
+:where(.page-users) .team-btn-danger:hover {
+  background: var(--danger-glow);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+:where(.page-users) .form-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+:where(.page-users) .inner-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 0;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  :where(.page-users) .page-header-actions {
+    align-items: stretch;
+  }
+}
+
+/* ---------------------------------------------------------------- La ventana
+
+   UI-8: estas reglas faltaban y por eso la ventana de invitar salia sin
+   margenes, sin separacion entre campos y pegada a un lado.
+
+   La causa de fondo NO es este fichero: `.modal-overlay`, `.modal-drawer`,
+   `.drawer-header`, `.form-group` y compania estan definidas **por separado en
+   cada pagina del panel** (Productos, Categorias, Pedidos, Paginas), asi que una
+   pantalla nueva nace sin ellas y nadie lo nota hasta que abre su modal. Lo
+   correcto es un componente de dialogo compartido; queda anotado en
+   `pendientes.md` como `TEC-11`. Mientras tanto, esto copia el patron de
+   ProductsPage, que es el que las demas siguen. */
+
+:where(.page-users) .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+:where(.page-users) .modal-drawer {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 4rem);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  /* UI-9: al llegar al final del recorrido, la rueda no sigue en la pagina. */
+  overscroll-behavior: contain;
+}
+
+:where(.page-users) .drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+:where(.page-users) .drawer-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+}
+
+:where(.page-users) .drawer-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-users) .drawer-close:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.05);
+}
+
+:where(.page-users) .drawer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-users) .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+:where(.page-users) .form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+:where(.page-users) .drawer-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-users) .drawer-actions button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}

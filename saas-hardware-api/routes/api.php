@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PlanController;
@@ -179,4 +180,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
 
     // Páginas informativas privadas
     Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
+
+    // Equipo de la tienda (FUN-4). Sin `show`: la lista ya trae todo lo que hay
+    // de un usuario. El controlador resuelve el {user} a mano y no por route
+    // model binding, para no salirse de la tienda (ver su cabecera).
+    Route::post('users/{user}/resend-invitation', [UserController::class, 'resend'])
+        ->middleware('throttle:3,1');
+    Route::apiResource('users', UserController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
 });

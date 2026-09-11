@@ -125,6 +125,12 @@ export interface User {
    * que no se le pide verificar nada.
    */
   email_verified?: boolean;
+  /**
+   * FUN-4. Quien todavia no ha entrado nunca: lo que distingue una invitacion
+   * pendiente de un companiero que ya trabaja. Booleano y no la fecha, por el
+   * mismo criterio que `email_verified`.
+   */
+  invitation_pending?: boolean;
 }
 
 /**

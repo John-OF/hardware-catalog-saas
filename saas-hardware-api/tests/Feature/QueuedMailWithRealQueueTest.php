@@ -40,6 +40,9 @@ use Tests\TestCase;
  * 4. El correo de verificacion del alta (FUN-5), que es el otro sin tienda
  *    resuelta y ademas el que se manda en el momento exacto en que la tienda
  *    acaba de nacer.
+ * 5. La invitacion al equipo (FUN-4), que sale del panel -o sea CON tienda
+ *    resuelta- pero viaja marcada `NotTenantAware`. Es el caso que faltaba por
+ *    cubrir: uno donde la tienda existe y aun asi el trabajo no la necesita.
  *
  * Al anadir un correo nuevo, anadir aqui su caso: la suite normal no lo cubre.
  */
@@ -203,6 +206,48 @@ class QueuedMailWithRealQueueTest extends TestCase
             $mensajes[0]->getEnvelope()->getRecipients()[0]->getAddress(),
         );
         $this->assertSame('Confirma tu correo y publica tu tienda', $mensajes[0]->getOriginalMessage()->getSubject());
+    }
+
+    public function test_la_invitacion_al_equipo_sale_por_la_cola(): void
+    {
+        // FUN-4. A diferencia del reset y de la verificacion, esta sale de una
+        // ruta que SI resuelve tienda (el panel), asi que aqui lo que se
+        // comprueba es lo contrario que alli: que marcarla `NotTenantAware` no
+        // rompe nada cuando la tienda existe. Y como todo lo de este fichero:
+        // con `sync` saldria igual, asi que solo el worker de verdad lo prueba.
+        // El plan gratuito solo admite UN usuario de panel, que es justo el
+        // dueno que ya existe: sin esto la invitacion se corta antes de llegar a
+        // la cola y el test comprobaria el tope del plan en vez del correo.
+        $this->tenant->update(['plan' => 'pro']);
+
+        $token = $this->admin->createToken('test', ['admin'])->plainTextToken;
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'X-Tenant'      => $this->tenant->slug,
+        ])->postJson('/api/users', [
+            'name'  => 'Vendedor',
+            'email' => 'vendedor@tienda-cola.com',
+        ])->assertCreated();
+
+        $this->assertSame(1, DB::table('jobs')->count(), 'La invitacion no llego a la cola.');
+
+        $this->trabajarLaCola();
+
+        $this->assertSame(0, DB::table('jobs')->count());
+        $this->assertSame(0, DB::table('failed_jobs')->count(), 'La invitacion fallo en el worker.');
+
+        $mensajes = $this->correosEnviados();
+
+        $this->assertCount(1, $mensajes, 'El worker no envio la invitacion.');
+        $this->assertStringContainsString(
+            'vendedor@tienda-cola.com',
+            $mensajes[0]->getEnvelope()->getRecipients()[0]->getAddress(),
+        );
+        $this->assertStringContainsString(
+            'te invito a administrar Tienda Cola',
+            $mensajes[0]->getOriginalMessage()->getSubject(),
+        );
     }
 
     /**

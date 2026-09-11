@@ -30,6 +30,12 @@
 | esto, cambiar el plan desde el panel de plataforma borraria datos de un
 | cliente, que es justo lo que no puede pasar al gestionar un moroso.
 |
+| `users` cuenta los usuarios del PANEL (admin y staff), no los clientes del
+| catalogo, que viven en la misma tabla `users` pero con rol `customer`. Una
+| tienda con 500 compradores registrados no puede quedarse sin poder invitar a
+| su vendedor. Con `users => 1` el plan gratuito se queda como estaba hasta hoy:
+| el dueno y nadie mas.
+|
 | `images_per_product` cuenta la GALERIA. La imagen principal del producto es
 | una columna suya (`products.image_url`), no una fila de `product_images`, y no
 | entra en el tope: un plan con 3 imagenes son la principal + 3 de galeria.
@@ -54,6 +60,7 @@ return [
             'limits' => [
                 'products'           => 20,
                 'images_per_product' => 3,
+                'users'              => 1,
                 'categories'         => 5,
                 'pages'              => 2,
                 'custom_domain'      => false,
@@ -66,6 +73,7 @@ return [
             'limits' => [
                 'products'           => 500,
                 'images_per_product' => 8,
+                'users'              => 3,
                 'categories'         => 50,
                 'pages'              => 15,
                 'custom_domain'      => true,
@@ -78,6 +86,7 @@ return [
             'limits' => [
                 'products'           => null,
                 'images_per_product' => null,
+                'users'              => null,
                 'categories'         => null,
                 'pages'              => null,
                 'custom_domain'      => true,
