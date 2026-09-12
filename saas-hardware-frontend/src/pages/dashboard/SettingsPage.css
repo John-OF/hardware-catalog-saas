@@ -150,3 +150,43 @@
 :where(.page-settings) .helper-text-warning {
   color: var(--warning);
 }
+
+/* Verificación del dominio propio (FUN-6). */
+:where(.page-settings) .domain-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+:where(.page-settings) .domain-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+:where(.page-settings) .domain-pending p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+:where(.page-settings) .domain-txt-record {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+:where(.page-settings) .domain-txt-record dt {
+  color: var(--text-muted);
+}
+
+:where(.page-settings) .domain-txt-record dd {
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}

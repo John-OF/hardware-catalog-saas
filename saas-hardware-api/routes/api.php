@@ -209,6 +209,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // ------------------------------------------------ solo admin (FUN-4)
     Route::middleware('admin')->group(function () {
         Route::put('/tenant', [TenantController::class, 'update']);
+        // Comprobar el registro TXT del dominio propio (FUN-6).
+        Route::post('/tenant/custom-domain/verify', [TenantController::class, 'verifyCustomDomain']);
 
         Route::post('products/import', [ProductController::class, 'import']);
         Route::post('products/bulk', [ProductController::class, 'bulkAction']);

@@ -48,7 +48,13 @@ class PublicCatalogController extends Controller
         // otra puerta de entrada al catalogo (la del dominio propio), asi que sin
         // esto una tienda sin verificar seguiria abierta por su dominio aunque el
         // slug la cerrara.
+        //
+        // FUN-6: `conDominioVerificado()`, ademas. `custom_domain` es una columna
+        // que cualquiera con acceso al panel puede escribir; sin este scope,
+        // pedir aqui el dominio de OTRA tienda -antes de demostrar que es tuyo-
+        // servia igual el catalogo ajeno.
         $tenant = Tenant::publica()
+            ->conDominioVerificado()
             ->where('custom_domain', $domain)
             ->select(self::COLUMNAS_PUBLICAS_TENANT)
             ->first();

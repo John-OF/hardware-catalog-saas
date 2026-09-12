@@ -26,9 +26,11 @@ class Tenant extends Model implements IsTenant
     ];
 
     protected $casts = [
-        'is_active'    => 'boolean',
-        'is_published' => 'boolean',
-        'theme'        => 'array',
+        'is_active'                   => 'boolean',
+        'is_published'                => 'boolean',
+        'theme'                       => 'array',
+        'custom_domain_requested_at'  => 'datetime',
+        'custom_domain_verified_at'   => 'datetime',
     ];
 
     /**
@@ -49,6 +51,21 @@ class Tenant extends Model implements IsTenant
     public function scopePublica(Builder $query): Builder
     {
         return $query->where('is_active', true)->where('is_published', true);
+    }
+
+    /**
+     * Dominio propio VERIFICADO (FUN-6).
+     *
+     * No basta con que `custom_domain` tenga un valor: hasta que se demuestre
+     * con el registro TXT, ese valor es solo lo que alguien escribió, y podría
+     * ser el dominio de otra persona. Centralizado por el mismo motivo que
+     * `scopePublica()`: es la unica pregunta que importa antes de resolver una
+     * tienda por su dominio, y repetirla a mano en cada sitio es la forma
+     * segura de que un dia se olvide en uno.
+     */
+    public function scopeConDominioVerificado(Builder $query): Builder
+    {
+        return $query->whereNotNull('custom_domain_verified_at');
     }
 
     public function users(): HasMany

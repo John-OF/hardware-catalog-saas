@@ -3,15 +3,33 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
+use App\Services\DomainVerifier;
 use App\Services\ImageService;
 use App\Support\PlanGate;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class TenantController extends Controller
 {
+    /**
+     * Cuánto se le da a alguien para verificar un dominio que acaba de pedir
+     * antes de que otra tienda pueda quitárselo (FUN-6).
+     *
+     * Sin esto, escribir el dominio de otro lo dejaba ocupado para siempre —
+     * `unique` no distingue entre "lo tengo y lo demostré" y "lo escribí una
+     * vez y no volví"—, y el dueño legítimo se comía un 422 sin saber por qué
+     * ni cuándo se liberaría. Un día es tiempo de sobra para poner un TXT (la
+     * propagación de DNS rara vez pasa de un par de horas) y poco tiempo para
+     * que alguien lo use de verdad como bloqueo.
+     */
+    private const LIBERAR_DOMINIO_TRAS_HORAS = 24;
+
     public function __construct(private ImageService $imageService) {}
 
     public function show(Request $request): JsonResponse
@@ -29,7 +47,38 @@ class TenantController extends Controller
             'primary_color'   => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'logo_url'        => 'sometimes|nullable|url|max:500',
             'logo'            => 'nullable|image|mimes:jpeg,png,webp|max:2048',
-            'custom_domain'   => 'sometimes|nullable|string|max:100|unique:tenants,custom_domain,' . $tenant->id,
+
+            // Cerrojo de FUN-6: un closure y no `unique:tenants,custom_domain`
+            // a secas, porque "ocupado" ya no es una pregunta binaria. Un
+            // dominio de otra tienda que nunca se verificó y lleva más de
+            // `LIBERAR_DOMINIO_TRAS_HORAS` sin moverse se considera abandonado
+            // y se deja pedir: si no, escribir el dominio de otro por error (o
+            // a propósito) lo dejaba ocupado para siempre, aunque quien lo
+            // escribió no fuera a demostrar nunca que es suyo.
+            'custom_domain' => [
+                'sometimes', 'nullable', 'string', 'max:100',
+                function (string $atributo, $valor, \Closure $fallar) use ($tenant) {
+                    if (blank($valor) || $valor === $tenant->custom_domain) {
+                        return;
+                    }
+
+                    $otra = Tenant::where('custom_domain', $valor)
+                        ->where('id', '!=', $tenant->id)
+                        ->first();
+
+                    if (! $otra) {
+                        return;
+                    }
+
+                    $abandonado = ! $otra->custom_domain_verified_at
+                        && $otra->custom_domain_requested_at
+                        && $otra->custom_domain_requested_at->lt(now()->subHours(self::LIBERAR_DOMINIO_TRAS_HORAS));
+
+                    if (! $abandonado) {
+                        $fallar('Ese dominio ya lo está usando otra tienda.');
+                    }
+                },
+            ],
 
             // Moneda de la tienda (OWN-1). La whitelist sale de config/currencies.php,
             // que es la misma lista que ofrece el selector de Configuración.
@@ -155,11 +204,130 @@ class TenantController extends Controller
         // Las claves de archivo no son columnas del modelo: quitarlas antes de guardar.
         unset($data['logo'], $data['banner'], $data['favicon']);
 
-        $tenant->update($data);
+        try {
+            DB::transaction(function () use ($tenant, $data) {
+                if (array_key_exists('custom_domain', $data)) {
+                    $this->prepararDominioPropio($tenant, $data['custom_domain']);
+                }
+
+                $tenant->update($data);
+            });
+        } catch (QueryException $e) {
+            // El UNIQUE de la columna es el ultimo cerrojo, detras de la
+            // validacion de arriba: dos peticiones reclamando el MISMO dominio
+            // abandonado a la vez pasan las dos esa comprobacion (ninguna ve
+            // todavia el cambio de la otra) y solo una gana la escritura.
+            // Rarisimo -exige el mismo dominio libre y las dos peticiones en la
+            // misma fraccion de segundo- pero un 422 claro es mejor que un 500.
+            return response()->json([
+                'message' => 'Alguien más acaba de quedarse con ese dominio justo ahora. Prueba con otro.',
+            ], 422);
+        }
 
         // Invalidar la caché pública del tenant para que el branding se refleje al instante
         Cache::forget("tenant:{$tenant->slug}");
 
         return response()->json($tenant->fresh());
+    }
+
+    /**
+     * Todo lo que rodea al VALOR del dominio, aparte de guardarlo (eso lo hace
+     * el `update()` normal de arriba, porque `custom_domain` sigue siendo una
+     * columna corriente de `$data`).
+     *
+     * Las tres columnas de verificación son de sistema —fuera de `$fillable`,
+     * ver el modelo— y sólo se escriben aquí, con `forceFill()`, nunca desde
+     * una petición.
+     *
+     * Se llama SIEMPRE dentro de la transacción de `update()`: si hay que
+     * liberar el dominio de otra tienda, esa liberación y el resto del guardado
+     * tienen que ir juntos o nada.
+     */
+    private function prepararDominioPropio(Tenant $tenant, ?string $nuevoDominio): void
+    {
+        // Resometer el mismo valor (guardar otra cosa sin tocar el dominio) no
+        // reinicia nada: perdería el progreso de una verificación en curso.
+        if ($nuevoDominio === $tenant->custom_domain) {
+            return;
+        }
+
+        if (blank($nuevoDominio)) {
+            $tenant->forceFill([
+                'custom_domain_token'        => null,
+                'custom_domain_requested_at' => null,
+                'custom_domain_verified_at'  => null,
+            ])->save();
+
+            return;
+        }
+
+        // Liberar el dominio si lo tenía una tienda que lo pidió y nunca lo
+        // verificó: la validación de arriba ya comprobó que se puede pedir
+        // (`LIBERAR_DOMINIO_TRAS_HORAS`); esto sólo lo suelta para no chocar
+        // con el UNIQUE de la columna al guardar el nuevo dueño.
+        Tenant::where('custom_domain', $nuevoDominio)
+            ->where('id', '!=', $tenant->id)
+            ->update([
+                'custom_domain'               => null,
+                'custom_domain_token'         => null,
+                'custom_domain_requested_at'  => null,
+                'custom_domain_verified_at'   => null,
+            ]);
+
+        $tenant->forceFill([
+            'custom_domain_token'        => Str::random(32),
+            'custom_domain_requested_at' => now(),
+            'custom_domain_verified_at'  => null,
+        ])->save();
+    }
+
+    /**
+     * Comprobar el registro TXT y, si está, marcar el dominio como verificado
+     * (FUN-6).
+     *
+     * Mientras no esté verificado, ni el catálogo público ni el panel resuelven
+     * la tienda por este dominio (`Tenant::scopeConDominioVerificado`, usado en
+     * `PublicCatalogController::resolveDomain` e `InitializeTenantByHeader`):
+     * "lo escribí" y "lo demostré" son preguntas distintas, y sólo la segunda
+     * abre algo.
+     */
+    public function verifyCustomDomain(DomainVerifier $verificador): JsonResponse
+    {
+        $tenant = app('currentTenant');
+
+        if (blank($tenant->custom_domain)) {
+            return response()->json([
+                'message' => 'Esta tienda no tiene ningún dominio propio configurado.',
+            ], 422);
+        }
+
+        if ($tenant->custom_domain_verified_at) {
+            return response()->json([
+                'verified' => true,
+                'message'  => 'Este dominio ya está verificado.',
+            ]);
+        }
+
+        // Subdominio con guion bajo (`_saas-verify`) y no el dominio pelado, por
+        // lo mismo que `_dmarc` o `_domainconnect`: así no compite con un
+        // subdominio de verdad que el dueño ya tuviera.
+        $host = '_saas-verify.'.$tenant->custom_domain;
+        $valorEsperado = 'saas-verify='.$tenant->custom_domain_token;
+
+        if (! $verificador->tieneRegistroTxt($host, $valorEsperado)) {
+            return response()->json([
+                'verified' => false,
+                'message'  => "No encontramos el registro TXT en {$host}. Puede tardar unas horas en propagarse desde que lo agregas.",
+            ], 422);
+        }
+
+        $tenant->forceFill(['custom_domain_verified_at' => now()])->save();
+        Cache::forget("tenant:{$tenant->slug}");
+
+        return response()->json([
+            'verified' => true,
+            'message'  => 'Dominio verificado: ya sirve el catálogo de esta tienda.',
+            'tenant'   => $tenant->fresh(),
+        ]);
     }
 }

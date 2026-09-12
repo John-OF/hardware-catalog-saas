@@ -186,7 +186,8 @@ app/
 ├── Services/
 │   ├── ImageService.php    # Subida y optimización a WebP
 │   ├── OrderPricing.php    # Precios y total calculados en el servidor
-│   └── ViewCounter.php     # Visitas acumuladas en caché
+│   ├── ViewCounter.php     # Visitas acumuladas en caché
+│   └── DomainVerifier.php  # Comprueba el TXT del dominio propio
 └── Support/
     ├── PlanGate.php        # Aplica los límites del plan
     ├── Money.php           # Formato de moneda por tienda
@@ -196,7 +197,7 @@ app/
 config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
-tests/Feature/         # 45 archivos, 371 tests (+1 en tests/Unit)
+tests/Feature/         # 45 archivos, 391 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -244,6 +245,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET | `/api/dashboard/stats` | Métricas | Sí |
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
 | GET · PUT | `/api/tenant` | Configuración y branding | Solo `GET` |
+| POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
@@ -265,6 +267,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar y cambiar plan |
 | POST | `/api/platform/tenants/{tenant}/password-reset` | Mandar recuperación al dueño |
 | POST | `/api/platform/tenants/{tenant}/impersonate` | Entrar como soporte: token de 15 min y **solo lectura** |
+| POST | `/api/platform/tenants/{tenant}/rescue-admin` | Nombrar admin a un colaborador cuando la tienda se quedó sin ninguno |
 
 > El token de soporte lleva la ability `soporte`, y el middleware `soporte` —aplicado al grupo
 > entero del panel— rechaza con 403 cualquier método que no sea GET/HEAD (salvo `/api/auth/logout`).
@@ -272,7 +275,12 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 
 **Rutas web (no API)** — `routes/web.php`: `/{slug}`, `/{slug}/product/{id}`, `/{slug}/p/{pageSlug}`
 y `/{slug}/builder` devuelven una vista Open Graph si quien pide es un crawler conocido, y
-redirigen a `FRONTEND_URL` si es una persona.
+redirigen a `FRONTEND_URL` si es una persona. Las mismas cuatro vistas existen otra vez sin el
+`{slug}`, bajo `Route::domain('{tenantDominio}')`, para las tiendas con **dominio propio y
+verificado**: resuelven la tienda por el `Host` de la petición en vez de por slug, y un humano sale
+hacia `FRONTEND_URL/{slug}/...` en vez de a la ruta pedida tal cual (sin slug, esa URL no sabría de
+qué tienda se trata). Un host que no es ni el de la app ni el de ninguna tienda cae en 404 —o en la
+vista `welcome` de siempre, si es la raíz.
 
 ### Variables de entorno relevantes
 
@@ -292,7 +300,7 @@ redirigen a `FRONTEND_URL` si es una persona.
 ### Comandos
 
 ```bash
-php artisan test        # 372 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 392 tests (PHPUnit, SQLite en memoria)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
 composer setup          # install + .env + key + migrate + build

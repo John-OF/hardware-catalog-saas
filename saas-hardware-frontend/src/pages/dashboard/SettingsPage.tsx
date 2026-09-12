@@ -3,7 +3,7 @@ import './SettingsPage.css';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTenantStore } from '../../stores/tenantStore';
-import { updateTenant } from '../../api/tenant';
+import { updateTenant, verifyCustomDomain } from '../../api/tenant';
 import { getPlan } from '../../api/plan';
 import type { UpdateTenantPayload } from '../../api/tenant';
 import { 
@@ -21,7 +21,10 @@ import {
   WandSparkles,
   Check,
   Frame,
-  Megaphone
+  Megaphone,
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
@@ -127,6 +130,10 @@ export default function SettingsPage() {
   
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
+  // FUN-6: aparte de isSaving, porque comprobar el TXT es una accion propia,
+  // no parte de "Guardar cambios" -no manda nada nuevo, solo pregunta si lo
+  // que ya se guardo se puede demostrar.
+  const [isVerifyingDomain, setIsVerifyingDomain] = useState(false);
 
   // El dominio propio es una funcion de plan (SAAS-3). El campo se deja
   // editable aunque el plan no lo incluya: si se bloqueara, una tienda que baja
@@ -352,6 +359,28 @@ export default function SettingsPage() {
     }
   };
 
+  /**
+   * Comprobar el registro TXT del dominio pendiente (FUN-6).
+   *
+   * No manda ningun campo: solo le pregunta al backend si ya encuentra el
+   * registro que le pedimos poner. `res.tenant` trae el modelo entero -con
+   * `custom_domain_verified_at` puesto- para que el aviso se quite sin
+   * esperar a recargar la pagina.
+   */
+  const handleVerifyDomain = async () => {
+    setIsVerifyingDomain(true);
+    try {
+      const res = await verifyCustomDomain();
+      if (res.tenant) setTenant(res.tenant);
+      toast.success(res.message);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'No se pudo comprobar el dominio.';
+      toast.error(msg);
+    } finally {
+      setIsVerifyingDomain(false);
+    }
+  };
+
   if (!tenant) {
     return (
       <div className="settings-loading page-settings">
@@ -439,6 +468,48 @@ export default function SettingsPage() {
               </span>
             )}
           </div>
+
+          {/* FUN-6: sobre lo GUARDADO, no sobre lo que se esté escribiendo. Si
+              el campo no coincide con `tenant.custom_domain` todavía no hay
+              nada que verificar — hay que guardar primero. */}
+          {tenant.custom_domain && customDomain === tenant.custom_domain && (
+            <div className="form-group full">
+              {tenant.custom_domain_verified_at ? (
+                <span className="badge badge-success domain-status">
+                  <ShieldCheck size={14} /> Dominio verificado
+                </span>
+              ) : (
+                <div className="domain-pending">
+                  <span className="badge badge-warning domain-status">
+                    <ShieldAlert size={14} /> Pendiente de verificar
+                  </span>
+                  <p>
+                    Para demostrar que <strong>{tenant.custom_domain}</strong> es tuyo, agrega este
+                    registro <strong>TXT</strong> en el panel de tu proveedor de DNS:
+                  </p>
+                  <dl className="domain-txt-record">
+                    <dt>Nombre / Host</dt>
+                    <dd><code>_saas-verify.{tenant.custom_domain}</code></dd>
+                    <dt>Valor</dt>
+                    <dd><code>saas-verify={tenant.custom_domain_token}</code></dd>
+                  </dl>
+                  <p className="helper-text">
+                    Puede tardar unas horas en propagarse. El catálogo público no usará este dominio
+                    hasta que quede verificado.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-mini"
+                    disabled={isVerifyingDomain}
+                    onClick={handleVerifyDomain}
+                  >
+                    {isVerifyingDomain ? <Loader2 size={14} className="spinner" /> : <RefreshCw size={14} />}
+                    Verificar ahora
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

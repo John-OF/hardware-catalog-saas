@@ -88,6 +88,14 @@ export interface Tenant {
    */
   is_published: boolean;
   custom_domain: string | null;
+  /**
+   * Verificación del dominio propio (FUN-6). `custom_domain_verified_at` es
+   * `null` mientras no se demuestre con el registro TXT; `custom_domain_token`
+   * es el valor que hay que poner ahí. Los dos solo llegan por `GET /tenant`
+   * -la pantalla del propio dueño-, no por las rutas públicas del catálogo.
+   */
+  custom_domain_token: string | null;
+  custom_domain_verified_at: string | null;
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
 }

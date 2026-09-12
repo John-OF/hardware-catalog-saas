@@ -37,6 +37,10 @@ class ResponseHygieneTest extends TestCase
             'plan'            => 'pro',
             'is_active'       => true,
         ]);
+
+        // FUN-6: sin esto, `resolve-domain` ya no resuelve nada -el dominio no
+        // basta, hay que demostrarlo-, y estos dos tests no son sobre eso.
+        $this->tenant->forceFill(['custom_domain_verified_at' => now()])->save();
     }
 
     // ------------------------------------------------------------------ AUD-9
@@ -53,7 +57,12 @@ class ResponseHygieneTest extends TestCase
         $respuesta = $this->getJson('/api/public/resolve-domain?domain=mitienda.example')
             ->assertStatus(200);
 
-        foreach (['plan', 'views_count', 'is_active', 'custom_domain', 'created_at', 'updated_at'] as $columna) {
+        foreach ([
+            'plan', 'views_count', 'is_active', 'custom_domain', 'created_at', 'updated_at',
+            // FUN-6: el token de verificación no publica el plan, pero es el
+            // secreto que demuestra el dominio — igual de impublicable.
+            'custom_domain_token', 'custom_domain_requested_at', 'custom_domain_verified_at',
+        ] as $columna) {
             $respuesta->assertJsonMissingPath($columna);
         }
     }

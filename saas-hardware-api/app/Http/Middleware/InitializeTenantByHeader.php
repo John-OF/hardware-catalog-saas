@@ -18,9 +18,12 @@ class InitializeTenantByHeader
         if ($slug) {
             $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
         } else {
-            // Resolver por dominio personalizado
+            // Resolver por dominio personalizado. `conDominioVerificado()` es a
+            // proposito (FUN-6): sin ella, cualquiera podia escribir el dominio
+            // de otra tienda y entrar aqui con SU host, antes de demostrar que
+            // el dominio es suyo.
             $host = $request->getHost();
-            $tenant = Tenant::where('custom_domain', $host)->where('is_active', true)->first();
+            $tenant = Tenant::conDominioVerificado()->where('custom_domain', $host)->where('is_active', true)->first();
         }
 
         if (!$tenant) {

@@ -51,3 +51,15 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
   });
   return data;
 };
+
+/** Respuesta de comprobar el registro TXT del dominio propio (FUN-6). */
+export interface VerifyDomainResponse {
+  verified: boolean;
+  message: string;
+  tenant?: Tenant;
+}
+
+export const verifyCustomDomain = async (): Promise<VerifyDomainResponse> => {
+  const { data } = await api.post<VerifyDomainResponse>('/tenant/custom-domain/verify');
+  return data;
+};
