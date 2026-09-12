@@ -101,8 +101,9 @@ Todos los tenants comparten **una sola base de datos**; cada fila lleva `tenant_
 (vía [spatie/laravel-multitenancy](https://github.com/spatie/laravel-multitenancy)).
 El tenant activo se resuelve según el tipo de ruta:
 
-- **Rutas privadas de administración** (`auth:sanctum` + `tenant` + `admin`): por el header
-  `X-Tenant: {slug}` — `app/Http/Middleware/InitializeTenantByHeader.php`.
+- **Rutas privadas del panel** (`auth:sanctum` + `tenant` + `panel`, y `admin` encima de lo que solo
+  decide un administrador): por el header `X-Tenant: {slug}` —
+  `app/Http/Middleware/InitializeTenantByHeader.php`.
 - **Rutas públicas** (`/api/public/{slug}/...`): por el slug de la URL — `InitializeTenantBySlug.php`.
 - **Dominios personalizados**: `GET /api/public/resolve-domain` devuelve el tenant asociado al
   dominio; en ese caso el frontend usa rutas **sin** prefijo de slug.
@@ -113,15 +114,24 @@ El tenant activo se resuelve según el tipo de ruta:
 devuelve nada en vez de devolverlo todo. Para mirar por encima de las tiendas hay que pedirlo
 explícitamente con `withoutTenant()`. **`User` es la única excepción**, y el porqué está escrito en
 el propio modelo (es el problema del huevo y la gallina: `auth:sanctum` resuelve al usuario antes de
-que ningún middleware haya resuelto la tienda).
+que ningún middleware haya resuelto la tienda). Ojo con lo que abarca: la excepción es solo **sin**
+tienda, donde `User` lo ve todo; **con** tienda resuelta —en todo el panel— su scope filtra igual que
+el de cualquier modelo, así que una consulta de `User` sobre **otras** tiendas también necesita
+`withoutTenant()`.
 
 Hay **tres autenticaciones separadas**, todas con Sanctum (tokens Bearer):
 
-1. **Administradores de tienda** — panel (header `X-Tenant` + Bearer). Token de 7 días, una sesión
-   activa por usuario.
+1. **Equipo de la tienda** — panel (header `X-Tenant` + Bearer). Token de 7 días, una sesión activa
+   por usuario. Dos roles: `admin` (todo) y `staff` (el día a día: pedidos, productos sin borrar,
+   reseñas, lista de espera). El rol se lee del usuario en cada petición, no del token. Un correo
+   solo puede estar en el panel de **una** tienda, porque el login no pide la tienda.
 2. **Clientes finales** — cuentas por tienda dentro del catálogo público (favoritos e historial).
    Token de 30 días. El middleware `customer` exige que el token sea **de esa tienda**.
-3. **Operador de la plataforma** (`superadmin`) — panel propio, restringido además por IP.
+3. **Operador de la plataforma** (`superadmin`) — panel propio, restringido además por IP. Token de
+   1 día. Puede **entrar en una tienda como soporte**: eso emite un token del admin de esa tienda
+   con la ability `soporte`, que caduca en 15 minutos, **no puede escribir nada** (middleware
+   `soporte`, aplicado al grupo entero del panel) y queda anotado en `activity_logs` antes de
+   emitirse. No revoca los tokens del dueño: puede seguir trabajando mientras el operador mira.
 
 El registro de tiendas es **self-service** (`POST /api/auth/register`) con validación de slugs
 reservados; la tienda nace sin publicar y se publica al verificar el correo. Las claves primarias son
@@ -162,15 +172,17 @@ app/
 │   ├── Middleware/
 │   │   ├── InitializeTenantByHeader.php    # Panel: X-Tenant
 │   │   ├── InitializeTenantBySlug.php      # Público: slug de la URL
+│   │   ├── EnsurePanelUser.php             # Puerta del panel: admin o staff
 │   │   ├── EnsureAdmin.php · EnsureSuperAdmin.php
 │   │   ├── EnsureTenantCustomer.php        # El token es de ESTA tienda
-│   │   └── RestrictPlatformIp.php          # Lista de IPs del panel de plataforma
+│   │   ├── RestrictPlatformIp.php          # Lista de IPs del panel de plataforma
+│   │   └── RestrictImpersonation.php       # Sesión de soporte: el panel, en solo lectura
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
 ├── Models/            # Tenant, User, Category, Product, ProductImage, Order,
-│                      # OrderItem, Review, StockNotification, Page
+│                      # OrderItem, Review, StockNotification, Page, ActivityLog
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
-├── Notifications/     # VerifyEmail, ResetPassword, NewOrder, OrderPlaced,
-│                      # OrderStatusChanged, BackInStock  (todas ShouldQueue)
+├── Notifications/     # VerifyEmail, ResetPassword, TeamInvitation, NewOrder,
+│                      # OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
 ├── Services/
 │   ├── ImageService.php    # Subida y optimización a WebP
 │   ├── OrderPricing.php    # Precios y total calculados en el servidor
@@ -178,12 +190,13 @@ app/
 └── Support/
     ├── PlanGate.php        # Aplica los límites del plan
     ├── Money.php           # Formato de moneda por tienda
-    └── StoreUrl.php        # URL pública de una tienda, para los correos
+    ├── StoreUrl.php        # URL pública de una tienda, para los correos
+    └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
-tests/Feature/         # 41 archivos, 320 tests (+1 en tests/Unit)
+tests/Feature/         # 45 archivos, 371 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -193,7 +206,7 @@ tests/Feature/         # 41 archivos, 320 tests (+1 en tests/Unit)
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/api/auth/register` | Alta de tienda (tenant + admin) · 5/min |
-| POST | `/api/auth/login` | Login de administrador · 5/min |
+| POST | `/api/auth/login` | Login del panel (admin o staff) · 5/min |
 | POST | `/api/auth/forgot-password` · `/reset-password` | Recuperación de contraseña · 5/min |
 | GET | `/api/auth/verify-email/{id}/{hash}` | Verificar correo (URL firmada) → redirige al SPA |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
@@ -221,22 +234,24 @@ tests/Feature/         # 41 archivos, 320 tests (+1 en tests/Unit)
 | GET | `/my-orders` | Historial de pedidos |
 | GET·POST | `/favorites` · `/favorites/{product}` | Listar y alternar favoritos |
 
-**Administración** (Bearer + `X-Tenant: {slug}` + rol admin):
+**Panel** (Bearer + `X-Tenant: {slug}` + rol `admin` o `staff`). La columna *Staff* dice qué puede
+un colaborador; un `admin` puede todo. El reparto y su criterio están en `routes/api.php`:
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión |
-| POST | `/api/auth/email/resend` | Reenviar verificación · 3/min |
-| GET | `/api/dashboard/stats` | Métricas |
-| GET | `/api/plan` | Plan, límites y consumo |
-| GET·PUT | `/api/tenant` | Configuración y branding |
-| CRUD | `/api/products` (+ `POST /reorder`, `/import`, `/bulk`, `/{id}/duplicate`) | Productos |
-| CRUD | `/api/categories` (+ `POST /reorder`) | Categorías |
-| CRUD | `/api/orders` | Pedidos y venta de mostrador |
-| GET·PUT·DELETE | `/api/reviews` | Moderación |
-| GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera |
-| CRUD | `/api/pages` | Páginas informativas |
-| GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo de la tienda |
+| Método | Ruta | Descripción | Staff |
+|---|---|---|---|
+| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión | Sí |
+| POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | Sí |
+| GET | `/api/dashboard/stats` | Métricas | Sí |
+| GET | `/api/plan` | Plan, límites y consumo | Sí |
+| GET · PUT | `/api/tenant` | Configuración y branding | Solo `GET` |
+| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos | Todo menos `DELETE` |
+| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
+| CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
+| CRUD | `/api/orders` | Pedidos y venta de mostrador | Todo menos `DELETE` |
+| GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
+| GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
+| CRUD | `/api/pages` | Páginas informativas | No |
+| GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto), cambiar rol, activar, eliminar | No |
 
 **Plataforma** (Bearer + rol `superadmin` + lista de IPs):
 
@@ -244,8 +259,16 @@ tests/Feature/         # 41 archivos, 320 tests (+1 en tests/Unit)
 |---|---|---|
 | POST | `/api/platform/login` · `/logout` | Sesión del operador |
 | GET | `/api/platform/me` · `/tenants` | Perfil y listado de tiendas |
+| GET | `/api/platform/stats` | Resumen del negocio: altas, estados, reparto por plan y totales |
+| GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`) |
+| GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora |
 | PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar y cambiar plan |
 | POST | `/api/platform/tenants/{tenant}/password-reset` | Mandar recuperación al dueño |
+| POST | `/api/platform/tenants/{tenant}/impersonate` | Entrar como soporte: token de 15 min y **solo lectura** |
+
+> El token de soporte lleva la ability `soporte`, y el middleware `soporte` —aplicado al grupo
+> entero del panel— rechaza con 403 cualquier método que no sea GET/HEAD (salvo `/api/auth/logout`).
+> `GET /api/auth/me` devuelve `soporte: true` para que el panel avise de que se está en casa ajena.
 
 **Rutas web (no API)** — `routes/web.php`: `/{slug}`, `/{slug}/product/{id}`, `/{slug}/p/{pageSlug}`
 y `/{slug}/builder` devuelven una vista Open Graph si quien pide es un crawler conocido, y
@@ -269,7 +292,7 @@ redirigen a `FRONTEND_URL` si es una persona.
 ### Comandos
 
 ```bash
-php artisan test        # 321 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 372 tests (PHPUnit, SQLite en memoria)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
 composer setup          # install + .env + key + migrate + build
@@ -303,7 +326,8 @@ react-hot-toast. CSS propio, sin framework.
 | `/dashboard` | Resumen con métricas |
 | `/dashboard/products` · `/categories` · `/orders` · `/pages` · `/reviews` · `/waitlist` | Gestión |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
-| `/platform/login` · `/platform` | Panel del operador del SaaS |
+| `/platform/login` | Acceso del operador del SaaS |
+| `/platform` · `/platform/tenants` · `/platform/tenants/:id` · `/platform/logs` | Panel del operador: resumen, tiendas, ficha y bitácora (layout en `PlatformLayout`) |
 | `*` | 404 explícito |
 
 **Carga diferida**: todo va con `lazy()` **menos el catálogo**, que se queda estático a propósito por
@@ -314,15 +338,16 @@ ser la ruta de entrada de casi todo el tráfico.
 ```
 src/
 ├── api/            # Cliente Axios (interceptores) y funciones por recurso
-├── router/         # Rutas, PrivateRoute, Suspense y errorElement globales
+├── router/         # Rutas, PrivateRoute, SoloAdmin (pantallas de admin), Suspense y errorElement
 ├── pages/
 │   ├── auth/       # Login, RegisterStore, ForgotPassword, ResetPassword
 │   ├── dashboard/  # Overview, Products, Categories, Orders, Pages, Reviews,
 │   │               # Waitlist, Settings (layout en DashboardPage)
-│   ├── platform/   # PlatformLogin, Platform
+│   ├── platform/   # PlatformLogin, PlatformLayout, PlatformOverview, Platform (tiendas),
+│   │               # PlatformTenant (ficha), PlatformLogs
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
 ├── components/
-│   ├── dashboard/  # NewOrderModal (venta de mostrador), VerifyEmailBanner
+│   ├── dashboard/  # NewOrderModal (venta de mostrador), VerifyEmailBanner, SupportBanner
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
 │   └── ui/         # CategoryIcon, ImageSourceField, ErrorBoundary, fallbacks

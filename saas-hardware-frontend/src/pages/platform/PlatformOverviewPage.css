@@ -1,0 +1,182 @@
+/* Estilos del resumen del panel de plataforma (INF-2).
+
+   Acotados a `.page-platform`, que pone `PlatformLayout` en la raíz: en un .css
+   importado las reglas son globales y siempre están cargadas, así que sin
+   acotar, nombres corrientes como `.stat-card` se pisarían con los de otra
+   pantalla. `:where()` para que no sumen especificidad (ver `UI-5`). */
+
+:where(.page-platform) .platform-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .stat-grid {
+  display: grid;
+  /* auto-fit + minmax: cuatro tarjetas en escritorio, dos en tableta y una en
+     móvil sin una sola media query. */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+}
+
+:where(.page-platform) .stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-platform) .stat-value {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .stat-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .stat-foot {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* La única cifra donde más es peor. */
+:where(.page-platform) .stat-card-alert .stat-value {
+  color: var(--warning);
+}
+
+:where(.page-platform) .overview-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .overview-card {
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+:where(.page-platform) .overview-card h2 {
+  font-size: 0.95rem;
+  margin-bottom: 0.9rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .overview-muted {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .overview-note {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+}
+
+:where(.page-platform) .plan-list li {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+:where(.page-platform) .plan-name {
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+:where(.page-platform) .plan-bar {
+  height: 7px;
+  border-radius: 50px;
+  background: rgba(127, 127, 127, 0.15);
+  overflow: hidden;
+}
+
+:where(.page-platform) .plan-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 50px;
+  background: var(--primary);
+}
+
+:where(.page-platform) .overview-dl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+:where(.page-platform) .overview-dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+:where(.page-platform) .overview-dl dt {
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .overview-dl dd {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .altas-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+:where(.page-platform) .altas-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.87rem;
+}
+
+:where(.page-platform) .altas-list li:last-child {
+  border-bottom: none;
+}
+
+:where(.page-platform) .altas-list a {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .altas-list a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+:where(.page-platform) .altas-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

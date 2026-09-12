@@ -53,23 +53,51 @@ class PlanGate
      */
     public static function plan(): string
     {
-        $plan = app()->bound('currentTenant')
+        return self::planDe(app()->bound('currentTenant')
             ? (string) app('currentTenant')->plan
-            : '';
+            : null);
+    }
 
-        return config("plans.plans.{$plan}") ? $plan : (string) config('plans.default');
+    /**
+     * Lo mismo pero para una tienda que NO es la actual.
+     *
+     * Lo necesita el panel de plataforma (INF-2), que pinta la ficha de una
+     * tienda sin hacerla current: alli no hay `currentTenant` y las tres de
+     * arriba devolverian el plan por defecto de todo el mundo. Se resuelve aqui
+     * y no con un `config()` suelto en el controlador para que la regla del
+     * plan desconocido —cae al plan por defecto, nunca a "sin limites"— siga
+     * escrita en un unico sitio.
+     */
+    public static function planDe(?string $plan): string
+    {
+        return ($plan !== null && $plan !== '' && config("plans.plans.{$plan}"))
+            ? $plan
+            : (string) config('plans.default');
     }
 
     /** Nombre comercial del plan, para los mensajes y para el panel. */
     public static function label(): string
     {
-        return (string) config('plans.plans.'.self::plan().'.label', self::plan());
+        return self::labelDe(self::plan());
+    }
+
+    public static function labelDe(?string $plan): string
+    {
+        $clave = self::planDe($plan);
+
+        return (string) config("plans.plans.{$clave}.label", $clave);
     }
 
     /** @return array<string, int|bool|null> */
     public static function limits(): array
     {
-        return (array) config('plans.plans.'.self::plan().'.limits', []);
+        return self::limitsDe(self::plan());
+    }
+
+    /** @return array<string, int|bool|null> */
+    public static function limitsDe(?string $plan): array
+    {
+        return (array) config('plans.plans.'.self::planDe($plan).'.limits', []);
     }
 
     public static function limit(string $clave): int|bool|null
@@ -209,7 +237,7 @@ class PlanGate
             }
 
             return User::where('tenant_id', app('currentTenant')->id)
-                ->whereIn('role', ['admin', 'staff'])
+                ->whereIn('role', User::ROLES_DE_PANEL)
                 ->count();
         }
 

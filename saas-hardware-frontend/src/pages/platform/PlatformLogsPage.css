@@ -1,0 +1,81 @@
+/* Estilos de la bitácora del panel de plataforma (INF-2).
+
+   Acotados a `.page-platform`, que pone `PlatformLayout` en la raíz, y con
+   `:where()` para no sumar especificidad (ver `UI-5`). Lo compartido con las
+   demás pantallas —filtros, contador, botones pequeños— está en
+   PlatformLayout.css, porque esta hoja no se carga hasta abrir la bitácora. */
+
+:where(.page-platform) .platform-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .log-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  padding: 0.35rem 1.25rem;
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+:where(.page-platform) .log-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-platform) .log-list li:last-child {
+  border-bottom: none;
+}
+
+:where(.page-platform) .log-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .log-desc {
+  font-size: 0.87rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .log-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .log-tenant {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+:where(.page-platform) a.log-tenant:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+/* La tienda ya no existe: la línea sigue valiendo, el enlace no. */
+:where(.page-platform) .log-tenant-gone {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+:where(.page-platform) .log-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}

@@ -754,3 +754,19 @@ select.premium-input option {
   color: var(--danger);
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
+
+/* Las dos variantes que faltaban del mismo componente (INF-2). Van aqui y no en
+   la hoja de la pagina que las estreno: `.badge` es del sistema de diseno, y una
+   regla `:where(.page-x) .badge-...` empata en especificidad con el componente y
+   se resuelve por orden de carga de los chunks (UI-5). */
+.badge-warning {
+  background: var(--warning-glow);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badge-neutral {
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}

@@ -1,37 +1,41 @@
 import './PlatformPage.css';
 
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import {
-  ShieldCheck,
   Search,
   Loader2,
   Ban,
   Play,
   KeyRound,
   ExternalLink,
-  LogOut,
 } from 'lucide-react';
 import {
   getPlatformTenants,
-  platformLogout,
   sendTenantPasswordReset,
   updatePlatformTenant,
 } from '../../api/platform';
 import type { PlatformTenant } from '../../api/platform';
 import type { PaginatedResponse } from '../../types';
-import { usePlatformAuthStore } from '../../stores/platformAuthStore';
 
 type ApiError = { response?: { data?: { message?: string } } };
 
 const PLANES = ['free', 'pro', 'enterprise'];
 
+/**
+ * Listado de tiendas del operador (SAAS-4).
+ *
+ * Es la pantalla de BUSCAR y de las dos acciones rápidas que se hacen sin mirar
+ * nada más (suspender y cambiar de plan). Entender una tienda —su equipo, su
+ * consumo frente al plan, sus últimos pedidos— es la ficha, y por eso el nombre
+ * es un enlace: desde `INF-2` esta tabla ya no intenta contarlo todo.
+ *
+ * La cabecera, la sesión y la navegación son de `PlatformLayout`.
+ */
 export default function PlatformPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAuthenticated, clearPlatformAuth } = usePlatformAuthStore();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -49,7 +53,6 @@ export default function PlatformPage() {
         search: debouncedSearch || undefined,
         status: status || undefined,
       }),
-    enabled: isAuthenticated,
   });
 
   const updateMutation = useMutation({
@@ -57,6 +60,10 @@ export default function PlatformPage() {
       updatePlatformTenant(id, payload),
     onSuccess: (tenant) => {
       queryClient.invalidateQueries({ queryKey: ['platformTenants'] });
+      // La ficha y la bitácora hablan de lo mismo: si no se invalidan, quedan
+      // enseñando el plan de antes y sin la línea que acaba de escribirse.
+      queryClient.invalidateQueries({ queryKey: ['platformTenant', tenant.id] });
+      queryClient.invalidateQueries({ queryKey: ['platformLogs'] });
       toast.success(tenant.is_active ? `${tenant.name} está activa` : `${tenant.name} quedó suspendida`);
     },
     onError: (error) => {
@@ -66,40 +73,19 @@ export default function PlatformPage() {
 
   const resetMutation = useMutation({
     mutationFn: (id: string) => sendTenantPasswordReset(id),
-    onSuccess: (res) => toast.success(res.message),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['platformLogs'] });
+      toast.success(res.message);
+    },
     onError: (error) => {
       toast.error((error as ApiError).response?.data?.message || 'No se pudo enviar el enlace.');
     },
   });
 
-  const handleLogout = async () => {
-    try {
-      await platformLogout();
-    } finally {
-      clearPlatformAuth();
-      navigate('/platform/login', { replace: true });
-    }
-  };
-
-  if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
-
   const tenants = data?.data ?? [];
 
   return (
-    <div className="platform-page animate-fade-in page-platform">
-      <header className="platform-header">
-        <div className="platform-title">
-          <ShieldCheck size={20} />
-          <div>
-            <h1>Tiendas de la plataforma</h1>
-            <p>{data ? `${data.total} tienda(s) registradas` : 'Cargando...'}</p>
-          </div>
-        </div>
-        <button type="button" className="btn-secondary" onClick={handleLogout}>
-          <LogOut size={15} /> Salir
-        </button>
-      </header>
-
+    <div className="platform-list animate-fade-in">
       <div className="platform-filters glass-card">
         <div className="platform-search">
           <Search size={16} className="platform-search-icon" />
@@ -120,6 +106,9 @@ export default function PlatformPage() {
           <option value="active">Activas</option>
           <option value="suspended">Suspendidas</option>
         </select>
+        <span className="platform-count">
+          {data ? `${data.total} tienda(s)` : 'Cargando...'}
+        </span>
       </div>
 
       {isLoading ? (
@@ -145,7 +134,9 @@ export default function PlatformPage() {
               {tenants.map((tenant) => (
                 <tr key={tenant.id} className={tenant.is_active ? '' : 'row-suspended'}>
                   <td>
-                    <strong>{tenant.name}</strong>
+                    <Link className="tenant-name" to={`/platform/tenants/${tenant.id}`}>
+                      {tenant.name}
+                    </Link>
                     <a
                       className="tenant-slug"
                       href={`/${tenant.slug}`}

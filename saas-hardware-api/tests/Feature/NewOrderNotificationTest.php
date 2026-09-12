@@ -138,6 +138,20 @@ class NewOrderNotificationTest extends TestCase
         Notification::assertSentTo($segundoAdmin, NewOrderNotification::class);
     }
 
+    /**
+     * FUN-4: quien atiende los pedidos suele ser staff, y es quien necesita
+     * enterarse. Con el filtro de antes (`role = admin`) no le llegaba nada.
+     */
+    public function test_el_staff_tambien_recibe_el_aviso(): void
+    {
+        $vendedor = $this->makeUser($this->tenant, 'vendedor@tienda-a.com', role: 'staff');
+
+        $this->placeOrder($this->tenant, $this->producto)->assertCreated();
+
+        Notification::assertSentTo($this->admin, NewOrderNotification::class);
+        Notification::assertSentTo($vendedor, NewOrderNotification::class);
+    }
+
     public function test_el_correo_lleva_el_detalle_del_pedido(): void
     {
         $this->placeOrder($this->tenant, $this->producto, quantity: 3)->assertCreated();

@@ -679,3 +679,30 @@
   border-color: var(--warning);
   color: var(--warning);
 }
+
+/* Lista vacía. Faltaba en esta hoja —las de Pedidos, Categorías y Páginas sí la
+   tienen, cada una su copia (TEC-11)— y el aviso salía pegado al borde de la
+   tarjeta y alineado a la izquierda. Mismo aspecto que el de Pedidos, que ocupa
+   el ancho de la lista igual que aquí, más aire para el botón de crear. */
+:where(.page-products) .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  gap: 0.5rem;
+}
+
+:where(.page-products) .empty-state h3 {
+  color: var(--text-primary);
+  margin-top: 0.5rem;
+  font-size: 1.2rem;
+}
+
+:where(.page-products) .empty-state p {
+  max-width: 400px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}

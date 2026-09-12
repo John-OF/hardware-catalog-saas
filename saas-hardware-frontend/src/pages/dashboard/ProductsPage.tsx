@@ -31,6 +31,7 @@ import { getPlan } from '../../api/plan';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
+import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 
 export default function ProductsPage() {
@@ -68,6 +69,11 @@ export default function ProductsPage() {
 
   // Bulk selection states
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+
+  // FUN-4: staff crea y edita, pero no borra, no importa CSV y no hace acciones
+  // masivas (el backend le responde 403). Se esconde en vez de apagarse porque
+  // no es algo que vaya a poder hacer esperando: no es de su rol.
+  const puedeAdministrar = useEsAdmin() !== false;
   const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
 
   // UI-9: con un modal abierto la pagina de detras no se mueve.
@@ -552,10 +558,12 @@ export default function ProductsPage() {
             </span>
           )}
 
-          <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
-            <Upload size={18} />
-            <span>Importar CSV</span>
-          </button>
+          {puedeAdministrar && (
+            <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
+              <Upload size={18} />
+              <span>Importar CSV</span>
+            </button>
+          )}
 
           <button onClick={openCreateModal} className="btn-primary add-product-btn">
             <Plus size={18} />
@@ -565,7 +573,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Bulk actions bar */}
-      {selectedProductIds.length > 0 && (
+      {puedeAdministrar && selectedProductIds.length > 0 && (
         <div className="bulk-actions-bar glass-card animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.5rem', background: 'rgba(var(--primary-rgb), 0.08)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-lg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
             <CheckSquare size={18} style={{ color: 'var(--primary)' }} />
@@ -632,14 +640,16 @@ export default function ProductsPage() {
               <thead>
                 <tr>
                   <th style={{ width: '30px' }}></th>
-                  <th style={{ width: '40px', textAlign: 'center' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={products.length > 0 && selectedProductIds.length === products.length}
-                      onChange={toggleSelectAll}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </th>
+                  {puedeAdministrar && (
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={products.length > 0 && selectedProductIds.length === products.length}
+                        onChange={toggleSelectAll}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </th>
+                  )}
                   <th>Imagen</th>
                   <th>Producto</th>
                   <th>Categoría</th>
@@ -666,14 +676,16 @@ export default function ProductsPage() {
                       <td style={{ textAlign: 'center', cursor: 'grab' }} className="drag-handle-cell" title="Arrastrar para ordenar">
                         <GripVertical size={16} />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          onChange={() => toggleSelectProduct(product.id)}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </td>
+                      {puedeAdministrar && (
+                        <td style={{ textAlign: 'center' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={() => toggleSelectProduct(product.id)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
+                      )}
                       <td>
                         <div className="table-img-wrapper">
                           {product.thumbnail_url ? (
@@ -764,9 +776,11 @@ export default function ProductsPage() {
                           <button onClick={() => handleDuplicateProduct(product.id)} className="table-action-btn edit" title="Clonar / Duplicar" style={{ color: 'var(--primary)' }}>
                             <Copy size={15} />
                           </button>
-                          <button onClick={() => handleDelete(product.id, product.name)} className="table-action-btn delete" title="Eliminar">
-                            <Trash2 size={15} />
-                          </button>
+                          {puedeAdministrar && (
+                            <button onClick={() => handleDelete(product.id, product.name)} className="table-action-btn delete" title="Eliminar">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

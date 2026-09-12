@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 import { getMe, logoutUser } from '../../api/auth';
 import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
-import { useAuthStore } from '../../stores/authStore';
+import SupportBanner from '../../components/dashboard/SupportBanner';
+import { rutaDeSalidaDelPanel, useAuthStore, useEsAdmin } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
 export default function DashboardPage() {
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const token = useAuthStore((s) => s.token);
   const setAuth = useAuthStore((s) => s.setAuth);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const setSoporte = useAuthStore((s) => s.setSoporte);
   
   const tenant = useTenantStore((s) => s.tenant);
   const setTenant = useTenantStore((s) => s.setTenant);
@@ -63,10 +65,17 @@ export default function DashboardPage() {
   // el campo vale undefined, y ahi el boton todavia no debe apagarse.
   const tiendaCerrada = tenant?.is_published === false;
 
+  // FUN-4: staff no ve Categorias, Paginas, Equipo ni Configuracion. `!== false`
+  // en el menu y no `=== true`: mientras getMe() no responde el rol es `null`, y
+  // lo normal es ser admin, asi que el menu no salta al recargar.
+  const esAdmin = useEsAdmin();
+
   useEffect(() => {
-    // Si no hay token, redirigir al login
+    // Si no hay token, fuera del panel. Por `rutaDeSalidaDelPanel` y no a
+    // `/login` fijo: este efecto también salta al salir del modo soporte, justo
+    // después de borrar el token, y pisaba la vuelta del operador a su panel.
     if (!token) {
-      navigate('/login', { replace: true });
+      navigate(rutaDeSalidaDelPanel(), { replace: true });
       return;
     }
 
@@ -77,33 +86,43 @@ export default function DashboardPage() {
         .then((data) => {
           setAuth(token, data.user);
           setTenant(data.tenant);
+          // INF-2: quien decide si esto es una sesion de soporte es el token, y
+          // eso solo lo sabe el backend. Al recargar la pagina es la unica
+          // forma de recuperar la marca, porque no se guarda en el navegador.
+          setSoporte(data.soporte);
         })
         .catch((error) => {
           console.error(error);
           toast.error('Sesión vencida. Vuelve a iniciar sesión.');
+          // Antes de limpiar: el destino depende de la sesión (INF-2).
+          const destino = rutaDeSalidaDelPanel();
           clearAuth();
           clearTenant();
-          navigate('/login', { replace: true });
+          navigate(destino, { replace: true });
         })
         .finally(() => {
           setIsLoading(false);
         });
     }
-  }, [user, token, setAuth, setTenant, clearAuth, clearTenant, navigate]);
+  }, [user, token, setAuth, setTenant, setSoporte, clearAuth, clearTenant, navigate]);
 
   const handleLogout = async () => {
+    // Se calcula antes de que `clearAuth()` borre la marca de soporte: el
+    // operador que cierra sesión desde el menú vuelve a su panel (INF-2).
+    const destino = rutaDeSalidaDelPanel();
+
     const logoutPromise = logoutUser()
       .then(() => {
         clearAuth();
         clearTenant();
-        navigate('/login', { replace: true });
+        navigate(destino, { replace: true });
       })
       .catch((err) => {
         console.error(err);
         // Fallback local por si el token ya expiró en backend
         clearAuth();
         clearTenant();
-        navigate('/login', { replace: true });
+        navigate(destino, { replace: true });
       });
 
     toast.promise(logoutPromise, {
@@ -123,6 +142,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
     if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
     if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
+    if (location.pathname.includes('/dashboard/users')) return 'Equipo';
     return 'Dashboard';
   };
 
@@ -183,15 +203,17 @@ export default function DashboardPage() {
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 
-          <NavLink 
-            to="/dashboard/categories" 
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <FolderTree size={20} />
-            <span>Categorías</span>
-            <ChevronRight className="nav-arrow" size={16} />
-          </NavLink>
+          {esAdmin !== false && (
+            <NavLink 
+              to="/dashboard/categories" 
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <FolderTree size={20} />
+              <span>Categorías</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
 
           <NavLink 
             to="/dashboard/orders" 
@@ -203,15 +225,17 @@ export default function DashboardPage() {
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 
-          <NavLink 
-            to="/dashboard/pages" 
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <FileText size={20} />
-            <span>Páginas</span>
-            <ChevronRight className="nav-arrow" size={16} />
-          </NavLink>
+          {esAdmin !== false && (
+            <NavLink 
+              to="/dashboard/pages" 
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <FileText size={20} />
+              <span>Páginas</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
 
           <NavLink 
             to="/dashboard/reviews" 
@@ -233,25 +257,29 @@ export default function DashboardPage() {
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 
-          <NavLink
-            to="/dashboard/users"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <UsersIcon size={20} />
-            <span>Equipo</span>
-            <ChevronRight className="nav-arrow" size={16} />
-          </NavLink>
+          {esAdmin !== false && (
+            <NavLink
+              to="/dashboard/users"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <UsersIcon size={20} />
+              <span>Equipo</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/dashboard/settings"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <Settings size={20} />
-            <span>Configuración</span>
-            <ChevronRight className="nav-arrow" size={16} />
-          </NavLink>
+          {esAdmin !== false && (
+            <NavLink
+              to="/dashboard/settings"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <Settings size={20} />
+              <span>Configuración</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -322,6 +350,10 @@ export default function DashboardPage() {
         <main className="dashboard-content animate-fade-in">
           {/* FUN-5: encima del Outlet y no dentro de una pantalla concreta, para
               que el aviso salga se este donde se este dentro del panel. */}
+          {/* INF-2: antes que el de verificacion. Pueden salir los dos a la
+              vez, y "estas en una tienda que no es tuya" es lo primero que hay
+              que leer. */}
+          <SupportBanner />
           <VerifyEmailBanner />
           <Outlet />
         </main>

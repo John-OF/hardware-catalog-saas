@@ -1,0 +1,147 @@
+/* Estilos del marco del panel de plataforma (INF-2).
+
+   Aquí vive lo COMPARTIDO por las cuatro pantallas del operador: el contenedor,
+   la cabecera con su navegación y los tres estados vacíos (cargando, sin datos,
+   spinner). Lo propio de cada pantalla está en su hoja.
+
+   El reparto no es cosmético: `.platform-page`, `.platform-header` y
+   `.platform-title` estaban en `PlatformPage.css`, que solo se carga con el
+   listado montado. En cuanto el marco pasó a ser común, dejarlos allí habría
+   dejado la cabecera sin estilo en el resumen y en la bitácora.
+
+   `:where(.page-platform)` y no `.page-platform` a secas: :where() vale 0 de
+   especificidad, así que estas reglas compiten con index.css igual que las de
+   las páginas (ver el encabezado de PlatformPage.css y `UI-5`). */
+
+:where(.page-platform).platform-shell {
+  min-height: 100vh;
+  background: var(--bg-app);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  /* #root es flex column: sin min-width los hijos no encogen por debajo de su
+     ancho intrinseco y una tabla arrastra la pagina entera. */
+  min-width: 0;
+}
+
+:where(.page-platform) .platform-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-platform) .platform-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--primary);
+}
+
+:where(.page-platform) .platform-title h1 {
+  font-size: 1.35rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .platform-title p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .platform-nav {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-platform) .platform-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+
+:where(.page-platform) .platform-nav-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.08));
+}
+
+:where(.page-platform) .platform-nav-link.active {
+  color: var(--primary);
+  border-color: var(--border);
+  background: var(--bg-card, rgba(127, 127, 127, 0.12));
+}
+
+/* Lo que usan varias pantallas del panel. Vive aquí y no en la hoja de la
+   primera que lo estrenó porque las hojas de página viajan en su propio chunk:
+   `.platform-filters` definido en PlatformPage.css solo existe con el listado
+   montado, así que la bitácora entrando en frío por su URL saldría en crudo. */
+:where(.page-platform) .platform-filters {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+
+/* Cuántos hay tras filtrar, al lado de los filtros. */
+:where(.page-platform) .platform-count {
+  align-self: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+:where(.page-platform) .plan-select {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  width: auto;
+}
+
+:where(.page-platform) .btn-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+:where(.page-platform) .tenant-slug {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .tenant-slug:hover {
+  color: var(--primary);
+}
+
+:where(.page-platform) .platform-loader,
+:where(.page-platform) .platform-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-platform) .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 720px) {
+  :where(.page-platform).platform-shell {
+    padding: 1rem;
+  }
+}

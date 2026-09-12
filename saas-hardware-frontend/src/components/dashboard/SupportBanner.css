@@ -1,0 +1,62 @@
+/* Estilos de <SupportBanner> (INF-2).
+
+   Sin acotar con `:where(.page-x)`: es un componente, no una pantalla, y se
+   monta encima de cualquier página del panel (TEC-6). Sus clases van prefijadas
+   con `support-banner`, así que no compiten con ninguna hoja de página.
+
+   UI-5: si alguna página necesitara retocarlo, la regla iría en ESTE fichero y
+   no en la de la página — `:where(.page-x) .support-banner` empata en
+   especificidad con lo de aquí y el desempate lo decidiría el orden de carga de
+   los chunks.
+
+   El color es el de peligro y no el de aviso a propósito: el de aviso ya es el
+   del banner de verificación, y estas dos barras pueden salir a la vez. Que se
+   distingan de un vistazo importa más que el matiz del significado. */
+
+.support-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--danger-glow);
+  color: var(--danger);
+}
+
+.support-banner p {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.support-banner strong {
+  color: var(--text-primary);
+}
+
+.support-banner > svg {
+  flex-shrink: 0;
+}
+
+.btn-support-exit {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .support-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .btn-support-exit {
+    width: 100%;
+    justify-content: center;
+  }
+}

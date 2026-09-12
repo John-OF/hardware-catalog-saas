@@ -803,7 +803,7 @@ class PublicCatalogController extends Controller
     }
 
     /**
-     * Avisar por correo a los admins de la tienda de que entro un pedido (OWN-2).
+     * Avisar por correo al equipo de la tienda de que entro un pedido (OWN-2).
      *
      * Va fuera de la transaccion y con el fallo tragado a proposito: el pedido
      * ya esta guardado, asi que un mailer caido no puede devolverle un error al
@@ -813,16 +813,18 @@ class PublicCatalogController extends Controller
     private function notifyOwnerOfNewOrder(Tenant $tenant, Order $order): void
     {
         try {
-            $admins = User::where('tenant_id', $tenant->id)
-                ->where('role', 'admin')
+            // Todo el equipo activo, no solo los admins (FUN-4): quien atiende
+            // los pedidos suele ser staff, y es quien necesita enterarse.
+            $equipo = User::where('tenant_id', $tenant->id)
+                ->whereIn('role', User::ROLES_DE_PANEL)
                 ->where('is_active', true)
                 ->get();
 
-            if ($admins->isEmpty()) {
+            if ($equipo->isEmpty()) {
                 return;
             }
 
-            Notification::send($admins, new NewOrderNotification($order));
+            Notification::send($equipo, new NewOrderNotification($order));
         } catch (\Throwable $e) {
             Log::error('No se pudo avisar del pedido nuevo', [
                 'order_id'  => $order->id,

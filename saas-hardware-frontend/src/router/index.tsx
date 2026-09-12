@@ -13,6 +13,7 @@ import { createBrowserRouter, Outlet } from 'react-router-dom';
 import RouteErrorFallback from '../components/ui/RouteErrorFallback';
 import RouteFallback from '../components/ui/RouteFallback';
 import PrivateRoute from './PrivateRoute';
+import SoloAdmin from './SoloAdmin';
 import CatalogPage from '../pages/public/CatalogPage';
 
 // AUD-18: hasta aquí no había ni un solo import dinámico, así que quien entraba
@@ -41,7 +42,11 @@ const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage')
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 
 const PlatformLoginPage = lazy(() => import('../pages/platform/PlatformLoginPage'));
+const PlatformLayout = lazy(() => import('../pages/platform/PlatformLayout'));
+const PlatformOverviewPage = lazy(() => import('../pages/platform/PlatformOverviewPage'));
 const PlatformPage = lazy(() => import('../pages/platform/PlatformPage'));
+const PlatformTenantPage = lazy(() => import('../pages/platform/PlatformTenantPage'));
+const PlatformLogsPage = lazy(() => import('../pages/platform/PlatformLogsPage'));
 
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const OverviewPage = lazy(() => import('../pages/dashboard/OverviewPage'));
@@ -84,8 +89,22 @@ export const router = createBrowserRouter([
   { path: '/reset-password', element: <ResetPasswordPage /> },
   // Panel del operador del SaaS. 'platform' es slug reservado en el backend,
   // asi que ninguna tienda puede ocupar estas rutas.
+  //
+  // El login queda FUERA del layout a proposito: el layout comprueba la sesion
+  // y redirige a esta misma ruta si no la hay, asi que meterlo dentro seria un
+  // bucle. Las demas cuelgan de el, y asi la comprobacion de sesion y la
+  // navegacion se escriben una sola vez (INF-2).
   { path: '/platform/login', element: <PlatformLoginPage /> },
-  { path: '/platform', element: <PlatformPage /> },
+  {
+    path: '/platform',
+    element: <PlatformLayout />,
+    children: [
+      { index: true,          element: <PlatformOverviewPage /> },
+      { path: 'tenants',      element: <PlatformPage /> },
+      { path: 'tenants/:id',  element: <PlatformTenantPage /> },
+      { path: 'logs',         element: <PlatformLogsPage /> },
+    ],
+  },
   // Rutas públicas (con prefijo de slug para SaaS)
   { path: '/:slug', element: <CatalogPage /> },
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },
@@ -104,13 +123,16 @@ export const router = createBrowserRouter([
     children: [
       { index: true,        element: <OverviewPage /> },
       { path: 'products',   element: <ProductsPage /> },
-      { path: 'categories', element: <CategoriesPage /> },
-      { path: 'settings',   element: <SettingsPage /> },
       { path: 'orders',     element: <OrdersPage /> },
-      { path: 'pages',      element: <PagesPage /> },
       { path: 'reviews',    element: <ReviewsPage /> },
       { path: 'waitlist',   element: <WaitlistPage /> },
-      { path: 'users',      element: <UsersPage /> },
+
+      // Solo admin (FUN-4). El backend ya responde 403 a staff; esto evita
+      // pintarle una pantalla que falla en cada peticion.
+      { path: 'categories', element: <SoloAdmin><CategoriesPage /></SoloAdmin> },
+      { path: 'settings',   element: <SoloAdmin><SettingsPage /></SoloAdmin> },
+      { path: 'pages',      element: <SoloAdmin><PagesPage /></SoloAdmin> },
+      { path: 'users',      element: <SoloAdmin><UsersPage /></SoloAdmin> },
     ],
   },
 

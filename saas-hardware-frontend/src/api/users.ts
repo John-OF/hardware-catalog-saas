@@ -1,6 +1,9 @@
 import api from './axios';
 import type { User } from '../types';
 
+/** Los dos roles del panel (FUN-4). En la interfaz, `staff` se llama "Colaborador". */
+export type RolDePanel = 'admin' | 'staff';
+
 /**
  * El equipo de la tienda (FUN-4).
  *
@@ -14,14 +17,16 @@ export const getTeamUsers = async (): Promise<User[]> => {
 };
 
 /** Invita a alguien: se crea sin contraseña y recibe un enlace para elegirla. */
-export const inviteUser = async (payload: { name: string; email: string }): Promise<User> => {
+export const inviteUser = async (
+  payload: { name: string; email: string; role?: RolDePanel },
+): Promise<User> => {
   const { data } = await api.post<User>('/users', payload);
   return data;
 };
 
 export const updateTeamUser = async (
   id: string,
-  payload: { name?: string; is_active?: boolean },
+  payload: { name?: string; is_active?: boolean; role?: RolDePanel },
 ): Promise<User> => {
   const { data } = await api.put<User>(`/users/${id}`, payload);
   return data;

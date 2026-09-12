@@ -124,9 +124,22 @@ Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platfo
     Route::post('/logout', [PlatformController::class, 'logout']);
     Route::get('/me',      [PlatformController::class, 'me']);
 
+    // Resumen del negocio y bitácora de lo que ha tocado el operador (INF-2).
+    Route::get('/stats', [PlatformController::class, 'stats']);
+    Route::get('/logs',  [PlatformController::class, 'logs']);
+
     Route::get('/tenants',            [PlatformController::class, 'tenants']);
+    Route::get('/tenants/{tenant}',   [PlatformController::class, 'show']);
     Route::put('/tenants/{tenant}',   [PlatformController::class, 'updateTenant']);
     Route::post('/tenants/{tenant}/password-reset', [PlatformController::class, 'sendAdminPasswordReset']);
+    // Entrar en una tienda como soporte: token de 15 minutos y SOLO LECTURA.
+    // Lo de "solo lectura" no lo impone esta ruta sino el middleware 'soporte'
+    // del panel, al otro lado (App\Support\Suplantacion).
+    Route::post('/tenants/{tenant}/impersonate', [PlatformController::class, 'impersonate']);
+    // Rescate: nombrar admin a un colaborador cuando la tienda se quedó sin
+    // ninguno (carrera de dos admins bajándose a la vez, o un desactivado a
+    // mano). Solo funciona si de verdad no hay ningún admin activo.
+    Route::post('/tenants/{tenant}/rescue-admin', [PlatformController::class, 'rescueAdmin']);
 });
 
 /*
@@ -134,7 +147,24 @@ Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platfo
 | Rutas privadas — Requieren autenticación + tenant
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
+/*
+| Dos niveles (FUN-4). Todo el grupo pide 'panel' -admin o staff activo- y lo
+| que solo decide un admin va ademas en el subgrupo 'admin' del final.
+|
+| El criterio del reparto: staff lleva el dia a dia de la tienda (pedidos,
+| productos, resenas, lista de espera) y el admin decide como es la tienda
+| (configuracion, categorias -que gobiernan el armador desde FUN-8-, paginas,
+| plan y equipo). Dentro de lo que staff toca, lo que BORRA o cambia el catalogo
+| de golpe tambien es de admin: borrar productos o pedidos, importar CSV y las
+| acciones masivas. Moderar resenas y la lista de espera, incluido borrar, si es
+| de staff: es su trabajo diario y no se lleva nada que no se pueda rehacer.
+|
+| El frontend esconde lo que staff no puede usar, pero la barrera es esta.
+*/
+// 'soporte' cierra el panel a escrituras cuando quien mira es el operador
+// entrando como soporte (INF-2). Va en el grupo entero a proposito: si fuera
+// ruta por ruta, la primera ruta nueva que alguien anadiera naceria sin ella.
+Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me',      [AuthController::class, 'me']);
@@ -148,27 +178,25 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
     // Estadísticas
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
-    // Configuración del tenant
+    // Configuración del tenant. Staff la LEE -el panel necesita la moneda, el
+    // slug y si la tienda esta publicada- pero no la cambia.
     Route::get('/tenant',    [TenantController::class, 'show']);
-    Route::put('/tenant',    [TenantController::class, 'update']);
 
     // Plan, limites y consumo (SAAS-3). Aparte de /tenant para no tocar la
     // forma de esa respuesta; el porque esta en PlanController.
     Route::get('/plan',      [PlanController::class, 'show']);
 
-    // Productos
+    // Productos: staff crea y edita, no borra (ver el subgrupo de abajo).
     Route::post('products/reorder', [ProductController::class, 'reorder']);
-    Route::post('products/import', [ProductController::class, 'import']);
-    Route::post('products/bulk', [ProductController::class, 'bulkAction']);
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate']);
-    Route::apiResource('products', ProductController::class);
+    Route::apiResource('products', ProductController::class)->except(['destroy']);
 
-    // Categorías
-    Route::post('categories/reorder', [CategoryController::class, 'reorder']);
-    Route::apiResource('categories', CategoryController::class);
+    // Categorías: staff solo las lee, que es lo que necesita el formulario de
+    // producto para elegir una.
+    Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 
     // Pedidos
-    Route::apiResource('orders', OrderController::class);
+    Route::apiResource('orders', OrderController::class)->except(['destroy']);
 
     // Reseñas/Calificaciones
     Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)->only(['index', 'update', 'destroy']);
@@ -178,14 +206,30 @@ Route::middleware(['auth:sanctum', 'tenant', 'admin'])->group(function () {
     Route::apiResource('stock-notifications', \App\Http\Controllers\Api\StockNotificationController::class)
         ->only(['index', 'update', 'destroy']);
 
-    // Páginas informativas privadas
-    Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
+    // ------------------------------------------------ solo admin (FUN-4)
+    Route::middleware('admin')->group(function () {
+        Route::put('/tenant', [TenantController::class, 'update']);
 
-    // Equipo de la tienda (FUN-4). Sin `show`: la lista ya trae todo lo que hay
-    // de un usuario. El controlador resuelve el {user} a mano y no por route
-    // model binding, para no salirse de la tienda (ver su cabecera).
-    Route::post('users/{user}/resend-invitation', [UserController::class, 'resend'])
-        ->middleware('throttle:3,1');
-    Route::apiResource('users', UserController::class)
-        ->only(['index', 'store', 'update', 'destroy']);
+        Route::post('products/import', [ProductController::class, 'import']);
+        Route::post('products/bulk', [ProductController::class, 'bulkAction']);
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+
+        Route::post('categories/reorder', [CategoryController::class, 'reorder']);
+        Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+
+        // Borrar un pedido atendido devuelve su stock y borra el registro de la
+        // venta: no es gestionar pedidos, es rehacer la contabilidad.
+        Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
+
+        // Páginas informativas privadas
+        Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
+
+        // Equipo de la tienda (FUN-4). Sin `show`: la lista ya trae todo lo que
+        // hay de un usuario. El controlador resuelve el {user} a mano y no por
+        // route model binding, para no salirse de la tienda (ver su cabecera).
+        Route::post('users/{user}/resend-invitation', [UserController::class, 'resend'])
+            ->middleware('throttle:3,1');
+        Route::apiResource('users', UserController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
+    });
 });

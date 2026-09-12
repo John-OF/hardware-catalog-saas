@@ -1,0 +1,237 @@
+/* Estilos de la ficha de tienda del panel de plataforma (INF-2).
+
+   Acotados a `.page-platform`, que pone `PlatformLayout` en la raíz, y con
+   `:where()` para no sumar especificidad (ver `UI-5` y la cabecera de
+   PlatformPage.css). */
+
+:where(.page-platform) .tenant-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .tenant-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-platform) .volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .volver:hover {
+  color: var(--primary);
+}
+
+:where(.page-platform) .tenant-detail-badges {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-platform) .tenant-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-platform) .tenant-head h2 {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .tenant-domain,
+:where(.page-platform) .tenant-meta {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .tenant-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Aviso de rescate (INF-2): mismo color de peligro que <SupportBanner>, porque
+   es del mismo orden de urgencia — una tienda sin nadie que pueda gestionarla. */
+:where(.page-platform) .tenant-rescue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--danger);
+  background: var(--danger-glow);
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-platform) .tenant-rescue-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: var(--danger);
+}
+
+:where(.page-platform) .tenant-rescue-text strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+}
+
+:where(.page-platform) .tenant-rescue-text span {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .tenant-rescue-text > svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+:where(.page-platform) .tenant-rescue-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-platform) .tenant-rescue-actions select {
+  flex: 1;
+  min-width: 220px;
+}
+
+:where(.page-platform) .tenant-rescue-vacio {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .tenant-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .tenant-card {
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+:where(.page-platform) .tenant-card h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.9rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .tenant-muted {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .tenant-note {
+  margin-top: 0.9rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .limites,
+:where(.page-platform) .equipo,
+:where(.page-platform) .pedidos,
+:where(.page-platform) .bitacora {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+:where(.page-platform) .limites li,
+:where(.page-platform) .equipo li,
+:where(.page-platform) .pedidos li,
+:where(.page-platform) .bitacora li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .limites li:last-child,
+:where(.page-platform) .equipo li:last-child,
+:where(.page-platform) .pedidos li:last-child,
+:where(.page-platform) .bitacora li:last-child {
+  border-bottom: none;
+}
+
+:where(.page-platform) .limites li > span:last-child {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Al tope o por encima: no es un error —bajar de plan no borra nada— pero es lo
+   que explica que esa tienda no pueda crear más. */
+:where(.page-platform) .lim-full {
+  color: var(--warning);
+}
+
+:where(.page-platform) .lim-ok {
+  color: var(--success);
+}
+
+:where(.page-platform) .lim-no,
+:where(.page-platform) .lim-muted {
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .equipo li > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+:where(.page-platform) .equipo strong {
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .equipo-mail {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+:where(.page-platform) .equipo-tags,
+:where(.page-platform) .pedido-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+:where(.page-platform) .bitacora li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+:where(.page-platform) .bitacora-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}

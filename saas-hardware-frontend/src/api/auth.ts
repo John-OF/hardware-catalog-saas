@@ -42,7 +42,15 @@ export const logoutUser = async (): Promise<void> => {
   await api.post('/auth/logout');
 };
 
-export const getMe = async (): Promise<{ user: User; tenant: Tenant }> => {
-  const response = await api.get<{ user: User; tenant: Tenant }>('/auth/me');
+/**
+ * Quién soy y en qué tienda estoy.
+ *
+ * `soporte` (INF-2) dice si esta sesión es el operador del SaaS mirando la
+ * tienda como soporte. Sale del token en el backend, no de lo que recuerde el
+ * navegador: es lo que decide si el panel pinta el aviso de "casa ajena, solo
+ * lectura", y esconderlo tocando el navegador no daría permiso para escribir.
+ */
+export const getMe = async (): Promise<{ user: User; tenant: Tenant; soporte: boolean }> => {
+  const response = await api.get<{ user: User; tenant: Tenant; soporte: boolean }>('/auth/me');
   return response.data;
 };

@@ -11,6 +11,7 @@ import {
   MailCheck,
   UserPlus,
   ShieldCheck,
+  Shield,
   Power,
   Trash2,
   Send,
@@ -21,6 +22,7 @@ import {
   updateTeamUser,
   deleteTeamUser,
   resendInvitation,
+  type RolDePanel,
 } from '../../api/users';
 import { getPlan } from '../../api/plan';
 import { useAuthStore } from '../../stores/authStore';
@@ -34,11 +36,19 @@ import type { PlanInfo, User } from '../../types';
  * vendedor le pasaba su contraseña, y como el login cierra las sesiones
  * anteriores, los dos se echaban mutuamente todo el día.
  *
- * Todos los invitados entran como administradores, con el mismo poder que quien
- * les invita. El rol limitado —dar solo stock o solo pedidos— es la segunda
- * mitad de FUN-4 y todavía no existe: por eso el aviso de la cabecera, que dice
- * lo que hay en vez de dejar que se suponga.
+ * Dos roles. **Administrador** lo puede todo. **Colaborador** (`staff` en el
+ * backend) lleva el día a día —pedidos, productos, reseñas, lista de espera—
+ * pero no la configuración, las categorías, las páginas ni este equipo, y no
+ * borra productos ni pedidos. El reparto de verdad está en `routes/api.php`;
+ * esta pantalla solo lo cuenta.
+ *
+ * Solo la ven los administradores (`SoloAdmin` en el router).
  */
+
+const NOMBRE_DE_ROL: Record<RolDePanel, string> = {
+  admin: 'Administrador',
+  staff: 'Colaborador',
+};
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const yo = useAuthStore((s) => s.user);
@@ -46,6 +56,9 @@ export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // Colaborador por defecto: dar poder de administrador tiene que ser una
+  // decisión, no lo que pasa si nadie toca el desplegable.
+  const [rol, setRol] = useState<RolDePanel>('staff');
 
   // UI-9: con la ventana abierta la pagina de detras no se mueve.
   useBloqueoDeScroll(isModalOpen);
@@ -91,6 +104,15 @@ export default function UsersPage() {
     onError: (err) => alFallar(err, 'No se pudo cambiar el acceso'),
   });
 
+  const cambiarRolMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: RolDePanel }) => updateTeamUser(id, { role }),
+    onSuccess: (usuario) => {
+      refrescar();
+      toast.success(`${usuario.name} ahora es ${NOMBRE_DE_ROL[usuario.role as RolDePanel].toLowerCase()}`);
+    },
+    onError: (err) => alFallar(err, 'No se pudo cambiar el rol'),
+  });
+
   const eliminarMutation = useMutation({
     mutationFn: deleteTeamUser,
     onSuccess: () => {
@@ -109,6 +131,7 @@ export default function UsersPage() {
   const abrirModal = () => {
     setName('');
     setEmail('');
+    setRol('staff');
     setIsModalOpen(true);
   };
 
@@ -122,7 +145,18 @@ export default function UsersPage() {
       return;
     }
 
-    invitarMutation.mutate({ name: name.trim(), email: email.trim() });
+    invitarMutation.mutate({ name: name.trim(), email: email.trim(), role: rol });
+  };
+
+  const cambiarRol = (usuario: User) => {
+    const nuevo: RolDePanel = usuario.role === 'admin' ? 'staff' : 'admin';
+    const aviso = nuevo === 'admin'
+      ? `¿Hacer administrador a ${usuario.name}? Podrá cambiar la configuración, las categorías y el equipo, incluido tu propio acceso.`
+      : `¿Pasar a ${usuario.name} a colaborador? Dejará de ver la configuración, las categorías, las páginas y el equipo.`;
+
+    if (window.confirm(`${aviso} Se le cerrará la sesión para que entre con su nuevo acceso.`)) {
+      cambiarRolMutation.mutate({ id: usuario.id, role: nuevo });
+    }
   };
 
   const eliminar = (usuario: User) => {
@@ -146,13 +180,13 @@ export default function UsersPage() {
         </button>
       </div>
 
-      {/* Decir lo que hay: hoy todos tienen el mismo poder. */}
+      {/* Lo que puede cada rol, dicho antes de invitar y no descubierto después. */}
       <div className="team-notice glass-card">
         <ShieldCheck size={18} />
         <p>
-          Por ahora todas las personas que invites tienen <strong>el mismo acceso que tú</strong>:
-          pueden ver y cambiar productos, pedidos, configuración y el propio equipo. Los permisos
-          limitados —dar acceso solo al stock o solo a los pedidos— están en camino.
+          Un <strong>colaborador</strong> atiende pedidos, reseñas y la lista de espera, y crea y edita
+          productos. No ve la configuración, las categorías, las páginas ni el equipo, y no puede
+          borrar productos ni pedidos. Un <strong>administrador</strong> puede todo lo que puedes tú.
         </p>
       </div>
 
@@ -187,6 +221,11 @@ export default function UsersPage() {
                 </div>
 
                 <div className="team-badges">
+                  <span className={`badge ${usuario.role === 'admin' ? 'badge-rol-admin' : 'badge-neutro'}`}>
+                    {usuario.role === 'admin' ? <ShieldCheck size={12} /> : <Shield size={12} />}
+                    {NOMBRE_DE_ROL[usuario.role as RolDePanel] ?? usuario.role}
+                  </span>
+
                   {usuario.is_active ? (
                     <span className="badge badge-success">Activo</span>
                   ) : (
@@ -220,6 +259,14 @@ export default function UsersPage() {
                       un botón que siempre falla es peor que no tenerlo. */}
                   {!soyYo && (
                     <>
+                      <button
+                        onClick={() => cambiarRol(usuario)}
+                        className="btn-secondary team-btn"
+                        disabled={cambiarRolMutation.isPending}
+                      >
+                        {usuario.role === 'admin' ? <Shield size={15} /> : <ShieldCheck size={15} />}
+                        {usuario.role === 'admin' ? 'Pasar a colaborador' : 'Hacer administrador'}
+                      </button>
                       <button
                         onClick={() => cambiarEstadoMutation.mutate({ id: usuario.id, is_active: !usuario.is_active })}
                         className="btn-secondary team-btn"
@@ -282,6 +329,24 @@ export default function UsersPage() {
                 <p className="form-hint">
                   Le enviaremos un enlace para que <strong>elija su propia contraseña</strong>. Tú no
                   tienes que inventarle ninguna ni pasársela por WhatsApp.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="user-role">Acceso</label>
+                <select
+                  id="user-role"
+                  value={rol}
+                  onChange={(e) => setRol(e.target.value as RolDePanel)}
+                  className="premium-input"
+                >
+                  <option value="staff">Colaborador — pedidos, productos, reseñas</option>
+                  <option value="admin">Administrador — todo, como tú</option>
+                </select>
+                <p className="form-hint">
+                  {rol === 'staff'
+                    ? 'Lleva el día a día sin tocar la configuración, las categorías ni el equipo. Puedes cambiarlo más tarde.'
+                    : 'Podrá cambiar la configuración, el plan y el equipo, incluido tu propio acceso. Dáselo solo a quien lleve la tienda contigo.'}
                 </p>
               </div>
 

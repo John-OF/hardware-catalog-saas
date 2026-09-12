@@ -1,5 +1,6 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { rutaDeSalidaDelPanel, useAuthStore } from '../stores/authStore';
 import { useCustomerAuthStore } from '../stores/customerAuthStore';
 
 const api = axios.create({
@@ -49,8 +50,17 @@ api.interceptors.response.use(
       if (isPublicRequest) {
         useCustomerAuthStore.getState().clearCustomerAuth();
       } else {
-        sessionStorage.clear();
-        window.location.href = '/login';
+        // Solo las claves del panel, no `sessionStorage.clear()` (INF-2): el
+        // panel de plataforma guarda su token en una clave propia para poder
+        // convivir con esta sesión, y un 401 aquí se llevaba también aquella.
+        // Con el modo soporte pasa constantemente: el token de soporte caduca a
+        // los 15 minutos, y ese 401 echaba al operador de su propio panel.
+        // El destino se calcula ANTES de limpiar: depende del estado de sesión.
+        // Al operador se le devuelve a su panel, no al login de tiendas: no
+        // tiene cuenta ahí y su sesión de plataforma sigue viva.
+        const destino = rutaDeSalidaDelPanel();
+        useAuthStore.getState().clearPanelSession();
+        window.location.href = destino;
       }
     }
     return Promise.reject(error);

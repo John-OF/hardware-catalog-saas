@@ -36,6 +36,7 @@ export default function VerifyEmailBanner() {
   const tenant = useTenantStore((s) => s.tenant);
   const setAuth = useAuthStore((s) => s.setAuth);
   const token = useAuthStore((s) => s.token);
+  const esSoporte = useAuthStore((s) => s.soporte);
 
   const [isSending, setIsSending] = useState(false);
 
@@ -73,7 +74,31 @@ export default function VerifyEmailBanner() {
 
   // `=== false` otra vez, y por lo mismo: mientras el tenant no ha llegado no se
   // puede afirmar que la tienda esté cerrada.
-  const tiendaCerrada = tenant?.is_published === false;
+  //
+  // Y solo cuenta para un admin: desde FUN-4 verificar el correo de un
+  // colaborador no publica nada (ver `AuthController::confirmarCorreo`), asi
+  // que prometerle "confirma para publicar" seria volver a mentir.
+  const tiendaCerrada = tenant?.is_published === false && user.role === 'admin';
+
+  // INF-2: en una sesión de soporte quien mira es el operador, no el dueño. El
+  // dato sí le sirve —suele ser la respuesta a "mi tienda no se ve"—, pero
+  // contado en tercera persona y sin el botón: reenviar es una escritura y la
+  // sesión de soporte responde 403 a todas.
+  if (esSoporte) {
+    return (
+      <div className="verify-email-banner" role="status">
+        <MailWarning size={20} className="verify-email-banner-icon" />
+        <div className="verify-email-banner-text">
+          <strong>El administrador no ha confirmado su correo.</strong>
+          <span>
+            {tiendaCerrada
+              ? <>Por eso el catálogo no es público: se abre cuando <b>{user.email}</b> abra el enlace de verificación.</>
+              : <><b>{user.email}</b> sigue sin verificar. La tienda ya es pública, pero no hay garantía de que le lleguen los avisos ni la recuperación de contraseña.</>}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="verify-email-banner" role="status">

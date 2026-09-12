@@ -20,7 +20,7 @@ php artisan queue:work        # OJO: sin esto no sale ningún correo
 ```
 
 ```bash
-php artisan test        # 321 tests
+php artisan test        # 372 tests
 vendor/bin/pint         # Formateo
 composer dev            # serve + queue + logs + vite en paralelo
 ```

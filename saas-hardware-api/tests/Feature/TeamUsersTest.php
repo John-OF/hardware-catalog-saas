@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
- * Una tienda puede tener más de una persona en el panel (FUN-4, primera mitad).
+ * Una tienda puede tener más de una persona en el panel (FUN-4). Lo que puede
+ * hacer cada rol en el resto del panel está en `StaffRoleTest`.
  *
  * Antes, el único usuario con acceso era el que nacía en el alta. El dueño con
  * un vendedor le pasaba su propia contraseña, y como el login **borra los tokens
@@ -20,9 +21,11 @@ use Tests\TestCase;
  * todo el día.
  *
  * Lo que más se vigila aquí es el **aislamiento**: `User` es la excepción al
- * fallo en cerrado de `AUD-4`, así que su global scope no filtra nada y lo único
- * que separa las tiendas son los `where('tenant_id')` escritos a mano en el
- * controlador. Si alguno se cae, estos tests son los que lo cazan.
+ * fallo en cerrado de `AUD-4` —sin tienda resuelta su global scope lo ve todo—,
+ * así que los `where('tenant_id')` del controlador están escritos a mano aunque
+ * en el panel el scope también filtre. Si alguno se cae, estos tests lo cazan.
+ * Y al revés: la comprobación de "este correo ya es del panel de otra tienda"
+ * (FUN-14) tiene que saltarse el scope a propósito, o no ve nada.
  */
 class TeamUsersTest extends TestCase
 {
@@ -120,7 +123,8 @@ class TeamUsersTest extends TestCase
 
         $invitado = User::where('email', 'vendedor@equipo.test')->firstOrFail();
         $this->assertSame($this->tienda->id, $invitado->tenant_id);
-        $this->assertSame('admin', $invitado->role);
+        // Sin decir rol, `staff`: dar poder de admin tiene que ser una decisión.
+        $this->assertSame('staff', $invitado->role);
 
         Notification::assertSentTo(
             $invitado,
@@ -192,21 +196,134 @@ class TeamUsersTest extends TestCase
         $this->assertFalse($equipo[0]['invitation_pending']);
     }
 
-    public function test_el_correo_es_unico_dentro_de_la_tienda_pero_no_entre_tiendas(): void
+    public function test_se_puede_invitar_como_admin_si_se_pide(): void
     {
-        $this->crearUsuario($this->otraTienda, 'repetido@ejemplo.test', 'admin');
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Socia',
+            'email' => 'socia@equipo.test',
+            'role'  => 'admin',
+        ])->assertCreated()->assertJsonPath('role', 'admin');
 
-        // En otra tienda ya existe: aquí se puede invitar igual (SEC-4).
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Nadie',
+            'email' => 'nadie@equipo.test',
+            'role'  => 'superadmin',
+        ])->assertStatus(422)->assertJsonValidationErrors('role');
+    }
+
+    public function test_el_correo_no_se_repite_dentro_de_la_tienda(): void
+    {
         $this->comoDuenio()->postJson('/api/users', [
             'name'  => 'Alguien',
             'email' => 'repetido@ejemplo.test',
         ])->assertCreated();
 
-        // Pero dos veces en la misma tienda, no.
         $this->comoDuenio()->postJson('/api/users', [
             'name'  => 'Otro',
             'email' => 'repetido@ejemplo.test',
         ])->assertStatus(422)->assertJsonValidationErrors('email');
+    }
+
+    /**
+     * FUN-14. Este test decía antes lo contrario —que se podía invitar a quien
+     * ya es admin de otra tienda— y fijaba un fallo: el login, el reset y el
+     * enlace de la propia invitación resuelven el correo sin saber la tienda y
+     * se quedan con la cuenta más antigua. Aceptar la invitación le cambiaba la
+     * contraseña de la OTRA tienda, y la cuenta de aquí no podía entrar nunca.
+     */
+    public function test_no_se_puede_invitar_a_quien_ya_es_del_panel_de_otra_tienda(): void
+    {
+        $ajeno = $this->crearUsuario($this->otraTienda, 'repetido@ejemplo.test', 'staff');
+
+        $respuesta = $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Alguien',
+            'email' => 'repetido@ejemplo.test',
+        ])->assertStatus(422);
+
+        $this->assertStringContainsString('otra tienda', $respuesta->json('errors.email.0'));
+        $this->assertSame(1, User::where('email', 'repetido@ejemplo.test')->count());
+        $this->assertSame('staff', $ajeno->fresh()->role);
+    }
+
+    /** Ser CLIENTE de otra tienda sí se permite: el login del panel no mira clientes. */
+    public function test_se_puede_invitar_a_un_cliente_de_otra_tienda(): void
+    {
+        $this->crearUsuario($this->otraTienda, 'comprador@vecina.test', 'customer');
+
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Vendedor',
+            'email' => 'comprador@vecina.test',
+        ])->assertCreated();
+    }
+
+    /**
+     * Aceptar la invitación demuestra que el buzón es suyo, así que el correo
+     * queda verificado. Sin esto al invitado le salía para siempre el aviso de
+     * "confirma tu correo"… y si lo confirmaba, se publicaba la tienda.
+     */
+    public function test_aceptar_la_invitacion_verifica_el_correo_sin_publicar_la_tienda(): void
+    {
+        $this->tienda->update(['is_published' => false]);
+
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Vendedor Nuevo',
+            'email' => 'vendedor@equipo.test',
+        ])->assertCreated();
+
+        $invitado = User::where('email', 'vendedor@equipo.test')->firstOrFail();
+        $token = $this->tokenDeLaInvitacion($invitado);
+
+        $this->desdeCero();
+
+        $this->postJson('/api/auth/reset-password', [
+            'token'                 => $token,
+            'email'                 => 'vendedor@equipo.test',
+            'password'              => 'ClaveDelVendedor#2026',
+            'password_confirmation' => 'ClaveDelVendedor#2026',
+        ])->assertOk();
+
+        $this->assertTrue($invitado->fresh()->hasVerifiedEmail());
+        // Staff verifica SU correo, no decide abrir la tienda.
+        $this->assertFalse($this->tienda->fresh()->is_published);
+    }
+
+    // ------------------------------------------------------------ cambiar rol
+
+    public function test_cambiar_el_rol_le_cierra_las_sesiones(): void
+    {
+        $vendedor = $this->crearUsuario($this->tienda, 'vendedor@equipo.test', 'staff');
+        $vendedor->createToken('test', ['staff']);
+
+        $this->comoDuenio()->putJson("/api/users/{$vendedor->id}", ['role' => 'admin'])
+            ->assertOk()->assertJsonPath('role', 'admin');
+
+        $this->assertSame(0, $vendedor->tokens()->count());
+    }
+
+    public function test_nadie_puede_cambiarse_su_propio_rol(): void
+    {
+        $this->crearUsuario($this->tienda, 'socia@equipo.test', 'admin');
+
+        $this->comoDuenio()->putJson("/api/users/{$this->duenio->id}", ['role' => 'staff'])
+            ->assertStatus(422);
+
+        $this->assertSame('admin', $this->duenio->fresh()->role);
+    }
+
+    /**
+     * Un admin puede bajar a otro. Que la tienda no se quede sin admins lo
+     * garantiza que nadie pueda bajarse a sí mismo: quien baja a otro sigue
+     * siendo admin.
+     */
+    public function test_un_admin_puede_bajar_a_otro_a_staff(): void
+    {
+        $socia = $this->crearUsuario($this->tienda, 'socia@equipo.test', 'admin');
+
+        $this->comoDuenio()->putJson("/api/users/{$socia->id}", ['role' => 'staff'])
+            ->assertOk()->assertJsonPath('role', 'staff');
+
+        $this->assertSame('staff', $socia->fresh()->role);
+        $this->assertSame('admin', $this->duenio->fresh()->role);
     }
 
     /**

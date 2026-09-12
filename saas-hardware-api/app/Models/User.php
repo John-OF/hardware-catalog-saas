@@ -39,6 +39,24 @@ class User extends Authenticatable implements MustVerifyEmail
         return true;
     }
 
+    /**
+     * Los roles que entran al panel de una tienda (FUN-4).
+     *
+     * `admin` lo puede todo; `staff` lleva el dia a dia -pedidos, productos,
+     * resenas, lista de espera- pero no la configuracion, las categorias, las
+     * paginas, el plan ni el equipo. El reparto de rutas esta en `routes/api.php`.
+     *
+     * Vive aqui porque se consulta en muchos sitios (login, reset, middleware,
+     * tope del plan, equipo, aviso de pedido nuevo) y una lista copiada a mano
+     * en cada uno es un rol que alguien olvidara anadir en alguno.
+     */
+    public const ROLES_DE_PANEL = ['admin', 'staff'];
+
+    public function esDelPanel(): bool
+    {
+        return in_array($this->role, self::ROLES_DE_PANEL, true);
+    }
+
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
     {

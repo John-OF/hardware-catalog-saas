@@ -22,6 +22,7 @@ import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
+import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
@@ -33,6 +34,7 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const puedeAdministrar = useEsAdmin() !== false;
 
   // UI-9: con el detalle abierto la lista de detras no se mueve.
   useBloqueoDeScroll(selectedOrder !== null);
@@ -298,14 +300,18 @@ export default function OrdersPage() {
                         </>
                       )}
 
-                      <button
-                        onClick={() => handleDelete(order.id, order.customer_name)}
-                        className="btn-icon delete-btn"
-                        title="Eliminar registro"
-                        aria-label="Eliminar registro"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* FUN-4: borrar un pedido atendido devuelve su stock y
+                          borra la venta; es de admin, no de quien atiende. */}
+                      {puedeAdministrar && (
+                        <button
+                          onClick={() => handleDelete(order.id, order.customer_name)}
+                          className="btn-icon delete-btn"
+                          title="Eliminar registro"
+                          aria-label="Eliminar registro"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -314,3 +314,11 @@
   justify-content: center;
   gap: 0.4rem;
 }
+
+/* FUN-4: el rol de cada persona. Admin con el color de marca para que se vea de
+   un vistazo quién puede tocarlo todo; colaborador en neutro, que es lo normal. */
+:where(.page-users) .badge-rol-admin {
+  background: rgba(var(--primary-rgb), 0.10);
+  color: var(--primary);
+  border: 1px solid rgba(var(--primary-rgb), 0.25);
+}

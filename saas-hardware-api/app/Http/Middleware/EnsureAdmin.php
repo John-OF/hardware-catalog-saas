@@ -10,7 +10,11 @@ class EnsureAdmin
 {
     /**
      * Permitir el acceso solo a usuarios administradores activos.
-     * Bloquea que un cliente (role 'customer') use las rutas del panel.
+     *
+     * Desde FUN-4 ya no es la puerta del panel -esa es `EnsurePanelUser`, que
+     * deja pasar tambien a `staff`-, sino la segunda cerradura de lo que solo
+     * decide un admin: configuracion, categorias, paginas, equipo y lo que borra
+     * o cambia el catalogo de golpe. Sigue bloqueando a clientes igual que antes.
      */
     public function handle(Request $request, Closure $next): Response
     {

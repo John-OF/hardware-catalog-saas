@@ -15,8 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant'     => \App\Http\Middleware\InitializeTenantByHeader::class,
+            // 'panel' es la puerta (admin o staff); 'admin' se anade encima de
+            // lo que solo decide un admin (FUN-4).
+            'panel'      => \App\Http\Middleware\EnsurePanelUser::class,
             'admin'      => \App\Http\Middleware\EnsureAdmin::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            // Cuando quien mira el panel es el operador entrando como soporte,
+            // el panel entero pasa a solo lectura (INF-2). Va en el grupo, no
+            // ruta por ruta: asi una ruta nueva nace protegida.
+            'soporte'    => \App\Http\Middleware\RestrictImpersonation::class,
             // Solo para las rutas publicas con sesion de cliente: el token tiene
             // que ser de la tienda del slug, no de cualquiera (AUD-3).
             'customer'   => \App\Http\Middleware\EnsureTenantCustomer::class,
@@ -57,6 +64,24 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
             prepend: \App\Http\Middleware\EnsureAdmin::class,
+        );
+        // Y la puerta del panel (FUN-4), por lo mismo que EnsureAdmin: desde que
+        // 'panel' sustituye a 'admin' en el grupo, sin esto un cliente de la
+        // tienda recibía 404 o 403 en `products/{id}` según el id existiera, o
+        // sea que el error le decía qué filas hay.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsurePanelUser::class,
+        );
+
+        // Igual con el modo soporte (INF-2): la negativa tiene que llegar ANTES
+        // de resolver el {producto} de la URL. Sin esto, un DELETE desde una
+        // sesion de soporte respondia 404 o 403 segun el id existiera o no, o
+        // sea que el propio error decia si esa fila esta ahi. Y de paso, una
+        // peticion que va a rechazarse no tiene por que ir a la base.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\RestrictImpersonation::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {

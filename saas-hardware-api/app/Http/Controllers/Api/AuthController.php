@@ -43,14 +43,15 @@ class AuthController extends Controller
             ],
             'whatsapp'       => 'required|string|max:20',
             'name'           => 'required|string|max:200',
-            // Unico solo frente a OTROS ADMINS, no frente a clientes: desde SEC-4 el
-            // correo es unico por tenant, asi que un dueño puede usar un correo que ya
-            // existe como cliente en otra tienda. Entre admins debe seguir siendo unico
-            // porque el login del panel resuelve por email sin saber la tienda.
+            // Unico solo frente al PANEL (admin o staff) de cualquier tienda, no
+            // frente a clientes: desde SEC-4 el correo es unico por tenant, asi que
+            // un dueño puede usar un correo que ya existe como cliente en otra
+            // tienda. Frente al panel tiene que ser unico en toda la plataforma
+            // porque el login resuelve por email sin saber la tienda (FUN-14).
             'email'          => [
                 'required',
                 'email',
-                Rule::unique('users', 'email')->where(fn ($query) => $query->where('role', 'admin')),
+                Rule::unique('users', 'email')->where(fn ($query) => $query->whereIn('role', User::ROLES_DE_PANEL)),
             ],
             'password'       => ['required', 'string', 'confirmed', PasswordRule::defaults()],
         ], [
@@ -93,6 +94,11 @@ class AuthController extends Controller
             'role'      => 'admin',
         ]);
         $user->tenant_id = $tenant->id;
+        // El alta ya deja la sesion abierta (devuelve token, no pasa por
+        // login()), asi que tambien es un acceso. Sin esto el dueño figuraba como
+        // "invitacion pendiente" en su propia pantalla de equipo hasta que
+        // cerrara sesion y volviera a entrar (FUN-4).
+        $user->forceFill(['last_login_at' => now()]);
         $user->save();
 
         // Se envia DESPUES de guardar y por cola, asi que un SMTP caido no tumba
@@ -127,7 +133,12 @@ class AuthController extends Controller
         // pertenecer a un admin y a clientes de otras tiendas. Sin filtrar por rol,
         // Auth::attempt resolveria al primero que coincida y un admin legitimo no
         // podria entrar si un cliente se registro antes con ese correo.
-        $credentials = $request->only('email', 'password') + ['role' => 'admin'];
+        //
+        // Con un array el proveedor de Eloquent hace `whereIn`: entra el equipo
+        // entero (admin y staff, FUN-4). Que el correo resuelva a UNA sola cuenta
+        // lo garantizan el registro y la invitacion, que no dejan repetir un
+        // correo del panel entre tiendas (FUN-14).
+        $credentials = $request->only('email', 'password') + ['role' => User::ROLES_DE_PANEL];
 
         if (!Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
@@ -140,7 +151,7 @@ class AuthController extends Controller
         // Defensa en profundidad: si alguien quita el rol de las credenciales de
         // arriba, esta comprobacion sigue cerrando el panel a no-admins.
         // Mismo mensaje genérico para no filtrar la existencia del correo.
-        if ($user->role !== 'admin' || !$user->is_active) {
+        if (!$user->esDelPanel() || !$user->is_active) {
             Auth::logout();
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales son incorrectas.'],
@@ -158,7 +169,9 @@ class AuthController extends Controller
         // Revocar tokens anteriores (una sesión activa por usuario)
         $user->tokens()->delete();
 
-        $token = $user->createToken('spa-token', ['admin'], now()->addDays(7));
+        // La ability es informativa: lo que decide que puede hacer cada uno es el
+        // rol del usuario, que los middleware leen en cada peticion (FUN-4).
+        $token = $user->createToken('spa-token', [$user->role], now()->addDays(7));
 
         return response()->json([
             'token'  => $token->plainTextToken,
@@ -187,7 +200,7 @@ class AuthController extends Controller
 
         Password::sendResetLink([
             'email'     => $request->input('email'),
-            'role'      => 'admin',
+            'role'      => User::ROLES_DE_PANEL,
             'is_active' => true,
         ]);
 
@@ -219,13 +232,20 @@ class AuthController extends Controller
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token')
-                + ['role' => 'admin', 'is_active' => true],
+                + ['role' => User::ROLES_DE_PANEL, 'is_active' => true],
             function (User $user, string $password) {
                 // El cast 'hashed' del modelo se encarga del bcrypt.
                 $user->forceFill([
                     'password'       => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
+
+                // El enlace llego a su buzon y lo abrio: eso YA es verificar el
+                // correo, igual que el enlace de FUN-5. Importa sobre todo para
+                // los invitados al equipo (FUN-4), que entran por aqui y nunca
+                // reciben el correo de verificacion del alta: sin esto les salia
+                // para siempre el aviso de "confirma tu correo".
+                $this->confirmarCorreo($user);
 
                 // Quien pide un reset suele hacerlo porque perdió el control de
                 // la cuenta, así que cerramos las sesiones abiertas: los tokens
@@ -276,16 +296,44 @@ class AuthController extends Controller
         // Un enlace usado dos veces (el segundo clic, el prefetch del cliente de
         // correo) no es un error: la cuenta ya está verificada, así que se manda
         // al mismo sitio que el primero en vez de a una pantalla de fallo.
-        if (!$user->hasVerifiedEmail()) {
-            $user->markEmailAsVerified();
-
-            // La tienda se publica aquí, y solo aquí. No se toca `is_active`: si
-            // la plataforma la había suspendido, sigue suspendida — son dos
-            // preguntas distintas y está explicado en la migración.
-            $user->tenant?->update(['is_published' => true]);
-        }
+        $this->confirmarCorreo($user);
 
         return redirect($this->urlDelPanel('/login?verificacion=ok'));
+    }
+
+    /**
+     * Dar el correo por verificado y, si es de un admin, publicar la tienda.
+     *
+     * Los dos caminos que demuestran que el buzon es tuyo -el enlace de
+     * verificacion del alta (FUN-5) y el de elegir contrasenia, que usan tambien
+     * las invitaciones (FUN-4)- pasan por aqui, para que no puedan divergir.
+     *
+     * **Solo un admin publica.** Antes de FUN-4 el unico usuario del panel era
+     * el dueño y "verificar" y "publicar" eran lo mismo. Con equipo ya no: un
+     * empleado que confirma SU correo no ha decidido nada sobre la tienda, y
+     * publicarla por eso seria abrir al publico un catalogo que el dueño aun
+     * esta montando.
+     */
+    private function confirmarCorreo(User $user): void
+    {
+        if ($user->hasVerifiedEmail()) {
+            return;
+        }
+
+        $user->markEmailAsVerified();
+
+        // La tienda se publica aquí, y solo aquí. No se toca `is_active`: si
+        // la plataforma la había suspendido, sigue suspendida — son dos
+        // preguntas distintas y está explicado en la migración.
+        //
+        // Que tambien valga el reset es a proposito: un dueño que recupera la
+        // contrasenia antes de abrir el correo de verificacion ha demostrado lo
+        // mismo, y si aqui se marcara el correo sin publicar, su tienda se
+        // quedaria cerrada sin aviso -el aviso sale solo con el correo sin
+        // verificar- y sin boton para abrirla.
+        if ($user->role === 'admin') {
+            $user->tenant?->update(['is_published' => true]);
+        }
     }
 
     /**
@@ -346,6 +394,11 @@ class AuthController extends Controller
         return response()->json([
             'user'   => new UserResource($request->user()),
             'tenant' => $request->user()->tenant,
+            // INF-2: si quien mira es el operador entrando como soporte. El
+            // panel lo necesita para avisar de que está en casa ajena y en solo
+            // lectura, y tiene que salir de aquí y no de lo que el navegador
+            // recuerde: sale del token, que es lo único que decide de verdad.
+            'soporte' => \App\Support\Suplantacion::activa($request),
         ]);
     }
 }
