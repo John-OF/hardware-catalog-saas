@@ -26,6 +26,7 @@ import {
 import { getMe, logoutUser } from '../../api/auth';
 import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
 import SupportBanner from '../../components/dashboard/SupportBanner';
+import TrialBanner from '../../components/dashboard/TrialBanner';
 import { rutaDeSalidaDelPanel, useAuthStore, useEsAdmin } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
@@ -355,6 +356,10 @@ export default function DashboardPage() {
               que leer. */}
           <SupportBanner />
           <VerifyEmailBanner />
+          {/* FUN-16: al final de los avisos, no antes: es informativo (cuántos
+              días quedan), no algo que impida usar el panel como los otros
+              dos. */}
+          <TrialBanner />
           <Outlet />
         </main>
       </div>

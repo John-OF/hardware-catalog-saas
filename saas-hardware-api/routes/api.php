@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
 use App\Http\Controllers\Api\Public\PublicFavoritesController;
 use App\Http\Controllers\Api\Public\PublicOrdersController;
+use App\Http\Controllers\Api\Public\PublicPlansController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -60,6 +61,11 @@ Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmai
 Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDomain'])
     ->middleware('throttle:catalogo_publico');
 
+// Catálogo de planes de la plataforma, para la landing (INF-1). Sin tienda ni
+// sesión: es la pantalla de quien todavía no se ha registrado.
+Route::get('public/plans', [PublicPlansController::class, 'index'])
+    ->middleware('throttle:catalogo_publico');
+
 //
 // AUD-4: 'tenant.slug' resuelve la tienda desde el slug y la deja como la actual,
 // para que el global scope de BelongsToTenant filtre tambien en lo publico. Antes
@@ -92,6 +98,14 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
     Route::post('/auth/register', [PublicAuthController::class, 'register'])
         ->middleware('throttle:5,1');
     Route::post('/auth/login', [PublicAuthController::class, 'login'])
+        ->middleware('throttle:5,1');
+
+    // Recuperación de contraseña del CLIENTE (FUN-11). Mismo throttle bajo que
+    // el resto de auth y el mismo motivo que el del panel: son endpoints sin
+    // sesión que aceptan un correo arbitrario.
+    Route::post('/auth/forgot-password', [PublicAuthController::class, 'forgotPassword'])
+        ->middleware('throttle:5,1');
+    Route::post('/auth/reset-password', [PublicAuthController::class, 'resetPassword'])
         ->middleware('throttle:5,1');
 
     // Rutas protegidas para clientes.

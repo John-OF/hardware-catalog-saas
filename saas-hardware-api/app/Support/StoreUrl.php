@@ -24,7 +24,12 @@ class StoreUrl
             return null;
         }
 
-        if (filled($tenant->custom_domain)) {
+        // FUN-6: un dominio sin verificar no resuelve NADA -ni el catálogo
+        // público ni el panel, ver `Tenant::scopeConDominioVerificado()`-, así
+        // que enlazarlo aquí sería mandar un correo con un 404 garantizado. Cae
+        // a la URL con slug, que siempre funciona, en vez de prometer un enlace
+        // que la propia plataforma todavía no sirve.
+        if (filled($tenant->custom_domain) && $tenant->custom_domain_verified_at) {
             return 'https://'.$tenant->custom_domain;
         }
 

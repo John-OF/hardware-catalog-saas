@@ -43,6 +43,28 @@
 | El frontend recibe esta misma matriz por `GET /api/plan`, asi que no hay una
 | segunda copia que mantener (a diferencia de config/currencies.php).
 |
+| `price_usd` (INF-1) es el precio de LA PLATAFORMA -lo que paga el dueño de la
+| tienda por usar el SaaS-, no tiene nada que ver con `tenants.currency` -en la
+| que esa tienda cobra a SUS clientes-. Es mensual y en USD porque todavia no
+| hay pasarela de cobro (7.7b, SAAS-3): es el precio que se ENSEÑA en la
+| landing, no uno que el sistema vaya a cobrar solo. El dia que 7.7b elija
+| proveedor y moneda, este es el sitio donde cambiar el numero.
+|
+| `public` (FUN-16) decide si un plan sale en `GET /api/public/plans`, o sea en
+| la landing. `trial` NO lleva esta clave -por eso PublicPlansController la
+| trata como `false`-: es un plan interno, el que usa PlanGate mientras dura la
+| prueba de una tienda nueva, y no algo que nadie compre. Enseñarlo en la
+| landing como una cuarta tarjeta de precio no tendria sentido.
+|
+| La CLAVE 'free' se queda con ese nombre por dentro aunque ya no sea gratis
+| (FUN-16, decision del dueño el 2026-09-12): sigue siendo el plan por defecto
+| al que cae un `tenants.plan` invalido o desconocido (ver arriba, "fallar en
+| cerrado"), y cambiar esa clave habria significado tocar la columna de la
+| migracion, cada test que crea una tienda esperando 'free', y el tipo del
+| frontend -todo por un cambio que es solo de ETIQUETA (`label`) y de PRECIO,
+| no de identidad-. Lo que ve el dueño de una tienda es `label`, nunca la
+| clave.
+|
 */
 
 return [
@@ -56,7 +78,13 @@ return [
     'plans' => [
 
         'free' => [
-            'label'  => 'Gratis',
+            // Sigue siendo el plan mas barato y el que cae por defecto -ver la
+            // cabecera-, pero desde FUN-16 ya no es gratis: $15/mes es lo que
+            // el dueño decidio como piso, para al menos no perder con la
+            // infraestructura que cuesta sostener la plataforma.
+            'label'     => 'Básico',
+            'price_usd' => 15,
+            'public'    => true,
             'limits' => [
                 'products'           => 20,
                 'images_per_product' => 3,
@@ -69,7 +97,9 @@ return [
         ],
 
         'pro' => [
-            'label'  => 'Pro',
+            'label'     => 'Pro',
+            'price_usd' => 29,
+            'public'    => true,
             'limits' => [
                 'products'           => 500,
                 'images_per_product' => 8,
@@ -82,13 +112,37 @@ return [
         ],
 
         'enterprise' => [
-            'label'  => 'Enterprise',
+            'label'     => 'Enterprise',
+            'price_usd' => 79,
+            'public'    => true,
             'limits' => [
                 'products'           => null,
                 'images_per_product' => null,
                 'users'              => null,
                 'categories'         => null,
                 'pages'              => null,
+                'custom_domain'      => true,
+                'csv_import'         => true,
+            ],
+        ],
+
+        /*
+        | Plan EFECTIVO de una tienda mientras dura su prueba (FUN-16). Nunca se
+        | guarda en `tenants.plan` -esa columna sigue con 'free' hasta que
+        | alguien elige uno de verdad-; lo devuelve `PlanGate::plan()` en su
+        | lugar, calculado a partir de `Tenant::enPrueba()`. Mismos limites que
+        | 'pro': lo bastante generoso para que se vea el producto de verdad
+        | (dominio propio, CSV, varias personas), sin llegar a prometer el techo
+        | de Enterprise que probablemente no va a comprar.
+        */
+        'trial' => [
+            'label'  => 'Prueba',
+            'limits' => [
+                'products'           => 500,
+                'images_per_product' => 8,
+                'users'              => 3,
+                'categories'         => 50,
+                'pages'              => 15,
                 'custom_domain'      => true,
                 'csv_import'         => true,
             ],

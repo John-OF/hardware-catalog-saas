@@ -85,6 +85,11 @@ class AuthController extends Controller
             'is_published'   => false,
         ]);
 
+        // Período de prueba (FUN-16): sin plan gratis permanente, esto es lo
+        // que deja probar el producto antes de tener que elegir uno. La
+        // columna es de sistema (fuera de $fillable), así que se pone aparte.
+        $tenant->forceFill(['trial_ends_at' => now()->addDays(Tenant::DIAS_DE_PRUEBA)])->save();
+
         // tenant_id se asigna explícitamente (está en $guarded, no en $fillable)
         // password se pasa en texto plano — el cast 'hashed' lo hashea automáticamente
         $user = new User([

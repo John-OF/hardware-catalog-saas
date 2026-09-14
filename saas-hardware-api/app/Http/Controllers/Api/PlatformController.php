@@ -147,6 +147,15 @@ class PlatformController extends Controller
 
         $tenant->update($data);
 
+        // Elegir un plan de verdad es SALIR de la prueba (FUN-16): sin esto,
+        // una tienda ya asignada seguiría cayendo en el cierre automático si
+        // el trabajo programado corriera antes de que alguien recordara
+        // vaciar la fecha a mano. `trial_ends_at` es de sistema (fuera de
+        // $fillable), de ahí el `forceFill()` aparte del `update()` de arriba.
+        if (array_key_exists('plan', $data)) {
+            $tenant->forceFill(['trial_ends_at' => null])->save();
+        }
+
         $this->anotarCambio($request, $tenant, $data, $planAnterior, $estabaActiva);
 
         // La caché pública guarda el tenant 5 minutos; sin esto una tienda
@@ -285,7 +294,13 @@ class PlatformController extends Controller
      */
     public function show(Tenant $tenant): JsonResponse
     {
-        $limites = PlanGate::limitsDe($tenant->plan);
+        // El plan EFECTIVO (FUN-16): si la tienda sigue en prueba, esto es
+        // 'trial' aunque `tenant.plan` siga diciendo 'free' -no se toca esa
+        // columna hasta que alguien elige un plan de verdad-. Sin esto, la
+        // ficha del operador mentiría sobre qué puede hacer hoy una tienda en
+        // prueba.
+        $planEfectivo = PlanGate::planEfectivoDe($tenant);
+        $limites = PlanGate::limitsDe($planEfectivo);
 
         // El uso se cuenta con las mismas claves de la matriz de planes, para
         // poder pintar "18 / 20" al lado de cada tope sin traducir nombres.
@@ -317,8 +332,8 @@ class PlatformController extends Controller
             'plan' => [
                 // El plan efectivo, no el que diga la columna: uno escrito a
                 // mano o sobrante de otra versión cae al plan por defecto.
-                'clave'   => PlanGate::planDe($tenant->plan),
-                'label'   => PlanGate::labelDe($tenant->plan),
+                'clave'   => $planEfectivo,
+                'label'   => PlanGate::labelDe($planEfectivo),
                 'limites' => $limites,
                 'uso'     => $uso,
             ],

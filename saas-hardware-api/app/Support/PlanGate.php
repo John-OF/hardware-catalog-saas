@@ -6,6 +6,7 @@ use App\Exceptions\PlanLimitException;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Models\User;
 
 /**
@@ -53,9 +54,25 @@ class PlanGate
      */
     public static function plan(): string
     {
-        return self::planDe(app()->bound('currentTenant')
-            ? (string) app('currentTenant')->plan
-            : null);
+        return app()->bound('currentTenant')
+            ? self::planEfectivoDe(app('currentTenant'))
+            : self::planDe(null);
+    }
+
+    /**
+     * El plan que de verdad aplica a UNA tienda, prueba incluida (FUN-16).
+     *
+     * Mientras `$tenant->enPrueba()`, el plan efectivo es 'trial' -limites de
+     * Pro- sin importar lo que guarde `tenants.plan` (que se queda en 'free'
+     * hasta que alguien elige uno de verdad). Es el mismo calculo que hace
+     * falta en dos sitios que no comparten `currentTenant`: el propio
+     * `plan()` de abajo, y la ficha de una tienda en el panel de plataforma
+     * (`PlatformController::show()`), que mira una tienda que no es la
+     * actual.
+     */
+    public static function planEfectivoDe(Tenant $tenant): string
+    {
+        return $tenant->enPrueba() ? 'trial' : self::planDe((string) $tenant->plan);
     }
 
     /**

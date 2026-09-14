@@ -77,13 +77,27 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
-     * Enviar el correo de recuperacion de contrasenia (SAAS-2).
+     * Enviar el correo de recuperacion de contrasenia (SAAS-2, FUN-11).
      *
      * Se sobreescribe la nativa de Laravel porque su enlace apunta a una ruta
-     * Blade que aqui no existe: el panel es un SPA aparte.
+     * Blade que aqui no existe: el panel es un SPA aparte, y el catalogo publico
+     * es otra ("panel de administracion" no significa nada para un cliente).
+     *
+     * El broker de Laravel es el MISMO para las tres cuentas -es la misma tabla,
+     * el mismo provider en config/auth.php-, asi que el unico sitio donde se
+     * puede decidir "que correo mandar" es aqui, mirando el rol. La tienda a la
+     * que pertenece un cliente sale de `tenant`, la relacion de `BelongsToTenant`
+     * (no hace falta tenerla resuelta como actual: es una consulta normal por
+     * `tenant_id`).
      */
     public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
     {
+        if ($this->role === 'customer') {
+            $this->notify(new \App\Notifications\CustomerResetPasswordNotification($token));
+
+            return;
+        }
+
         $this->notify(new \App\Notifications\ResetPasswordNotification($token));
     }
 

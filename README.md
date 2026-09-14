@@ -33,6 +33,10 @@ Monorepo con dos aplicaciones:
 
 ## Qué hace
 
+**Para quien todavía no tiene tienda**: una landing (`/` sin tienda que resolver) que presenta el
+producto y los tres planes con su precio real, servido por `GET /api/public/plans` — sin pasarela de
+cobro todavía, así que hoy es "enséñalo", no "véndelo" (`SAAS-3`).
+
 **Para la tienda**: alta self-service con verificación de correo, catálogo con especificaciones
 técnicas, imágenes optimizadas, importación por CSV, pedidos con estados y descuento automático de
 stock, venta de mostrador, moderación de reseñas, lista de espera de productos agotados, páginas
@@ -60,6 +64,9 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 - Una base de datos (MySQL/MariaDB; los tests corren en SQLite en memoria)
 - **Un worker de colas corriendo** (`php artisan queue:work`): los correos van por cola y sin él no
   sale ninguno
+- **En producción, un cron del sistema llamando `php artisan schedule:run` cada minuto**: es lo que
+  cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`); sin él, ninguna
+  prueba se cierra aunque la fecha ya haya pasado
 - Opcional en local, **obligatorio en producción**: almacenamiento compatible con S3 (Cloudflare R2)
   para las imágenes
 - Opcional en local, **obligatorio en producción**: claves de
@@ -166,9 +173,10 @@ app/
 │   │   ├── PlatformController.php          # Panel del operador
 │   │   └── Public/
 │   │       ├── PublicCatalogController.php # Catálogo, ficha, reseñas, pedidos, avisos
-│   │       ├── PublicAuthController.php    # Cuentas de cliente
+│   │       ├── PublicAuthController.php    # Cuentas de cliente (incluida su recuperación de contraseña)
 │   │       ├── PublicFavoritesController.php
-│   │       └── PublicOrdersController.php
+│   │       ├── PublicOrdersController.php
+│   │       └── PublicPlansController.php   # Catálogo de planes con precio, para la landing (INF-1)
 │   ├── Middleware/
 │   │   ├── InitializeTenantByHeader.php    # Panel: X-Tenant
 │   │   ├── InitializeTenantBySlug.php      # Público: slug de la URL
@@ -181,8 +189,8 @@ app/
 ├── Models/            # Tenant, User, Category, Product, ProductImage, Order,
 │                      # OrderItem, Review, StockNotification, Page, ActivityLog
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
-├── Notifications/     # VerifyEmail, ResetPassword, TeamInvitation, NewOrder,
-│                      # OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
+├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
+│                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
 ├── Services/
 │   ├── ImageService.php    # Subida y optimización a WebP
 │   ├── OrderPricing.php    # Precios y total calculados en el servidor
@@ -197,7 +205,8 @@ app/
 config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
-tests/Feature/         # 45 archivos, 391 tests (+1 en tests/Unit)
+routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
+tests/Feature/         # 50 archivos, 423 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -211,6 +220,7 @@ tests/Feature/         # 45 archivos, 391 tests (+1 en tests/Unit)
 | POST | `/api/auth/forgot-password` · `/reset-password` | Recuperación de contraseña · 5/min |
 | GET | `/api/auth/verify-email/{id}/{hash}` | Verificar correo (URL firmada) → redirige al SPA |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
+| GET | `/api/public/plans` | Catálogo de planes con precio, para la landing (INF-1) |
 
 **Catálogo público** (prefijo `/api/public/{slug}`, throttle de grupo 120/min, tenant por slug):
 
@@ -226,6 +236,7 @@ tests/Feature/         # 45 archivos, 391 tests (+1 en tests/Unit)
 | POST | `/orders` | Crear pedido · 10/min |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
 | POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min |
+| POST | `/auth/forgot-password` · `/auth/reset-password` | Recuperar contraseña del cliente · 5/min |
 
 **Cliente autenticado** (Bearer + middleware `customer`, dentro de `/api/public/{slug}`):
 
@@ -300,7 +311,8 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 392 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 424 tests (PHPUnit, SQLite en memoria)
+php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
 composer setup          # install + .env + key + migrate + build
@@ -320,7 +332,7 @@ react-hot-toast. CSS propio, sin framework.
 
 | Ruta | Página |
 |---|---|
-| `/{slug}` · `/` | Catálogo (`/` resuelve la tienda por el dominio) |
+| `/{slug}` · `/` | Catálogo (`/` resuelve la tienda por el dominio; sin ninguna que resolver, landing — `pages/marketing/LandingPage.tsx`, INF-1) |
 | `/{slug}/product/:id` · `/product/:id` | Ficha de producto |
 | `/{slug}/builder` · `/builder` | Armador de PC |
 | `/{slug}/p/:pageSlug` · `/p/:pageSlug` | Página informativa |

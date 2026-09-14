@@ -66,6 +66,25 @@ export const resolveTenantDomain = async (domain: string): Promise<Tenant> => {
   return response.data;
 };
 
+/**
+ * Un plan de LA PLATAFORMA, para la landing (INF-1). No confundir con
+ * `PlanInfo` (`types/index.ts`), que es el plan de una tienda YA autenticada
+ * y con su consumo — aquí no hay tienda ni sesión, es el catálogo entero.
+ */
+export interface PublicPlan {
+  key: 'free' | 'pro' | 'enterprise';
+  label: string;
+  /** Precio mensual de la plataforma, en USD. Nada que ver con `tenant.currency`. */
+  price_usd: number;
+  /** Un número es un tope, `null` sin tope, un booleano una función incluida o no. */
+  limits: Record<string, number | boolean | null>;
+}
+
+export const getPublicPlans = async (): Promise<PublicPlan[]> => {
+  const { data } = await api.get<{ plans: PublicPlan[] }>('/public/plans');
+  return data.plans;
+};
+
 export interface CreateReviewPayload {
   customer_name: string;
   customer_email?: string;

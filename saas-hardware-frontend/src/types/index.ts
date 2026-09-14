@@ -96,6 +96,14 @@ export interface Tenant {
    */
   custom_domain_token: string | null;
   custom_domain_verified_at: string | null;
+  /**
+   * Período de prueba (FUN-16). `null` significa que esta tienda no está en
+   * prueba —ya eligió un plan, o es de antes de este cambio—. Mientras la
+   * fecha no pasa, el plan EFECTIVO es 'trial' (límites de Pro) aunque
+   * `plan` siga diciendo el plan por defecto: eso lo decide el backend
+   * (`PlanGate`), no el frontend.
+   */
+  trial_ends_at: string | null;
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
 }

@@ -43,6 +43,12 @@ use Tests\TestCase;
  * 5. La invitacion al equipo (FUN-4), que sale del panel -o sea CON tienda
  *    resuelta- pero viaja marcada `NotTenantAware`. Es el caso que faltaba por
  *    cubrir: uno donde la tienda existe y aun asi el trabajo no la necesita.
+ * 6. La recuperacion de contrasenia del CLIENTE (FUN-11), que sale de
+ *    `public/{slug}/auth/forgot-password` -con tienda resuelta, a diferencia
+ *    de la del punto 1- y tambien viaja `NotTenantAware`. Mismo motivo que el
+ *    punto 5, con un matiz: aqui la tienda SI hace falta para el enlace -sale
+ *    de `$notifiable->tenant`, no de la tienda actual-, asi que este test es el
+ *    que demuestra que eso funciona sin necesidad de la tienda resuelta.
  *
  * Al anadir un correo nuevo, anadir aqui su caso: la suite normal no lo cubre.
  */
@@ -248,6 +254,39 @@ class QueuedMailWithRealQueueTest extends TestCase
             'te invito a administrar Tienda Cola',
             $mensajes[0]->getOriginalMessage()->getSubject(),
         );
+    }
+
+    public function test_el_correo_de_recuperacion_del_cliente_sale_por_la_cola(): void
+    {
+        $cliente = new User([
+            'name'      => 'Cliente',
+            'email'     => 'cliente@tienda-cola.com',
+            'password'  => 'password123',
+            'role'      => 'customer',
+            'is_active' => true,
+        ]);
+        $cliente->tenant_id = $this->tenant->id;
+        $cliente->save();
+
+        // A diferencia del reset del panel (punto 1), esta ruta SI lleva
+        // 'tenant.slug': el trabajo se encola con la tienda ya resuelta, y aun
+        // asi la notificacion sigue marcada `NotTenantAware` (mismo motivo que
+        // la invitacion, punto 5).
+        $this->postJson("/api/public/{$this->tenant->slug}/auth/forgot-password", ['email' => $cliente->email])
+            ->assertOk();
+
+        $this->assertSame(1, DB::table('jobs')->count(), 'El correo no llego a la cola.');
+
+        $this->trabajarLaCola();
+
+        $this->assertSame(0, DB::table('jobs')->count());
+        $this->assertSame(0, DB::table('failed_jobs')->count(), 'El trabajo fallo en el worker.');
+
+        $mensajes = $this->correosEnviados();
+
+        $this->assertCount(1, $mensajes, 'El worker no envio el correo de recuperacion del cliente.');
+        $this->assertStringContainsString($cliente->email, $mensajes[0]->getEnvelope()->getRecipients()[0]->getAddress());
+        $this->assertSame('Recupera el acceso a tu cuenta', $mensajes[0]->getOriginalMessage()->getSubject());
     }
 
     /**

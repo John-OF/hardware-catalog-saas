@@ -44,6 +44,7 @@ class ActivityLog extends Model
     public const TIENDA_RESET = 'tenant.reset_password';
     public const TIENDA_SOPORTE = 'tenant.soporte';
     public const TIENDA_RESCATE_ADMIN = 'tenant.rescate_admin';
+    public const TIENDA_PRUEBA_VENCIDA = 'tenant.prueba_vencida';
 
     protected $fillable = [
         'tenant_id', 'actor_id', 'actor_email', 'actor_role',

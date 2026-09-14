@@ -28,13 +28,26 @@ interface CustomerAccountModalProps {
   currency?: string | null;
   /** WhatsApp de la tienda, del que se deduce el prefijo por defecto (PUB-4). */
   whatsappNumber?: string | null;
+  /**
+   * Del enlace de recuperación de contraseña (FUN-11): `CatalogPage` los lee
+   * de la URL (`reset_token`/`reset_email`, los pone
+   * `CustomerResetPasswordNotification`) y se los pasa tal cual. El email no
+   * se deja editar en la pestaña de reset: tiene que ser exactamente el del
+   * enlace, o el token no calza con ninguna cuenta.
+   */
+  resetToken?: string | null;
+  resetEmail?: string | null;
+  /** Se llama al fijar la contraseña con éxito, para que la URL no se quede con el token. */
+  onResetConsumed?: () => void;
 }
 
-export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, currency, whatsappNumber }: CustomerAccountModalProps) {
+export default function CustomerAccountModal({
+  isOpen, onClose, tenantSlug, currency, whatsappNumber, resetToken, resetEmail, onResetConsumed,
+}: CustomerAccountModalProps) {
   const money = (n: number | string | null | undefined) => formatMoney(n, currency);
 
   const { user, token, isAuthenticated, setCustomerAuth, clearCustomerAuth, setFavoriteIds, toggleFavoriteId } = useCustomerAuthStore();
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'favorites' | 'orders'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot' | 'reset' | 'favorites' | 'orders'>('login');
   
   // Form states
   const [email, setEmail] = useState('');
@@ -59,10 +72,13 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
       setActiveTab('favorites');
       fetchFavorites();
       fetchOrders();
+    } else if (resetToken && resetEmail) {
+      // FUN-11: llegó por el enlace del correo de recuperación.
+      setActiveTab('reset');
     } else {
       setActiveTab('login');
     }
-  }, [isAuthenticated, isOpen]);
+  }, [isAuthenticated, isOpen, resetToken, resetEmail]);
 
   const fetchFavorites = async () => {
     if (!token) return;
@@ -136,6 +152,68 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
       fetchOrders();
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Error al registrarse.';
+      toast.error(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Pedir el enlace de recuperación (FUN-11). Reutiliza el campo `email` del login. */
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error('Escribe tu correo electrónico.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post(`/public/${tenantSlug}/auth/forgot-password`, { email });
+      toast.success(res.data.message);
+      setActiveTab('login');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || 'No se pudo enviar el enlace. Inténtalo de nuevo.';
+      toast.error(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Fijar la nueva contraseña con el token del enlace (FUN-11).
+   *
+   * `resetToken`/`resetEmail` vienen de la URL vía props, no de un campo del
+   * formulario: el email no se deja tocar porque tiene que ser exactamente el
+   * que llevaba el enlace.
+   */
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || !passwordConfirmation) {
+      toast.error('Completa los dos campos de contraseña.');
+      return;
+    }
+    if (password !== passwordConfirmation) {
+      toast.error('Las contraseñas no coinciden.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post(`/public/${tenantSlug}/auth/reset-password`, {
+        token: resetToken,
+        email: resetEmail,
+        password,
+        password_confirmation: passwordConfirmation,
+      });
+      toast.success(res.data.message);
+      setPassword('');
+      setPasswordConfirmation('');
+      setEmail(resetEmail ?? '');
+      onResetConsumed?.();
+      setActiveTab('login');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message
+        || err.response?.data?.errors?.email?.[0]
+        || err.response?.data?.errors?.password?.[0]
+        || 'El enlace no es válido o ya caducó. Solicita uno nuevo.';
       toast.error(errMsg);
     } finally {
       setLoading(false);
@@ -536,6 +614,23 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                   </div>
 
                   <button
+                    type="button"
+                    onClick={() => setActiveTab('forgot')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      textAlign: 'right',
+                      padding: 0,
+                      marginTop: '-0.5rem'
+                    }}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+
+                  <button
                     type="submit"
                     disabled={loading}
                     className="btn-primary"
@@ -551,6 +646,174 @@ export default function CustomerAccountModal({ isOpen, onClose, tenantSlug, curr
                     }}
                   >
                     {loading ? <Loader2 size={18} className="animate-spin" /> : 'Entrar'}
+                  </button>
+                </form>
+              ) : activeTab === 'forgot' ? (
+                /* FORGOT PASSWORD FORM */
+                <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Escribe el correo de tu cuenta y te mandamos un enlace para elegir una contraseña nueva.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Correo Electrónico</label>
+                    <div style={{ position: 'relative' }}>
+                      <Mail size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="ejemplo@correo.com"
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                          background: 'var(--bg-input)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      fontWeight: 'bold',
+                      marginTop: '0.5rem'
+                    }}
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : 'Enviar enlace'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('login')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      padding: 0
+                    }}
+                  >
+                    Volver a iniciar sesión
+                  </button>
+                </form>
+              ) : activeTab === 'reset' ? (
+                /* RESET PASSWORD FORM — llega solo por el enlace del correo (FUN-11) */
+                <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Elige la nueva contraseña para <strong style={{ color: 'var(--text-primary)' }}>{resetEmail}</strong>.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nueva contraseña</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Mínimo 8 caracteres"
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 2.5rem 0.6rem 2.25rem',
+                          background: 'var(--bg-input)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Confirmar contraseña</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type={showPasswordConfirmation ? "text" : "password"}
+                        value={passwordConfirmation}
+                        onChange={(e) => setPasswordConfirmation(e.target.value)}
+                        placeholder="••••••••"
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 2.5rem 0.6rem 2.25rem',
+                          background: 'var(--bg-input)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 0
+                        }}
+                      >
+                        {showPasswordConfirmation ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      fontWeight: 'bold',
+                      marginTop: '0.5rem'
+                    }}
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : 'Guardar contraseña'}
                   </button>
                 </form>
               ) : (

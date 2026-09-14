@@ -1,0 +1,49 @@
+/* Estilos de <TrialBanner> (FUN-16).
+
+   Sin acotar con `:where(.page-x)`: es un componente, no una pantalla, y se
+   monta encima de cualquier página del panel (TEC-6). Sus clases van todas
+   prefijadas con `trial-banner`, así que no compiten con ninguna hoja de
+   página.
+
+   UI-5: por eso mismo, si alguna página necesitara retocarlo, la regla iría en
+   ESTE fichero y no en la de la página — `:where(.page-x) .trial-banner`
+   empata en especificidad con lo de aquí y el desempate lo decidiría el orden
+   de carga de los chunks. */
+
+.trial-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--info);
+  border-radius: 12px;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+/* Últimos dos días: mismo aviso, tono de advertencia en vez de informativo. */
+.trial-banner-urgente {
+  border-color: var(--warning);
+  background: var(--warning-glow);
+}
+
+.trial-banner-icon {
+  flex-shrink: 0;
+  color: var(--info);
+}
+
+.trial-banner-urgente .trial-banner-icon {
+  color: var(--warning);
+}
+
+.trial-banner p {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.trial-banner p strong {
+  color: var(--text-primary);
+}

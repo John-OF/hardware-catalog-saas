@@ -1,8 +1,16 @@
 import './CatalogPage.css';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom';
+import { lazy, useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import RouteFallback from '../../components/ui/RouteFallback';
+
+// INF-1: la landing es un chunk aparte y no un import normal. Quien entra a
+// una tienda de verdad —la inmensa mayoría del tráfico— no debe pagar por
+// bajarla; y al reves, quien llega al dominio de la plataforma no necesita el
+// bundle entero del catálogo. `CatalogPage` decide cuál de las dos mostrar
+// más abajo, mirando si hay tienda que resolver.
+const LandingPage = lazy(() => import('../marketing/LandingPage'));
 import {
   Search,
   Store,
@@ -156,8 +164,21 @@ export default function CatalogPage() {
   // UI-9: con el comparador abierto el catalogo de detras no se mueve.
   useBloqueoDeScroll(isCompareModalOpen);
 
+  // FUN-11: el enlace de recuperación de un cliente vuelve aquí con
+  // `reset_token`/`reset_email` en la URL (`CustomerResetPasswordNotification`,
+  // backend). No son filtros del catálogo -de ahí que no pasen por
+  // `aplicarFiltros`-, así que se leen aparte y solo para pasárselos al modal.
+  const resetToken = searchParams.get('reset_token');
+  const resetEmail = searchParams.get('reset_email');
+
   // Customer Auth
-  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  //
+  // El estado inicial ya mira si el enlace de recuperación trajo los dos
+  // parámetros, en vez de abrirlo desde un efecto tras el primer pintado: así
+  // no hay un instante en el que se vea el catálogo sin nada antes de que el
+  // modal aparezca, y de paso no hace falta un `setState` dentro de un efecto
+  // solo para esto.
+  const [accountModalOpen, setAccountModalOpen] = useState(() => Boolean(resetToken && resetEmail));
   const { isAuthenticated: isCustomerAuthenticated, favoriteIds, setFavoriteIds, toggleFavoriteId } = useCustomerAuthStore();
 
   const handleToggleCompare = (e: React.MouseEvent, product: Product) => {
@@ -176,12 +197,17 @@ export default function CatalogPage() {
     });
   };
 
-  // Redireccionar en localhost si falta el slug.
+  // Mostrar la landing en vez del catálogo si falta el slug.
   //
-  // AUD-14: aqui solo se DECIDE; el `<Navigate>` se devuelve mas abajo, despues
-  // de todos los hooks. Ver el comentario que acompaña al return.
+  // AUD-14: aqui solo se DECIDE; la landing se devuelve mas abajo, despues de
+  // todos los hooks. Ver el comentario que acompaña al return.
+  //
+  // INF-1: hasta que exista una forma real de distinguir "el dominio de la
+  // propia plataforma" de "un dominio propio que todavia no resolvio nadie"
+  // (algo que en produccion tendria que mirar contra `FRONTEND_URL`, no
+  // contra el hostname), la señal sigue siendo la de siempre: local sin slug.
   const isSaaSBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const redirigirAlLogin = isSaaSBase && !slug;
+  const esLandingDeLaPlataforma = isSaaSBase && !slug;
 
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant, isError: isErrorTenant } = useQuery<Tenant>({
@@ -193,11 +219,11 @@ export default function CatalogPage() {
         return resolveTenantDomain(currentDomain);
       }
     },
-    // Mientras se redirige no hay tienda que resolver: sin esto, quitar el
-    // return de arriba habria estrenado una peticion a `resolve-domain` con
-    // 'localhost' que solo puede fallar. Las demas consultas ya estaban
-    // apagadas por su cuenta, porque cuelgan de `resolvedSlug`.
-    enabled: !redirigirAlLogin,
+    // Mientras se muestra la landing no hay tienda que resolver: sin esto, se
+    // habria estrenado una peticion a `resolve-domain` con 'localhost' que
+    // solo puede fallar. Las demas consultas ya estaban apagadas por su
+    // cuenta, porque cuelgan de `resolvedSlug`.
+    enabled: !esLandingDeLaPlataforma,
   });
 
   const resolvedSlug = tenant?.slug;
@@ -302,8 +328,12 @@ export default function CatalogPage() {
   // `/:slug` -> `/` con el componente montado, React se encuentra con menos
   // hooks de los que registro la vez anterior ("Rendered fewer hooks than
   // expected") y se cae la tienda entera, no solo esta pantalla.
-  if (redirigirAlLogin) {
-    return <Navigate to="/login" replace />;
+  if (esLandingDeLaPlataforma) {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <LandingPage />
+      </Suspense>
+    );
   }
 
   if (isLoadingTenant) {
@@ -778,12 +808,20 @@ export default function CatalogPage() {
         })}
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={resolvedSlug!} tenant={tenant} />
-      <CustomerAccountModal 
-        isOpen={accountModalOpen} 
-        onClose={() => setAccountModalOpen(false)} 
-        tenantSlug={resolvedSlug!} 
+      <CustomerAccountModal
+        isOpen={accountModalOpen}
+        onClose={() => setAccountModalOpen(false)}
+        tenantSlug={resolvedSlug!}
         currency={tenant?.currency}
         whatsappNumber={tenant?.whatsapp_number}
+        resetToken={resetToken}
+        resetEmail={resetEmail}
+        onResetConsumed={() => setSearchParams((previos) => {
+          const params = new URLSearchParams(previos);
+          params.delete('reset_token');
+          params.delete('reset_email');
+          return params;
+        }, { replace: true })}
       />
 
         {/* Barra Flotante de Comparación */}

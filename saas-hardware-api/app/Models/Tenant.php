@@ -31,7 +31,34 @@ class Tenant extends Model implements IsTenant
         'theme'                       => 'array',
         'custom_domain_requested_at'  => 'datetime',
         'custom_domain_verified_at'   => 'datetime',
+        'trial_ends_at'               => 'datetime',
     ];
+
+    /**
+     * Cuánto dura la prueba de una tienda nueva (FUN-16).
+     *
+     * Sólo la usa `AuthController::register()`, al crear la tienda -de ahí que
+     * viva aquí y no en `config/plans.php`: no es un límite de ningún plan, es
+     * cuánto tiempo se le da a alguien para decidir antes de tener que elegir
+     * uno.
+     */
+    public const DIAS_DE_PRUEBA = 7;
+
+    /**
+     * Si esta tienda sigue dentro de su período de prueba (FUN-16).
+     *
+     * `trial_ends_at` nula significa que nunca tuvo prueba (una tienda vieja,
+     * de antes de este cambio) o que ya se le asignó un plan de verdad -ver
+     * `PlatformController::updateTenant()`, que la vacía al elegir plan-. Una
+     * prueba VENCIDA (la fecha ya pasó) tampoco cuenta: para entonces el
+     * trabajo programado ya debería haber suspendido la tienda, y aunque no
+     * hubiera corrido todavía, tratarla como "sigue en prueba" le regalaría
+     * tiempo de más sólo por un retraso del cron.
+     */
+    public function enPrueba(): bool
+    {
+        return $this->trial_ends_at !== null && $this->trial_ends_at->isFuture();
+    }
 
     /**
      * Las tiendas que se ven desde fuera (FUN-5).
