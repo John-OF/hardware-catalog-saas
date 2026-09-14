@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
 use App\Support\Paginacion;
@@ -86,6 +87,7 @@ class OrderController extends Controller
             'status'              => 'required|string|in:pending,processing,attended',
             'items'               => 'required|array|min:1|max:100',
             'items.*.product_id'  => 'required|uuid',
+            'items.*.variant_id'  => 'nullable|uuid',
             'items.*.quantity'    => 'required|integer|min:1|max:999',
         ], [
             'customer_name.required' => 'Escribe a nombre de quién va la venta.',
@@ -233,6 +235,17 @@ class OrderController extends Controller
      * Las líneas guardan un snapshot del producto, así que `product_id` puede
      * ser null si el artículo se borró del catálogo después de venderse: en ese
      * caso no hay stock que mover y la línea se salta.
+     *
+     * MOD-5: una línea de una variante mueve el stock de ESA variante y después
+     * recalcula el resumen del producto. Se salta —sin mover nada— en dos casos
+     * en los que no hay dónde devolverlo con sentido: la variante se borró
+     * (queda su nombre pero no su id), o la línea es de antes de que el producto
+     * tuviera variantes (el stock del producto ya es solo un resumen, y el
+     * próximo cálculo pisaría lo que se le sumara a mano).
+     *
+     * Con el modelo (`increment()` de una instancia) y no con una consulta suelta,
+     * para que salten los eventos: el aviso de "ya llegó" al devolver stock de un
+     * pedido cancelado.
      */
     private function applyStockDelta(Order $order, bool $decrement): void
     {
@@ -241,11 +254,35 @@ class OrderController extends Controller
                 continue;
             }
 
-            $query = Product::where('id', $item->product_id);
+            if ($item->variant_id) {
+                $variante = ProductVariant::find($item->variant_id);
+
+                if (! $variante) {
+                    continue;
+                }
+
+                $decrement
+                    ? $variante->decrement('stock', $item->quantity)
+                    : $variante->increment('stock', $item->quantity);
+
+                $variante->product?->sincronizarResumenDeVariantes();
+
+                continue;
+            }
+
+            if ($item->variant_name !== null) {
+                continue;
+            }
+
+            $producto = Product::withCount('variants')->find($item->product_id);
+
+            if (! $producto || $producto->variants_count > 0) {
+                continue;
+            }
 
             $decrement
-                ? $query->decrement('stock', $item->quantity)
-                : $query->increment('stock', $item->quantity);
+                ? $producto->decrement('stock', $item->quantity)
+                : $producto->increment('stock', $item->quantity);
         }
     }
 }

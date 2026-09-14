@@ -28,7 +28,11 @@ class StockNotificationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = StockNotification::with(['product:id,name,stock,price,sale_price,thumbnail_url'])
+        $query = StockNotification::with([
+            'product:id,name,stock,price,sale_price,thumbnail_url',
+            // MOD-5: la variante que espera, con su propio stock.
+            'variant:id,product_id,options,stock,price,sale_price',
+        ])
             ->orderByRaw('notified_at IS NULL DESC')
             ->orderBy('created_at');
 

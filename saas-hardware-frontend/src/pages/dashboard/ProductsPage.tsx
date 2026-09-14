@@ -29,6 +29,14 @@ import { getProducts, createProduct, updateProduct, deleteProduct, importProduct
 import { getCategories } from '../../api/categories';
 import { getPlan } from '../../api/plan';
 import Dialogo from '../../components/ui/Dialogo';
+import EditorDeVariantes from '../../components/dashboard/EditorDeVariantes';
+import {
+  agregarVariantesAlFormulario,
+  problemaDeVariantes,
+  variantesDesdeProducto,
+  type VarianteEnFormulario,
+} from '../../utils/variantesEnFormulario';
+import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
@@ -100,6 +108,12 @@ export default function ProductsPage() {
   
   // Specs list state (list of { key, value })
   const [specsList, setSpecsList] = useState<{ key: string; value: string }[]>([]);
+
+  // MOD-5: variantes. Con alguna, precio y stock son de cada una y los campos de
+  // la ficha se esconden: el backend los calcula como resumen.
+  const [ejesVariantes, setEjesVariantes] = useState<string[]>([]);
+  const [filasVariantes, setFilasVariantes] = useState<VarianteEnFormulario[]>([]);
+  const conVariantesEnFormulario = filasVariantes.length > 0;
 
   // Fetch categories (for the filter and form dropdown)
   const { data: categories = [] } = useQuery<Category[]>({
@@ -269,6 +283,8 @@ export default function ProductsPage() {
     setExistingGallery([]);
     setDeletedImageIds([]);
     setSpecsList([]);
+    setEjesVariantes([]);
+    setFilasVariantes([]);
     setIsModalOpen(true);
   };
 
@@ -302,7 +318,11 @@ export default function ProductsPage() {
     } else {
       setSpecsList([]);
     }
-    
+
+    const { ejes, filas } = variantesDesdeProducto(product.variants);
+    setEjesVariantes(ejes);
+    setFilasVariantes(filas);
+
     setIsModalOpen(true);
   };
 
@@ -337,24 +357,41 @@ export default function ProductsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !price || !stock) {
-      toast.error('Nombre, precio y stock son obligatorios.');
+    if (!name.trim()) {
+      toast.error('El nombre es obligatorio.');
       return;
     }
 
-    if (salePrice && Number(salePrice) >= Number(price)) {
-      toast.error('El precio de oferta debe ser menor que el precio regular.');
-      return;
+    if (conVariantesEnFormulario) {
+      const problema = problemaDeVariantes(ejesVariantes, filasVariantes);
+      if (problema) {
+        toast.error(problema);
+        return;
+      }
+    } else {
+      if (!price || !stock) {
+        toast.error('Nombre, precio y stock son obligatorios.');
+        return;
+      }
+
+      if (salePrice && Number(salePrice) >= Number(price)) {
+        toast.error('El precio de oferta debe ser menor que el precio regular.');
+        return;
+      }
     }
 
     const formData = new FormData();
     formData.append('name', name);
     formData.append('brand', brand);
     formData.append('sku', sku || '');
-    formData.append('price', price);
-    formData.append('sale_price', salePrice || '');
-    formData.append('stock', stock);
-    formData.append('low_stock_threshold', lowStockThreshold || '5');
+    // Con variantes, precio y stock de la ficha los calcula el backend: mandarlos
+    // vacíos solo daría un error de validación.
+    if (!conVariantesEnFormulario) {
+      formData.append('price', price);
+      formData.append('sale_price', salePrice || '');
+      formData.append('stock', stock);
+      formData.append('low_stock_threshold', lowStockThreshold || '5');
+    }
     formData.append('category_id', categoryId);
     formData.append('description', description);
     formData.append('is_active', isActive ? '1' : '0');
@@ -383,6 +420,10 @@ export default function ProductsPage() {
     
     // Append specs as JSON string or key value
     formData.append('specs', JSON.stringify(specsObj));
+
+    // Siempre, también vacía: una lista vacía es lo que le dice al backend que
+    // quite las variantes de un producto que las tenía.
+    agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes);
 
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, formData });
@@ -659,7 +700,15 @@ export default function ProductsPage() {
               <tbody>
                 {products.map((product, index) => {
                   const isSelected = selectedProductIds.includes(product.id);
-                  const isLowStock = product.stock <= (product.low_stock_threshold ?? 5);
+                  // MOD-5: con variantes, "stock bajo" es que ALGUNA esté en su umbral:
+                  // el total puede ser alto con la de 32 GB a punto de agotarse.
+                  const conVariantes = tieneVariantes(product);
+                  const variantesBajas = conVariantes
+                    ? product.variants!.filter((v) => v.stock <= (v.low_stock_threshold ?? 5))
+                    : [];
+                  const isLowStock = conVariantes
+                    ? variantesBajas.length > 0
+                    : product.stock <= (product.low_stock_threshold ?? 5);
                   return (
                     <tr
                       key={product.id}
@@ -702,6 +751,11 @@ export default function ProductsPage() {
                                 SKU: {product.sku}
                               </span>
                             )}
+                            {conVariantes && (
+                              <span className="variants-tag" title={product.variants!.map((v) => v.nombre).join(', ')}>
+                                {product.variants!.length} {product.variants!.length === 1 ? 'variante' : 'variantes'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -711,6 +765,7 @@ export default function ProductsPage() {
                         </span>
                       </td>
                       <td className="price-cell">
+                        {precioEsDesde(product) && <span className="price-from">Desde </span>}
                         {product.sale_price !== null && product.sale_price !== undefined ? (
                           <div className="admin-price-box">
                             <span className="strike-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.85em', marginRight: '0.4rem', fontWeight: 'normal' }}>
@@ -732,13 +787,18 @@ export default function ProductsPage() {
                           <span className="stock-label">
                             {product.stock === 0 ? (
                               'Sin Stock'
+                            ) : isLowStock && conVariantes ? (
+                              <span style={{ color: '#f87171', fontWeight: 600 }} title={variantesBajas.map((v) => `${v.nombre}: ${v.stock}`).join(', ')}>
+                                Stock bajo en {variantesBajas.length === 1 ? variantesBajas[0].nombre : `${variantesBajas.length} variantes`}
+                              </span>
                             ) : isLowStock ? (
                               <span style={{ color: '#f87171', fontWeight: 600 }}>Stock Bajo (≤{product.low_stock_threshold ?? 5})</span>
                             ) : (
                               'Disponible'
                             )}
                           </span>
-                          {product.stock === 0 && (product.waitlist_count ?? 0) > 0 && (
+                          {/* Con variantes puede haber quien espere una agotada aunque el total tenga stock. */}
+                          {(product.stock === 0 || conVariantes) && (product.waitlist_count ?? 0) > 0 && (
                             /* FUN-1b: la insignia ya existia pero era un numero muerto.
                                Ahora lleva a la lista de espera filtrada por este
                                producto, que es lo que el dueno quiere ver al leerla:
@@ -960,6 +1020,25 @@ export default function ProductsPage() {
                 </select>
               </div>
 
+              <EditorDeVariantes
+                ejes={ejesVariantes}
+                filas={filasVariantes}
+                moneda={currencyCode}
+                onChange={(ejes, filas) => {
+                  setEjesVariantes(ejes);
+                  setFilasVariantes(filas);
+                }}
+              />
+
+              {conVariantesEnFormulario ? (
+                <p className="variants-price-note">
+                  El precio y el stock se definen en cada variante. En el catálogo, el producto se
+                  muestra con el precio de la más barata y la suma del stock.
+                  {editingProduct && tieneVariantes(editingProduct) === false && (
+                    <> El precio y el stock que tenía el producto dejarán de usarse.</>
+                  )}
+                </p>
+              ) : (<>
               <div className="form-row">
                 <div className="form-group half">
                   <label htmlFor="prod-price">Precio Regular ({currencyCode})</label>
@@ -1018,6 +1097,7 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+              </>)}
 
               <div className="form-group">
                 <label htmlFor="prod-desc">Descripción (soporta formato básico)</label>

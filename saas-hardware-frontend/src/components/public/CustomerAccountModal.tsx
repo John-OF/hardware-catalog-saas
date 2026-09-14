@@ -486,7 +486,7 @@ export default function CustomerAccountModal({
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
                               {ord.items?.map((item: any) => (
                                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                  <span>{item.quantity}x {item.product_name}</span>
+                                  <span>{item.quantity}x {item.product_name}{item.variant_name ? ` (${item.variant_name})` : ''}</span>
                                   <span>{money(item.subtotal)}</span>
                                 </div>
                               ))}

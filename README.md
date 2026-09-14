@@ -38,7 +38,8 @@ producto y los tres planes con su precio real, servido por `GET /api/public/plan
 cobro todavía, así que hoy es "enséñalo", no "véndelo" (`SAAS-3`).
 
 **Para la tienda**: alta self-service con verificación de correo, catálogo con especificaciones
-técnicas, imágenes optimizadas, importación por CSV, pedidos con estados y descuento automático de
+técnicas y variantes (capacidad, color…, cada una con su precio, stock y foto), imágenes
+optimizadas, importación por CSV, pedidos con estados y descuento automático de
 stock, venta de mostrador, moderación de reseñas, lista de espera de productos agotados, páginas
 informativas, métricas y personalización visual completa (colores, tipografías, portada, pie,
 favicon).
@@ -52,7 +53,7 @@ cambiar su plan y rescatar la contraseña de un dueño. Los planes limitan cuán
 tienda (`config/plans.php`).
 
 **Lo que todavía no existe** y conviene saber antes de nada: no hay pasarela de pago ni facturación
-del SaaS, ni envíos, ni impuestos/comprobante, ni variantes de producto. El detalle completo —qué
+del SaaS, ni envíos, ni impuestos/comprobante. El detalle completo —qué
 hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionalidades.md`.
 
 ---
@@ -186,8 +187,8 @@ app/
 │   │   ├── RestrictPlatformIp.php          # Lista de IPs del panel de plataforma
 │   │   └── RestrictImpersonation.php       # Sesión de soporte: el panel, en solo lectura
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
-├── Models/            # Tenant, User, Category, Product, ProductImage, Order,
-│                      # OrderItem, Review, StockNotification, Page, ActivityLog
+├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
+│                      # Order, OrderItem, Review, StockNotification, Page, ActivityLog
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
 ├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
 │                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
@@ -207,7 +208,7 @@ config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 52 archivos, 444 tests (+1 en tests/Unit)
+tests/Feature/         # 53 archivos, 467 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -231,10 +232,10 @@ tests/Feature/         # 52 archivos, 444 tests (+1 en tests/Unit)
 | GET | `/categories` | Categorías activas (con `component_type`) |
 | GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación |
 | GET | `/facets` | Valores de spec reales del catálogo, para los filtros |
-| GET | `/products/{product}` | Ficha: galería, reseñas aprobadas, relacionados |
+| GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
-| POST | `/products/{product}/notify-me` | "Avísame cuando llegue" · 10/min |
-| POST | `/orders` | Crear pedido · 10/min |
+| POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
+| POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes · 10/min |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
 | POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min (el login, por correo; 20/min por IP) |
 | POST | `/auth/forgot-password` · `/auth/reset-password` | Recuperar contraseña del cliente · 5/min |
@@ -258,7 +259,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
 | GET · PUT | `/api/tenant` | Configuración y branding | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
-| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos | Todo menos `DELETE` |
+| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]` | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador | Todo menos `DELETE` |
@@ -312,7 +313,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 445 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 468 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -368,7 +369,8 @@ src/
 │   │               # PlatformTenant (ficha), PlatformLogs
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
 ├── components/
-│   ├── dashboard/  # NewOrderModal (venta de mostrador), VerifyEmailBanner, SupportBanner
+│   ├── dashboard/  # NewOrderModal (venta de mostrador), EditorDeVariantes, VerifyEmailBanner,
+│   │               # SupportBanner
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
 │   └── ui/         # Dialogo (ventana flotante del panel), CategoryIcon, ImageSourceField,
@@ -378,7 +380,8 @@ src/
 ├── hooks/          # useTenantBranding (título, favicon, meta/OG), useTenantTheme,
 │                   # useBloqueoDeScroll
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
-│                   # branding, phone, sanitizeHtml, componentTypes
+│                   # branding, phone, sanitizeHtml, componentTypes, variants,
+│                   # variantesEnFormulario
 └── types/          # Tipos compartidos de la API
 ```
 
@@ -401,7 +404,11 @@ src/
   a partir de lo que devuelve la API: variables CSS, modo claro/oscuro, título y favicon.
 - **Los filtros del catálogo viven en la URL**, no en estado local: un enlace compartido reproduce
   lo que el remitente estaba viendo.
-- El **carrito** (`cartStore`) se persiste en `localStorage` y es por tienda.
+- El **carrito** (`cartStore`) se persiste en `localStorage` y es por tienda. Una línea es producto +
+  variante: el mismo producto en 16 GB y en 32 GB son dos líneas.
+- **Variantes: el precio y el stock de un producto con variantes son un resumen** (el de la más
+  barata y la suma), para listar, ordenar y filtrar. Todo lo que **cobra o descuenta** usa la
+  variante: `datosDeVenta()` en `utils/variants.ts`, `OrderPricing` en el backend.
 - La sesión de cliente (`customerAuthStore`) es independiente de la de admin (`authStore`).
 
 ### Variables de entorno y scripts
@@ -432,6 +439,9 @@ npm run lint      # ESLint
 - **Al añadir un sitio que cree algo limitado**, acordarse del gate; al añadir una consulta que mire
   por encima de las tiendas, `withoutTenant()` explícito.
 - **Los topes son de la creación, no del estado existente**: bajar de plan nunca borra nada.
+- **Cambiar precio o stock de una variante fuera del formulario** (una venta, una devolución, un
+  ajuste en lote) obliga a llamar después a `Product::sincronizarResumenDeVariantes()`, o el
+  catálogo enseñará un precio y un stock que ya no son.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
 - **Rate limits con nombre, nunca `throttle:5,1` a secas**: un throttle sin nombre usa como clave

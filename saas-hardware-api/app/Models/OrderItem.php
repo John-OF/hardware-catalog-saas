@@ -20,7 +20,7 @@ class OrderItem extends Model
     }
 
     protected $fillable = [
-        'order_id', 'product_id', 'product_name',
+        'order_id', 'product_id', 'variant_id', 'product_name', 'variant_name',
         'unit_price', 'quantity', 'subtotal',
     ];
 
@@ -38,5 +38,21 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
+    }
+
+    /**
+     * "Memoria Kingston Fury (16 GB)": el nombre de la linea tal como se vendio,
+     * para los correos. Sale de los dos snapshots, no del producto actual.
+     */
+    public function descripcion(): string
+    {
+        return $this->variant_name
+            ? "{$this->product_name} ({$this->variant_name})"
+            : $this->product_name;
     }
 }

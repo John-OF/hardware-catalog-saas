@@ -24,6 +24,7 @@ import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import Dialogo from '../../components/ui/Dialogo';
+import { nombreConVariante } from '../../utils/variants';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
@@ -109,7 +110,7 @@ export default function OrdersPage() {
     const totalFormatted = money(order.total);
     const tenantName = tenant?.name || 'nuestra tienda';
     const itemsDescription = order.items && order.items.length > 0
-      ? order.items.map(item => `${item.quantity}x ${item.product_name}`).join(', ')
+      ? order.items.map(item => `${item.quantity}x ${nombreConVariante(item.product_name, item.variant_name)}`).join(', ')
       : 'productos';
     
     // FUN-3: el número va en todos los mensajes porque es el que el cliente ya
@@ -413,7 +414,10 @@ export default function OrdersPage() {
                     <div className="detail-item-row" key={item.id}>
                       <div className="item-name-col">
                         <span className="item-qty">{item.quantity}x</span>
-                        <span className="item-name">{item.product_name}</span>
+                        <span className="item-name">
+                          {item.product_name}
+                          {item.variant_name && <span className="item-variant"> · {item.variant_name}</span>}
+                        </span>
                       </div>
                       <div className="item-price-col">
                         <span>{money(item.unit_price)}</span>

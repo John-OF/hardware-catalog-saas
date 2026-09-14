@@ -203,6 +203,12 @@
   font-size: 0.75rem;
 }
 
+/* La variante que espera (MOD-5), entre el nombre y su stock. */
+:where(.page-waitlist) .product-variant {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
 :where(.page-waitlist) .product-stock.in {
   color: var(--success);
 }

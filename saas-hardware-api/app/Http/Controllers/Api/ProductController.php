@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Category;
 use App\Services\ImageService;
 use App\Support\PlanGate;
@@ -31,12 +32,13 @@ class ProductController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $products = Product::with(['category', 'images'])
+        $products = Product::with(['category', 'images', 'variants'])
             ->withCount(['stockNotifications as waitlist_count' => fn($q) => $q->whereNull('notified_at')])
             ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
             ->when($request->search, fn($q) => $q->where(function ($query) use ($request) {
                 $query->where('name', 'like', "%{$request->search}%")
-                      ->orWhere('sku', 'like', "%{$request->search}%");
+                      ->orWhere('sku', 'like', "%{$request->search}%")
+                      ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', "%{$request->search}%"));
             }))
             ->when($request->active_only, fn($q) => $q->where('is_active', true))
             ->orderBy('sort_order')
@@ -57,7 +59,13 @@ class ProductController extends Controller
             PlanGate::ensureCanAdd('images_per_product', 0, count($request->file('gallery')));
         }
 
-        $data = $request->validated();
+        [$data, $variantes] = $this->separarVariantes($request->validated());
+
+        if ($variantes) {
+            // Provisional: `price` no admite null y el resumen de las variantes
+            // lo pisa en cuanto se guarden, unas lineas mas abajo.
+            $data += ['price' => 0, 'stock' => 0];
+        }
 
         if ($request->hasFile('image')) {
             $tenant = app('currentTenant');
@@ -82,12 +90,16 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load(['category', 'images']), 201);
+        if ($variantes !== null) {
+            $this->sincronizarVariantes($product, $variantes, $request);
+        }
+
+        return response()->json($product->fresh()->load(['category', 'images', 'variants']), 201);
     }
 
     public function show(Product $product): JsonResponse
     {
-        return response()->json($product->load(['category', 'images']));
+        return response()->json($product->load(['category', 'images', 'variants']));
     }
 
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
@@ -116,7 +128,7 @@ class ProductController extends Controller
             PlanGate::ensureCanAdd('images_per_product', $actual, count($request->file('gallery')));
         }
 
-        $data = $request->validated();
+        [$data, $variantes] = $this->separarVariantes($request->validated());
 
         if ($request->hasFile('image')) {
             // Eliminar imágenes anteriores
@@ -154,7 +166,11 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load(['category', 'images']));
+        if ($variantes !== null) {
+            $this->sincronizarVariantes($product, $variantes, $request);
+        }
+
+        return response()->json($product->fresh()->load(['category', 'images', 'variants']));
     }
 
     public function destroy(Product $product): JsonResponse
@@ -165,6 +181,12 @@ class ProductController extends Controller
         // Eliminar imágenes de la galería
         foreach ($product->images as $imgModel) {
             $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
+        }
+
+        // Y las de sus variantes (MOD-5): las filas caen por cascada, los
+        // archivos no.
+        foreach ($product->variants as $variante) {
+            $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
         }
 
         $product->delete();
@@ -473,13 +495,17 @@ class ProductController extends Controller
             // AUD-23: la galeria se trae de una vez. Antes `$prod->images` era
             // una consulta por producto, asi que borrar 50 productos costaba 50
             // consultas solo para averiguar que imagenes tenian.
-            $products = $query->with('images')->get();
+            $products = $query->with(['images', 'variants'])->get();
 
             foreach ($products as $prod) {
                 $this->imageService->deleteProductImages($prod->image_url, $prod->thumbnail_url);
 
                 foreach ($prod->images as $img) {
                     $this->imageService->deleteProductImages($img->image_url, $img->thumbnail_url);
+                }
+
+                foreach ($prod->variants as $variante) {
+                    $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
                 }
             }
 
@@ -525,9 +551,26 @@ class ProductController extends Controller
                 return response()->json(['message' => 'El porcentaje de ajuste de precio debe ser distinto de cero.'], 422);
             }
 
-            $products = $query->get();
+            $products = $query->with('variants')->get();
+            $multiplier = 1 + ($percentage / 100);
+
             foreach ($products as $prod) {
-                $multiplier = 1 + ($percentage / 100);
+                // MOD-5: con variantes se ajusta cada una y la ficha se recalcula;
+                // ajustar solo el resumen lo dejaria desalineado de lo que se cobra.
+                if ($prod->variants->isNotEmpty()) {
+                    foreach ($prod->variants as $variante) {
+                        $variante->price = round($variante->price * $multiplier, 2);
+                        if ($variante->sale_price !== null) {
+                            $variante->sale_price = round($variante->sale_price * $multiplier, 2);
+                        }
+                        $variante->save();
+                    }
+
+                    $prod->sincronizarResumenDeVariantes();
+
+                    continue;
+                }
+
                 $prod->price = round($prod->price * $multiplier, 2);
                 if ($prod->sale_price !== null) {
                     $prod->sale_price = round($prod->sale_price * $multiplier, 2);
@@ -569,7 +612,15 @@ class ProductController extends Controller
             ]);
         }
 
-        return response()->json($newProduct->load(['category', 'images']), 201);
+        // MOD-5: la copia lleva las mismas variantes, con su stock. Las fotos se
+        // comparten igual que las de la galeria (misma URL).
+        foreach ($product->variants as $variante) {
+            $copia = $variante->replicate(['nombre']);
+            $copia->product_id = $newProduct->id;
+            $copia->save();
+        }
+
+        return response()->json($newProduct->load(['category', 'images', 'variants']), 201);
     }
 
     /**
@@ -627,6 +678,93 @@ class ProductController extends Controller
      * masivo, que no dispara eventos—. Lo que guarda producto a producto ya lo
      * hace el hook `saved` de `Product`.
      */
+    /**
+     * Saca las variantes de lo validado (MOD-5).
+     *
+     * Devuelve los atributos del producto y la lista de variantes: `null` si el
+     * formulario no las mando (no se tocan), un array —vacio incluido— si las
+     * mando. Con variantes, el precio y el stock de la ficha no se aceptan del
+     * formulario: son el resumen que calcula `sincronizarResumenDeVariantes()`.
+     *
+     * @param  array<string, mixed>  $validado
+     * @return array{0: array<string, mixed>, 1: array<int, array<string, mixed>>|null}
+     */
+    private function separarVariantes(array $validado): array
+    {
+        $variantes = array_key_exists('variants', $validado) ? ($validado['variants'] ?? []) : null;
+
+        unset($validado['variants'], $validado['variant_images']);
+
+        if ($variantes) {
+            unset($validado['price'], $validado['sale_price'], $validado['stock']);
+        }
+
+        return [$validado, $variantes];
+    }
+
+    /**
+     * Deja las variantes del producto tal como vienen del formulario (MOD-5).
+     *
+     * La lista manda: las que traen un `id` de ESTE producto se actualizan, las
+     * que no se crean, y las que tenia y ya no vienen se borran —con sus fotos—.
+     * Un `id` de otro producto u otra tienda no se adopta: se trata como nueva,
+     * porque solo se busca entre las variantes que ya tenia este.
+     *
+     * La foto de cada una llega como `variant_images[<posicion>]`. No cuenta para
+     * el tope de imagenes del plan: es una por variante y las variantes ya tienen
+     * su techo fijo (`ProductVariant::MAXIMO_POR_PRODUCTO`).
+     *
+     * @param  array<int, array<string, mixed>>  $entrada
+     */
+    private function sincronizarVariantes(Product $product, array $entrada, Request $request): void
+    {
+        $tenant = app('currentTenant');
+        $existentes = $product->variants()->get()->keyBy('id');
+        $conservadas = [];
+
+        foreach (array_values($entrada) as $posicion => $datos) {
+            $variante = isset($datos['id']) ? $existentes->get($datos['id']) : null;
+            $variante ??= new ProductVariant(['product_id' => $product->id]);
+
+            $variante->fill([
+                'options' => array_values(array_map(
+                    fn (array $opcion) => ['name' => trim($opcion['name']), 'value' => trim($opcion['value'])],
+                    $datos['options'],
+                )),
+                'sku'                 => $datos['sku'] ?? null,
+                'price'               => $datos['price'],
+                'sale_price'          => $datos['sale_price'] ?? null,
+                'stock'               => $datos['stock'],
+                'low_stock_threshold' => $datos['low_stock_threshold'] ?? 5,
+                'sort_order'          => $posicion,
+            ]);
+
+            $foto = $request->file("variant_images.{$posicion}");
+
+            if (($foto || ! empty($datos['remove_image'])) && $variante->image_url) {
+                $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
+                $variante->image_url = null;
+                $variante->thumbnail_url = null;
+            }
+
+            if ($foto) {
+                $variante->fill($this->imageService->uploadProductImage($foto, $tenant->slug));
+            }
+
+            $variante->save();
+            $conservadas[] = $variante->id;
+        }
+
+        foreach ($existentes as $id => $variante) {
+            if (! in_array($id, $conservadas, true)) {
+                $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
+                $variante->delete();
+            }
+        }
+
+        $product->sincronizarResumenDeVariantes();
+    }
+
     private function invalidarCachePublica(): void
     {
         $tenant = app('currentTenant');

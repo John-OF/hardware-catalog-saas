@@ -642,6 +642,13 @@
   color: var(--text-primary);
 }
 
+/* "Desde" delante del precio de un producto cuyas variantes cuestan distinto (MOD-5). */
+:where(.page-catalog) .card-price-from {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 :where(.page-catalog) .card-add-btn {
   margin-top: 0.85rem;
   width: 100%;

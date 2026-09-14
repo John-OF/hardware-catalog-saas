@@ -119,7 +119,7 @@ class PublicCatalogController extends Controller
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->where('status', 'published')
-                ->with(['category:id,name,icon', 'images'])
+                ->with(['category:id,name,icon', 'images', 'variants'])
                 ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
                 ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
                 ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
@@ -160,7 +160,10 @@ class PublicCatalogController extends Controller
                     $q->where(function ($sub) use ($termino) {
                         $sub->where('name', 'like', $termino)
                             ->orWhere('brand', 'like', $termino)
-                            ->orWhere('sku', 'like', $termino);
+                            ->orWhere('sku', 'like', $termino)
+                            // MOD-5: con variantes, el SKU que se busca suele ser
+                            // el de una de ellas ("KF432C16BB/16").
+                            ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', $termino));
                     });
                 })
                 ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
@@ -356,7 +359,7 @@ class PublicCatalogController extends Controller
             ->where('id', $productId)
             ->where('is_active', true)
             ->where('status', 'published')
-            ->with(['category', 'images', 'reviews' => fn($q) => $q->where('is_approved', true)->orderByDesc('created_at')])
+            ->with(['category', 'images', 'variants', 'reviews' => fn($q) => $q->where('is_approved', true)->orderByDesc('created_at')])
             ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
             ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
             ->firstOrFail();
@@ -390,7 +393,7 @@ class PublicCatalogController extends Controller
             ->where('id', '!=', $product->id)
             ->where('is_active', true)
             ->where('status', 'published')
-            ->with(['category', 'images']);
+            ->with(['category', 'images', 'variants']);
 
         // FUN-8: los complementarios salen del TIPO de la categoría, no de su
         // nombre. Antes esto era `str_contains($categoryName, 'procesador')` y
@@ -706,12 +709,29 @@ class PublicCatalogController extends Controller
         $data = $request->validate([
             'customer_name'    => 'required|string|max:150',
             'customer_contact' => 'required|string|max:150', // teléfono o email
+            'variant_id'       => 'nullable|uuid',
         ]);
 
-        // Solo tiene sentido si el producto está agotado
-        if ($product->stock > 0) {
+        // MOD-5: con variantes, el cliente espera UNA de ellas (la agotada que
+        // quiere), no el producto: el aviso llega cuando se repone esa.
+        $variante = null;
+
+        if ($product->variants()->exists()) {
+            $variante = $product->variants()->where('id', $data['variant_id'] ?? null)->first();
+
+            if (! $variante) {
+                return response()->json([
+                    'message' => 'Elige qué opción del producto quieres que te avisemos.',
+                ], 422);
+            }
+        }
+
+        // Solo tiene sentido si lo que espera está agotado
+        if (($variante ? $variante->stock : $product->stock) > 0) {
             return response()->json([
-                'message' => 'Este producto ya está disponible. ¡Puedes pedirlo ahora!',
+                'message' => $variante
+                    ? 'Esa opción ya está disponible. ¡Puedes pedirla ahora!'
+                    : 'Este producto ya está disponible. ¡Puedes pedirlo ahora!',
             ], 422);
         }
 
@@ -719,6 +739,7 @@ class PublicCatalogController extends Controller
         $notification = \App\Models\StockNotification::firstOrCreate(
             [
                 'product_id'       => $product->id,
+                'variant_id'       => $variante?->id,
                 'customer_contact' => $data['customer_contact'],
             ],
             [
@@ -773,6 +794,7 @@ class PublicCatalogController extends Controller
             'customer_note'      => 'nullable|string|max:1000',
             'items'              => 'required|array|min:1|max:100',
             'items.*.product_id' => 'required|uuid',
+            'items.*.variant_id' => 'nullable|uuid',
             'items.*.quantity'   => 'required|integer|min:1|max:999',
         ]);
 

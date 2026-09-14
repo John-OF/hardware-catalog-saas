@@ -530,6 +530,23 @@
   color: var(--primary);
 }
 
+/* Variantes (MOD-5): la opción del producto del cajón y la del paso elegido. */
+:where(.page-pc-builder) .dp-variant-select {
+  max-width: 140px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+:where(.page-pc-builder) .selected-product-preview .prod-info .prod-variant {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
 :where(.page-pc-builder) .btn-select-add {
   background: var(--primary);
   color: var(--text-on-primary);

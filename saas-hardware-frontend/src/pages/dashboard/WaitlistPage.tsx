@@ -20,6 +20,7 @@ import {
   deleteStockNotification,
 } from '../../api/stockNotifications';
 import type { StockNotification, PaginatedResponse } from '../../types';
+import { nombreConVariante } from '../../utils/variants';
 import './WaitlistPage.css';
 
 /**
@@ -96,7 +97,9 @@ export default function WaitlistPage() {
 
   const escribirPorWhatsapp = (espera: StockNotification) => {
     const telefono = espera.customer_contact.replace(/[^0-9]/g, '');
-    const producto = espera.product?.name ?? 'el producto que esperabas';
+    const producto = espera.product
+      ? nombreConVariante(espera.product.name, espera.variant?.nombre)
+      : 'el producto que esperabas';
     const mensaje = encodeURIComponent(
       `Hola ${espera.customer_name}, te escribimos porque ${producto} volvio a estar disponible. ` +
       `Avisanos si todavia lo quieres y te lo separamos.`
@@ -171,6 +174,8 @@ export default function WaitlistPage() {
                 {esperas.map((espera) => {
                   const porCorreo = esCorreo(espera.customer_contact);
                   const pendiente = espera.notified_at === null;
+                  // MOD-5: si espera una variante, el stock que importa es el suyo.
+                  const stockEsperado = espera.variant ? espera.variant.stock : espera.product?.stock ?? 0;
 
                   return (
                     <tr key={espera.id}>
@@ -193,10 +198,13 @@ export default function WaitlistPage() {
                             <span className="product-name" title={espera.product?.name}>
                               {espera.product?.name || 'Producto eliminado'}
                             </span>
+                            {espera.variant && (
+                              <span className="product-variant">{espera.variant.nombre}</span>
+                            )}
                             {espera.product && (
-                              <span className={`product-stock ${espera.product.stock > 0 ? 'in' : 'out'}`}>
-                                {espera.product.stock > 0
-                                  ? `${espera.product.stock} en stock`
+                              <span className={`product-stock ${stockEsperado > 0 ? 'in' : 'out'}`}>
+                                {stockEsperado > 0
+                                  ? `${stockEsperado} en stock`
                                   : 'Sigue agotado'}
                               </span>
                             )}

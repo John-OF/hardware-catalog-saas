@@ -7,7 +7,8 @@ export interface CreateOrderPayload {
   /** Opcional (FUN-2): si lo deja, recibe confirmacion y avisos de estado. */
   customer_email?: string;
   customer_note?: string;
-  items: { product_id: string; quantity: number }[];
+  /** `variant_id` obligatorio para un producto con variantes (MOD-5). */
+  items: { product_id: string; variant_id?: string | null; quantity: number }[];
 }
 
 export const getPublicTenant = async (slug: string): Promise<Tenant> => {
@@ -104,6 +105,8 @@ export const createPublicReview = async (
 export interface StockNotificationPayload {
   customer_name: string;
   customer_contact: string;
+  /** La variante agotada que espera (MOD-5); obligatoria si el producto tiene variantes. */
+  variant_id?: string | null;
 }
 
 export const subscribeStockNotification = async (

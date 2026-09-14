@@ -215,18 +215,51 @@ export interface Product {
   reviews?: Review[];
   related_products?: Product[];
   waitlist_count?: number;
+  /**
+   * MOD-5. Vacío o ausente: producto sin variantes, precio y stock son los de
+   * arriba. Con variantes, `price`/`sale_price` son los de la más barata y
+   * `stock` la suma: un resumen para listar y ordenar, no lo que se cobra.
+   */
+  variants?: ProductVariant[];
   created_at: string;
+}
+
+/** Una opción de una variante: "Capacidad" = "16 GB". */
+export interface VariantOption {
+  name: string;
+  value: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  options: VariantOption[];
+  /** Los valores de las opciones unidos: "16 GB / Negro". Lo calcula el backend. */
+  nombre: string;
+  sku: string | null;
+  price: number | string;
+  sale_price: number | string | null;
+  stock: number;
+  low_stock_threshold: number;
+  image_url: string | null;
+  thumbnail_url: string | null;
+  sort_order: number;
 }
 
 export interface CartItem {
   product: Product;
+  /** La variante elegida (MOD-5); null o ausente en un producto sin variantes. */
+  variant?: ProductVariant | null;
   quantity: number;
 }
 
 export interface OrderItem {
   id: string;
   product_id: string | null;
+  variant_id?: string | null;
   product_name: string;
+  /** Snapshot de la variante vendida ("16 GB"); null si el producto no tenía variantes. */
+  variant_name?: string | null;
   unit_price: number;
   quantity: number;
   subtotal: number;
@@ -270,6 +303,9 @@ export interface StockNotification {
   notified_at: string | null;
   created_at: string;
   product?: Pick<Product, 'id' | 'name' | 'stock' | 'price' | 'sale_price' | 'thumbnail_url'>;
+  /** La variante que espera (MOD-5); null si espera el producto entero. */
+  variant_id?: string | null;
+  variant?: Pick<ProductVariant, 'id' | 'options' | 'nombre' | 'stock' | 'price' | 'sale_price'> | null;
 }
 
 export interface PaginatedResponse<T> {

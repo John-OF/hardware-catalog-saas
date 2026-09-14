@@ -22,7 +22,7 @@ class PublicFavoritesController extends Controller
             ->where('tenant_id', $tenant->id)
             ->where('is_active', true)
             ->where('status', 'published')
-            ->with(['category', 'images'])
+            ->with(['category', 'images', 'variants'])
             ->get();
 
         return response()->json($favorites);

@@ -49,6 +49,7 @@ import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -646,8 +647,11 @@ export default function CatalogPage() {
                     <>
                       <div className={`catalog-grid layout-${tenant.theme?.layout || 'grid'}`}>
                         {products.map((product) => {
-                          const cartItem = cartItems.find((item) => item.product.id === product.id);
-                          const qtyInCart = cartItem ? cartItem.quantity : 0;
+                          // Con variantes (MOD-5) puede haber varias líneas del mismo producto: se suman.
+                          const qtyInCart = cartItems
+                            .filter((item) => item.product.id === product.id)
+                            .reduce((acc, item) => acc + item.quantity, 0);
+                          const conVariantes = tieneVariantes(product);
 
                           return (
                             <Link 
@@ -738,6 +742,7 @@ export default function CatalogPage() {
                                 <h3 className="card-title">{product.name}</h3>
                                 <div className="card-footer">
                                   <span className="card-price">
+                                    {precioEsDesde(product) && <span className="card-price-from">Desde </span>}
                                     {product.sale_price !== null && product.sale_price !== undefined ? (
                                       <>
                                         <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.4rem', opacity: 0.5, fontSize: '0.85em', fontWeight: 'normal' }}>
@@ -756,11 +761,17 @@ export default function CatalogPage() {
                                 <button
                                   type="button"
                                   className={`card-add-btn ${qtyInCart > 0 ? 'added' : ''}`}
-                                  onClick={(e) => handleAddToCart(e, product)}
+                                  // Con variantes no se agrega desde la tarjeta: el clic sigue
+                                  // al enlace de la tarjeta y lleva a la ficha para elegir.
+                                  onClick={conVariantes ? undefined : (e) => handleAddToCart(e, product)}
                                   disabled={product.stock === 0}
                                 >
                                   {product.stock === 0 ? (
                                     'Agotado'
+                                  ) : conVariantes ? (
+                                    <>
+                                      Elegir opción <ChevronRight size={15} />
+                                    </>
                                   ) : qtyInCart > 0 ? (
                                     <>
                                       <CheckCircle size={15} /> En carrito ({qtyInCart})
@@ -896,17 +907,30 @@ export default function CatalogPage() {
                             <span className="compare-header-brand">{p.brand || 'Genérico'}</span>
                             <h4 className="compare-header-title">{p.name}</h4>
                             <span className="compare-header-price">
+                              {precioEsDesde(p) && 'Desde '}
                               {money(p.sale_price !== null ? p.sale_price : p.price)}
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => handleAddToCart(e, p)}
-                              disabled={p.stock === 0}
-                              className="btn-primary compare-add-btn"
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', marginTop: '0.5rem', width: '100%' }}
-                            >
-                              Agregar
-                            </button>
+                            {tieneVariantes(p) ? (
+                              // MOD-5: sin elegir variante no se puede agregar; va a la ficha.
+                              <Link
+                                to={getPublicPath(`/product/${p.id}`)}
+                                onClick={() => setIsCompareModalOpen(false)}
+                                className="btn-primary compare-add-btn"
+                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', marginTop: '0.5rem', width: '100%', textDecoration: 'none', textAlign: 'center' }}
+                              >
+                                Elegir opción
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => handleAddToCart(e, p)}
+                                disabled={p.stock === 0}
+                                className="btn-primary compare-add-btn"
+                                style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', marginTop: '0.5rem', width: '100%' }}
+                              >
+                                Agregar
+                              </button>
+                            )}
                           </div>
                         </th>
                       ))}

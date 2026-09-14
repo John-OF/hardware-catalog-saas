@@ -19,6 +19,7 @@ class StockNotification extends Model
     protected $fillable = [
         'tenant_id',
         'product_id',
+        'variant_id',
         'customer_name',
         'customer_contact',
         'notified_at',
@@ -31,5 +32,11 @@ class StockNotification extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** La variante concreta que espera el cliente (MOD-5); null si espera el producto entero. */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 }

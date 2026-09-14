@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidaVariantes;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateProductRequest extends FormRequest
 {
+    use ValidaVariantes;
+
     public function authorize(): bool
     {
         return true;
@@ -22,6 +26,8 @@ class UpdateProductRequest extends FormRequest
                 'specs' => json_decode($this->specs, true) ?? [],
             ]);
         }
+
+        $this->decodificarVariantes();
     }
 
     public function rules(): array
@@ -29,9 +35,10 @@ class UpdateProductRequest extends FormRequest
         return [
             'name'        => 'sometimes|string|max:300',
             'brand'       => 'nullable|string|max:100',
-            'price'       => 'sometimes|numeric|min:0',
+            // MOD-5: vacío solo vale si llegan variantes (ver StoreProductRequest).
+            'price'       => 'sometimes|nullable|required_without:variants|numeric|min:0',
             'sale_price'  => 'nullable|numeric|min:0',
-            'stock'       => 'sometimes|integer|min:0',
+            'stock'       => 'sometimes|nullable|required_without:variants|integer|min:0',
             'sku'                 => 'nullable|string|max:100',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'category_id'         => 'nullable|uuid|exists:categories,id',
@@ -43,6 +50,17 @@ class UpdateProductRequest extends FormRequest
             'deleted_image_ids'   => 'nullable',
             'is_active'           => 'nullable|boolean',
             'status'              => 'nullable|string|in:draft,published',
+            ...$this->reglasDeVariantes(),
         ];
+    }
+
+    public function messages(): array
+    {
+        return $this->mensajesDeVariantes();
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(fn (Validator $v) => $this->comprobarVariantesRepetidas($v));
     }
 }

@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 class OrderPricing
 {
     /**
-     * @param  array<int, array{product_id: string, quantity: int}>  $items
+     * @param  array<int, array{product_id: string, variant_id?: string|null, quantity: int}>  $items
      * @param  bool  $soloVisibles  true en el catalogo publico (solo productos
      *                              activos); false en el panel, donde el dueño
      *                              vende lo que tenga fisicamente aunque lo
@@ -42,6 +42,7 @@ class OrderPricing
         $products = Product::where('tenant_id', $tenant->id)
             ->when($soloVisibles, fn ($q) => $q->where('is_active', true)->where('status', 'published'))
             ->whereIn('id', $productIds)
+            ->with('variants')
             ->get()
             ->keyBy('id');
 
@@ -59,17 +60,52 @@ class OrderPricing
                 ]);
             }
 
+            $variantId = $item['variant_id'] ?? null;
+            $variante = null;
+
+            // MOD-5: con variantes, lo que se vende es una de ellas, y precio y
+            // stock son suyos. El precio del producto es solo el resumen ("desde"),
+            // asi que cobrarlo seria cobrar la variante mas barata por cualquiera.
+            if ($product->variants->isNotEmpty()) {
+                if (! $variantId) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Elige una opción de \"{$product->name}\" antes de pedirlo."],
+                    ]);
+                }
+
+                // Solo entre las variantes de ESTE producto: un id de variante de
+                // otro producto -o de otra tienda- no se acepta aunque exista.
+                $variante = $product->variants->firstWhere('id', $variantId);
+
+                if (! $variante) {
+                    throw ValidationException::withMessages([
+                        'items' => ["La opción elegida de \"{$product->name}\" ya no está disponible. Actualiza tu carrito."],
+                    ]);
+                }
+            } elseif ($variantId) {
+                // El carrito guardo una variante que ya no existe porque el dueño
+                // le quito las variantes al producto: el precio que vio ya no es
+                // el de nada. Mejor pedir que lo revise que cobrar otro.
+                throw ValidationException::withMessages([
+                    'items' => ["\"{$product->name}\" cambió desde que lo agregaste. Actualiza tu carrito."],
+                ]);
+            }
+
             // El precio que vale es el de oferta cuando existe: es el que ve el
             // comprador en el catalogo.
-            $unitPrice = $product->sale_price !== null ? (float) $product->sale_price : (float) $product->price;
+            $unitPrice = $variante
+                ? $variante->precioVisible()
+                : ($product->sale_price !== null ? (float) $product->sale_price : (float) $product->price);
             $subtotal = round($unitPrice * $item['quantity'], 2);
             $total += $subtotal;
 
             $lines[] = [
                 'product_id'   => $product->id,
+                'variant_id'   => $variante?->id,
                 // Snapshot del nombre: el producto puede renombrarse o borrarse
                 // despues y el historial debe seguir contando lo que se vendio.
                 'product_name' => $product->name,
+                'variant_name' => $variante?->nombre,
                 'unit_price'   => $unitPrice,
                 'quantity'     => $item['quantity'],
                 'subtotal'     => $subtotal,

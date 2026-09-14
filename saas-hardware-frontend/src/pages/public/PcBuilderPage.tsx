@@ -32,7 +32,8 @@ import AnnouncementBar from '../../components/public/AnnouncementBar';
 import StoreFooter from '../../components/public/StoreFooter';
 import StoreHeader from '../../components/public/StoreHeader';
 import { getPublicPages } from '../../api/pages';
-import type { Tenant, Product, Category, ComponentType, PaginatedResponse, Page } from '../../types';
+import type { Tenant, Product, Category, ComponentType, PaginatedResponse, Page, ProductVariant } from '../../types';
+import { datosDeVenta, nombreConVariante, tieneVariantes } from '../../utils/variants';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 
 /**
@@ -87,6 +88,24 @@ export default function PcBuilderPage() {
 
   // Selecciones actuales (key de paso -> producto seleccionado)
   const [selections, setSelections] = useState<Record<string, Product>>({});
+
+  // MOD-5: la variante elegida de cada paso (null si el producto no tiene). Va
+  // aparte de `selections` a propósito: la compatibilidad se evalúa con las specs
+  // de la ficha, que son las mismas para todas sus variantes.
+  const [variantesElegidas, setVariantesElegidas] = useState<Record<string, ProductVariant | null>>({});
+
+  // Y la que está marcada en el desplegable de cada producto del cajón, antes de
+  // pulsar "Seleccionar".
+  const [varianteEnCajon, setVarianteEnCajon] = useState<Record<string, string>>({});
+
+  /** La variante de un producto del cajón: la marcada, o la primera con stock. */
+  const varianteDelCajon = (product: Product): ProductVariant | null => {
+    if (!tieneVariantes(product)) return null;
+    const variantes = product.variants!;
+    return variantes.find((v) => v.id === varianteEnCajon[product.id])
+      ?? variantes.find((v) => v.stock > 0)
+      ?? variantes[0];
+  };
   
   // Paso actualmente activo para seleccionar (expandido en la lista)
   const [activeStepId, setActiveStepId] = useState<number | null>(null);
@@ -371,12 +390,12 @@ export default function PcBuilderPage() {
   };
 
   // Suma total de precios
-  const totalPrice = Object.values(selections).reduce((acc, prod) => {
-    const price = prod.sale_price !== null ? Number(prod.sale_price) : Number(prod.price);
-    return acc + price;
-  }, 0);
+  const totalPrice = Object.entries(selections).reduce(
+    (acc, [key, prod]) => acc + datosDeVenta(prod, variantesElegidas[key]).precio,
+    0,
+  );
 
-  const handleSelectProduct = (stepKey: string, product: Product) => {
+  const handleSelectProduct = (stepKey: string, product: Product, variante: ProductVariant | null = null) => {
     const tempSelections = { ...selections, [stepKey]: product };
     // Solo los errores que APORTA esta pieza: preguntar por un conflicto que ya
     // existia entre otras dos seria echarle la culpa a quien no la tiene.
@@ -390,18 +409,22 @@ export default function PcBuilderPage() {
     }
 
     setSelections(tempSelections);
+    setVariantesElegidas({ ...variantesElegidas, [stepKey]: variante });
     setActiveStepId(null);
-    toast.success(`${product.name} agregado al armado`);
+    toast.success(`${nombreConVariante(product.name, variante?.nombre)} agregado al armado`);
   };
 
   const handleRemoveSelection = (stepKey: string) => {
     const temp = { ...selections };
     delete temp[stepKey];
     setSelections(temp);
+    const variantes = { ...variantesElegidas };
+    delete variantes[stepKey];
+    setVariantesElegidas(variantes);
   };
 
   const handleAddAllToCart = () => {
-    const items = Object.values(selections);
+    const items = Object.entries(selections);
     if (items.length === 0) {
       toast.error('No has seleccionado ningún componente todavía');
       return;
@@ -412,8 +435,8 @@ export default function PcBuilderPage() {
       }
     }
 
-    items.forEach((prod) => {
-      addItem(slug!, prod, 1);
+    items.forEach(([key, prod]) => {
+      addItem(slug!, prod, 1, variantesElegidas[key]);
     });
 
     toast.success('Todos los componentes fueron agregados a tu pedido');
@@ -429,8 +452,8 @@ export default function PcBuilderPage() {
     let message = `*Hola! He armado una PC compatible desde tu catálogo virtual:*\n\n`;
     items.forEach(([key, prod]) => {
       const step = BUILDER_STEPS.find(s => s.key === key);
-      const price = prod.sale_price !== null ? prod.sale_price : prod.price;
-      message += `• *${step?.name}:* ${prod.name} (${money(price)})\n`;
+      const variante = variantesElegidas[key];
+      message += `• *${step?.name}:* ${nombreConVariante(prod.name, variante?.nombre)} (${money(datosDeVenta(prod, variante).precio)})\n`;
     });
 
     message += `\n*Total Estimado:* ${money(totalPrice)}\n`;
@@ -538,8 +561,11 @@ export default function PcBuilderPage() {
                       </div>
                       <div className="prod-info">
                         <h5>{selectedProduct.name}</h5>
+                        {variantesElegidas[step.key] && (
+                          <span className="prod-variant">{variantesElegidas[step.key]!.nombre}</span>
+                        )}
                         <span className="prod-price">
-                          {money(selectedProduct.sale_price !== null ? selectedProduct.sale_price : selectedProduct.price)}
+                          {money(datosDeVenta(selectedProduct, variantesElegidas[step.key]).precio)}
                         </span>
                         {selectedProduct.specs && (
                           <div className="prod-mini-specs">
@@ -584,7 +610,7 @@ export default function PcBuilderPage() {
               {BUILDER_STEPS.map((step) => {
                 const prod = selections[step.key];
                 if (!prod) return null;
-                const price = prod.sale_price !== null ? prod.sale_price : prod.price;
+                const price = datosDeVenta(prod, variantesElegidas[step.key]).precio;
                 return (
                   <div key={step.id} className="breakdown-row animate-fade-in">
                     <span className="breakdown-label">{step.name.split(' (')[0]}</span>
@@ -744,7 +770,8 @@ export default function PcBuilderPage() {
               ) : (
                 <div className="drawer-products-grid">
                   {availableProducts.map((product) => {
-                    const price = product.sale_price !== null ? product.sale_price : product.price;
+                    const variante = varianteDelCajon(product);
+                    const price = datosDeVenta(product, variante).precio;
                     const { clase: compClass, etiqueta: compLabel } = estadoDelCandidato(activeStep!.key, product);
                     
                     return (
@@ -773,10 +800,25 @@ export default function PcBuilderPage() {
                           </div>
                         </div>
                         <div className="dp-action-area">
+                          {variante && (
+                            <select
+                              className="dp-variant-select"
+                              value={variante.id}
+                              onChange={(e) => setVarianteEnCajon({ ...varianteEnCajon, [product.id]: e.target.value })}
+                              aria-label={`Opción de ${product.name}`}
+                            >
+                              {product.variants!.map((v) => (
+                                <option key={v.id} value={v.id} disabled={v.stock <= 0}>
+                                  {v.nombre}{v.stock <= 0 ? ' (agotado)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <span className="dp-price">{money(price)}</span>
                           <button
-                            onClick={() => handleSelectProduct(activeStep!.key, product)}
+                            onClick={() => handleSelectProduct(activeStep!.key, product, variante)}
                             className="btn-select-add"
+                            disabled={variante !== null && variante.stock <= 0}
                           >
                             Seleccionar
                           </button>

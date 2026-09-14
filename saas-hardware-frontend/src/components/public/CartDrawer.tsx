@@ -9,6 +9,7 @@ import { createPublicOrder } from '../../api/public';
 import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
+import { claveDeLinea, datosDeVenta, nombreConVariante } from '../../utils/variants';
 
 interface CartDrawerProps {
   open: boolean;
@@ -56,10 +57,8 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
   const buildWhatsappMessage = (orderNumber: number) => {
     const lines = items.map((i) => {
-      const price = i.product.sale_price !== null && i.product.sale_price !== undefined
-        ? Number(i.product.sale_price)
-        : Number(i.product.price);
-      return `• ${i.quantity} x ${i.product.name} — ${money(price * i.quantity)}`;
+      const { precio } = datosDeVenta(i.product, i.variant);
+      return `• ${i.quantity} x ${nombreConVariante(i.product.name, i.variant?.nombre)} — ${money(precio * i.quantity)}`;
     });
     return (
       `Hola ${tenant.name}, quiero hacer este pedido:\n\n` +
@@ -85,7 +84,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         customer_phone: submittedPhone,
         customer_email: email.trim() || undefined,
         customer_note: note || undefined,
-        items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
+        items: items.map((i) => ({ product_id: i.product.id, variant_id: i.variant?.id ?? null, quantity: i.quantity })),
       });
 
       const text = encodeURIComponent(buildWhatsappMessage(order.number));
@@ -126,40 +125,48 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         ) : (
           <>
             <div className="cart-items">
-              {items.map((i) => (
-                <div className="cart-item" key={i.product.id}>
+              {items.map((i) => {
+                // MOD-5: precio y foto de la variante elegida, si la hay.
+                const venta = datosDeVenta(i.product, i.variant);
+                const miniatura = i.variant?.thumbnail_url ?? i.product.thumbnail_url;
+                const varianteId = i.variant?.id ?? null;
+
+                return (
+                <div className="cart-item" key={claveDeLinea(i.product.id, varianteId)}>
                   <div className="cart-item-img">
-                    {i.product.thumbnail_url
-                      ? <img loading="lazy" decoding="async" src={i.product.thumbnail_url} alt={i.product.name} />
+                    {miniatura
+                      ? <img loading="lazy" decoding="async" src={miniatura} alt={i.product.name} />
                       : <ShoppingCart size={18} />}
                   </div>
                   <div className="cart-item-info">
                     <p className="cart-item-name">{i.product.name}</p>
+                    {i.variant && <p className="cart-item-variant">{i.variant.nombre}</p>}
                     <span className="cart-item-price">
-                      {i.product.sale_price !== null && i.product.sale_price !== undefined ? (
+                      {venta.sale_price !== null ? (
                         <>
                           <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.35rem', opacity: 0.6 }}>
-                            {money(Number(i.product.price))}
+                            {money(venta.price)}
                           </span>
                           <span className="sale-price-active" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                            {money(Number(i.product.sale_price))}
+                            {money(venta.sale_price)}
                           </span>
                         </>
                       ) : (
-                        money(Number(i.product.price))
+                        money(venta.price)
                       )}
                     </span>
                   </div>
                   <div className="cart-item-actions">
                     <div className="qty-stepper">
-                      <button type="button" onClick={() => setQuantity(i.product.id, i.quantity - 1)} aria-label="Menos"><Minus size={14} /></button>
+                      <button type="button" onClick={() => setQuantity(i.product.id, i.quantity - 1, varianteId)} aria-label="Menos"><Minus size={14} /></button>
                       <span>{i.quantity}</span>
-                      <button type="button" onClick={() => setQuantity(i.product.id, i.quantity + 1)} aria-label="Más"><Plus size={14} /></button>
+                      <button type="button" onClick={() => setQuantity(i.product.id, i.quantity + 1, varianteId)} aria-label="Más"><Plus size={14} /></button>
                     </div>
-                    <button type="button" className="cart-item-remove" onClick={() => removeItem(i.product.id)} aria-label="Quitar"><Trash2 size={15} /></button>
+                    <button type="button" className="cart-item-remove" onClick={() => removeItem(i.product.id, varianteId)} aria-label="Quitar"><Trash2 size={15} /></button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <form className="cart-checkout" onSubmit={handleSubmit}>

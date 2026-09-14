@@ -42,8 +42,9 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
  * despues, al enviar. Sin sitekey se dice ahora donde se puede arreglar.
  */
 const TURNSTILE_SITEKEY = import.meta.env.VITE_TURNSTILE_SITEKEY as string | undefined;
-import type { Tenant, Product, Page } from '../../types';
+import type { Tenant, Product, Page, ProductVariant } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import { claveDeLinea, datosDeVenta, nombreConVariante, precioEsDesde, tieneVariantes } from '../../utils/variants';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -210,7 +211,7 @@ export default function ProductDetailPage() {
   });
 
   const notifyMutation = useMutation({
-    mutationFn: (payload: { customer_name: string; customer_contact: string }) =>
+    mutationFn: (payload: { customer_name: string; customer_contact: string; variant_id?: string | null }) =>
       subscribeStockNotification(resolvedSlug!, id!, payload),
     onSuccess: (data) => {
       toast.success(data.message || '¡Listo! Te avisaremos cuando llegue.');
@@ -232,6 +233,8 @@ export default function ProductDetailPage() {
     notifyMutation.mutate({
       customer_name: notifyName.trim(),
       customer_contact: notifyContact.trim(),
+      // MOD-5: se espera la variante agotada que está elegida, no el producto.
+      variant_id: varianteElegida?.id ?? null,
     });
   };
 
@@ -277,25 +280,49 @@ export default function ProductDetailPage() {
   // Título, favicon y SEO metadata de la pestaña: "Producto · Mi Tienda"
   useTenantBranding(tenant, product?.name, product?.description, product?.images?.[0]?.image_url || product?.image_url);
 
+  // MOD-5: la variante elegida. Mientras el comprador no toque nada, la primera
+  // que tenga stock (o la primera, si todas están agotadas): entrar a la ficha y
+  // encontrarse elegida una agotada con otras disponibles sería un "Agotado" falso.
+  const [varianteId, setVarianteId] = useState<string | null>(null);
+  const varianteInicial = product?.variants?.find((v) => v.stock > 0) ?? product?.variants?.[0] ?? null;
+  const varianteElegida = product?.variants?.find((v) => v.id === varianteId) ?? varianteInicial;
+  const venta = product ? datosDeVenta(product, varianteElegida) : null;
+
   useEffect(() => {
     if (product) {
-      setActiveImage(product.image_url);
+      setActiveImage(varianteInicial?.image_url ?? product.image_url);
     }
+    // Solo al cargar el producto: elegir otra variante cambia la foto en su clic.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product]);
+
+  const elegirVariante = (varianteNueva: ProductVariant) => {
+    setVarianteId(varianteNueva.id);
+    // El aviso de "te avisamos" era de la variante anterior.
+    setNotifySubmitted(false);
+    if (varianteNueva.image_url) {
+      setActiveImage(varianteNueva.image_url);
+    }
+  };
 
   const addItem = useCartStore((s) => s.addItem);
 
   const handleAddToCart = () => {
     if (!product || !resolvedSlug) return;
-    addItem(resolvedSlug, product);
-    toast.success(`${product.name} agregado al pedido`);
+    addItem(resolvedSlug, product, 1, varianteElegida);
+    toast.success(`${nombreConVariante(product.name, varianteElegida?.nombre)} agregado al pedido`);
   };
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // Collect all images including main and gallery
+  // Collect all images including main and gallery. La foto de la variante
+  // elegida va delante, para que el visor la recorra con las demás.
   const allImages = product
-    ? [product.image_url, ...(product.images || []).map((img) => img.image_url)].filter(Boolean) as string[]
+    ? [...new Set([
+        varianteElegida?.image_url,
+        product.image_url,
+        ...(product.images || []).map((img) => img.image_url),
+      ].filter(Boolean) as string[])]
     : [];
 
   const currentImageIndex = allImages.indexOf(activeImage || '');
@@ -339,8 +366,8 @@ export default function ProductDetailPage() {
     if (!product || !tenant) return;
 
     const currentUrl = window.location.href;
-    const finalPrice = product.sale_price !== null && product.sale_price !== undefined ? product.sale_price : product.price;
-    const baseMessage = `Hola, estoy interesado en el producto *${product.name}* (Precio: ${money(finalPrice)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
+    const finalPrice = datosDeVenta(product, varianteElegida).precio;
+    const baseMessage = `Hola, estoy interesado en el producto *${nombreConVariante(product.name, varianteElegida?.nombre)}* (Precio: ${money(finalPrice)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
     const encodedMessage = encodeURIComponent(baseMessage);
     
     // Quitar cualquier carácter que no sea numérico del teléfono
@@ -369,8 +396,13 @@ export default function ProductDetailPage() {
     );
   }
 
-  const mainCartItem = cartItems.find((item) => item.product.id === product?.id);
+  // La línea de ESTA variante: el 16 GB en el carrito no dice nada del 32 GB.
+  const mainCartItem = cartItems.find(
+    (item) => claveDeLinea(item.product.id, item.variant?.id) === claveDeLinea(product.id, varianteElegida?.id),
+  );
   const mainQtyInCart = mainCartItem ? mainCartItem.quantity : 0;
+  // `venta` solo es null sin producto, y aquí ya lo hay.
+  const { price: precioBase, sale_price: precioOferta, stock: stockVisible } = venta!;
 
   return (
     <div className="product-detail-container animate-fade-in page-product-detail">
@@ -503,35 +535,61 @@ export default function ProductDetailPage() {
             </div>
           ) : null}
 
+          {/* MOD-5: elegir la variante. Todo lo de abajo —precio, stock, carrito,
+              aviso— es de la que esté elegida. */}
+          {product.variants && product.variants.length > 0 && (
+            <div className="variant-picker">
+              <span className="variant-picker-label">
+                {[...new Set(product.variants.flatMap((v) => v.options.map((o) => o.name)))].join(' / ')}
+              </span>
+              <div className="variant-chips" role="radiogroup">
+                {product.variants.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={varianteElegida?.id === v.id}
+                    className={`variant-chip ${varianteElegida?.id === v.id ? 'active' : ''} ${v.stock <= 0 ? 'sold-out' : ''}`}
+                    onClick={() => elegirVariante(v)}
+                    aria-label={v.stock <= 0 ? `${v.nombre} (agotado)` : v.nombre}
+                    title={v.stock <= 0 ? 'Agotado' : undefined}
+                  >
+                    {v.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Pricing & Stock card */}
           <div className="pricing-stock-card">
             <div className="detail-price-box">
               <span className="price-label">
                 {/* PUB-7: decía "Precio Sugerido", que en una tienda suena a
                     precio de lista orientativo y no al precio que se cobra. */}
-                {product.sale_price !== null && product.sale_price !== undefined ? 'Precio de Oferta' : 'Precio'}
+                {precioOferta !== null ? 'Precio de Oferta' : 'Precio'}
               </span>
               <span className="detail-price">
-                {product.sale_price !== null && product.sale_price !== undefined ? (
+                {precioOferta !== null ? (
                   <>
                     <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.75rem', opacity: 0.5, fontSize: '0.7em', fontWeight: 'normal' }}>
-                      {money(product.price)}
+                      {money(precioBase)}
                     </span>
-                    <span>{money(product.sale_price)}</span>
+                    <span>{money(precioOferta)}</span>
                   </>
                 ) : (
-                  money(product.price)
+                  money(precioBase)
                 )}
               </span>
             </div>
 
             <div className="detail-stock-box">
-              {product.stock > 0 ? (
+              {stockVisible > 0 ? (
                 <div className="stock-indicator instock">
                   <CheckCircle size={18} />
                   <div>
                     <span className="stock-state">En Stock</span>
-                    <span className="stock-count">{product.stock} unidades disponibles</span>
+                    <span className="stock-count">{stockVisible} unidades disponibles</span>
                   </div>
                 </div>
               ) : (
@@ -551,10 +609,10 @@ export default function ProductDetailPage() {
             <button
               onClick={handleAddToCart}
               className={`btn-secondary add-cart-btn ${mainQtyInCart > 0 ? 'added' : ''}`}
-              disabled={product.stock === 0}
+              disabled={stockVisible <= 0}
               style={{ flex: 1 }}
             >
-              {product.stock === 0 ? (
+              {stockVisible <= 0 ? (
                 <>
                   <Plus size={18} />
                   <span>Agotado</span>
@@ -574,7 +632,7 @@ export default function ProductDetailPage() {
             <button
               onClick={handleWhatsappQuery}
               className="btn-primary whatsapp-buy-btn"
-              disabled={product.stock === 0}
+              disabled={stockVisible <= 0}
               style={{ flex: 1 }}
             >
               <Phone size={18} />
@@ -619,19 +677,27 @@ export default function ProductDetailPage() {
             </button>
           </div>
 
-          {/* "Avísame cuando llegue" — solo si el producto está agotado */}
-          {product.stock === 0 && (
+          {/* "Avísame cuando llegue" — solo si lo elegido está agotado */}
+          {stockVisible <= 0 && (
             <div className="notify-stock-box">
               {notifySubmitted ? (
                 <div className="notify-success">
                   <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                  <span>Te avisaremos apenas este producto vuelva a estar disponible.</span>
+                  <span>
+                    {varianteElegida
+                      ? `Te avisaremos apenas vuelva a haber ${varianteElegida.nombre}.`
+                      : 'Te avisaremos apenas este producto vuelva a estar disponible.'}
+                  </span>
                 </div>
               ) : (
                 <>
                   <div className="notify-header">
                     <Bell size={16} />
-                    <span>¿Lo quieres? Te avisamos cuando llegue</span>
+                    <span>
+                      {varianteElegida
+                        ? `¿Quieres ${varianteElegida.nombre}? Te avisamos cuando llegue`
+                        : '¿Lo quieres? Te avisamos cuando llegue'}
+                    </span>
                   </div>
                   <form onSubmit={handleNotifySubmit} className="notify-form">
                     <input
@@ -710,6 +776,13 @@ export default function ProductDetailPage() {
             {product.related_products.map((p) => {
               const hasSale = p.sale_price !== null && p.sale_price !== undefined;
               const price = hasSale ? p.sale_price : p.price;
+              // MOD-5: con variantes no se puede agregar sin elegir una; el botón lleva a la ficha.
+              const conVariantes = tieneVariantes(p);
+              const irALaFicha = () => {
+                const path = resolvedSlug ? `/${resolvedSlug}/product/${p.id}` : `/product/${p.id}`;
+                navigate(path);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              };
               const displayImageUrl = p.images?.[0]?.image_url || p.image_url;
 
               return (
@@ -728,11 +801,7 @@ export default function ProductDetailPage() {
                     transition: 'transform 0.2s ease, border-color 0.2s ease',
                     cursor: 'pointer'
                   }}
-                  onClick={() => {
-                    const path = resolvedSlug ? `/${resolvedSlug}/product/${p.id}` : `/product/${p.id}`;
-                    navigate(path);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
+                  onClick={irALaFicha}
                 >
                   <div style={{ position: 'relative', width: '100%', height: '140px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {displayImageUrl ? (
@@ -773,11 +842,22 @@ export default function ProductDetailPage() {
                         </span>
                       )}
                       <span style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {precioEsDesde(p) && <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-muted)', marginRight: '0.25rem' }}>Desde</span>}
                         {money(price)}
                       </span>
                     </div>
 
-                    {(() => {
+                    {conVariantes ? (
+                      <button
+                        type="button"
+                        className="btn-icon"
+                        disabled={p.stock === 0}
+                        style={{ padding: '0.35rem 0.6rem', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', color: p.stock === 0 ? 'var(--text-muted)' : 'var(--primary)', fontSize: '0.75rem', border: 'none' }}
+                        onClick={(e) => { e.stopPropagation(); irALaFicha(); }}
+                      >
+                        Elegir
+                      </button>
+                    ) : (() => {
                       const relCartItem = cartItems.find((item) => item.product.id === p.id);
                       const relQty = relCartItem ? relCartItem.quantity : 0;
 

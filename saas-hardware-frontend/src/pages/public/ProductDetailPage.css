@@ -153,6 +153,58 @@
   color: var(--text-primary);
 }
 
+/* Selector de variantes (MOD-5). Una pastilla por variante con su nombre
+   completo ("16 GB / Negro"): con dos ejes, un selector por eje obligaría a
+   explicar qué combinaciones existen, y las pastillas ya lo enseñan. Una agotada
+   se puede elegir igual —para ver su precio y apuntarse al aviso—, tachada. */
+:where(.page-product-detail) .variant-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:where(.page-product-detail) .variant-picker-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+:where(.page-product-detail) .variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+:where(.page-product-detail) .variant-chip {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-product-detail) .variant-chip:hover {
+  border-color: var(--primary);
+}
+
+:where(.page-product-detail) .variant-chip.active {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+:where(.page-product-detail) .variant-chip.sold-out {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
 /* Pricing Card */
 :where(.page-product-detail) .pricing-stock-card {
   background: rgba(255, 255, 255, 0.01);

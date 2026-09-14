@@ -355,6 +355,11 @@
   color: var(--text-primary);
 }
 
+/* La variante vendida (MOD-5), tal como quedó guardada en la línea. */
+:where(.page-orders) .item-variant {
+  color: var(--text-secondary);
+}
+
 :where(.page-orders) .item-price-col {
   display: flex;
   flex-direction: column;

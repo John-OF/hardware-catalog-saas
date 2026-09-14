@@ -1,0 +1,190 @@
+/* <EditorDeVariantes>, dentro del formulario de producto (MOD-5).
+
+   Global, como la hoja de cualquier componente; las clases llevan el prefijo
+   `variant-` para no chocar con las de ninguna página. */
+
+.variant-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+.variant-editor-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.variant-editor-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.variant-axes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.variant-axis {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1 1 150px;
+}
+
+.variant-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.variant-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.variant-row-image {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+}
+
+.variant-row-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.variant-image-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.variant-image-pick:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.variant-image-pick input {
+  display: none;
+}
+
+.variant-image-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  padding: 2px;
+  border: none;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  cursor: pointer;
+}
+
+.variant-row-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.variant-values {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.variant-values input {
+  flex: 1;
+  min-width: 0;
+}
+
+.variant-numbers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.variant-numbers label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.variant-numbers span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.variant-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.3rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.variant-icon-btn:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.05);
+}
+
+.variant-icon-btn.danger:hover {
+  color: var(--danger);
+}
+
+.variant-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.variant-add-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .variant-numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

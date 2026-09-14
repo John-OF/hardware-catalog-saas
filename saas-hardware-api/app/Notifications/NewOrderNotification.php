@@ -58,7 +58,7 @@ class NewOrderNotification extends Notification implements ShouldQueue
             'total'      => Money::format($order->total, $moneda),
             'lineas'     => $order->items->map(fn ($item) => [
                 'cantidad' => $item->quantity,
-                'producto' => $item->product_name,
+                'producto' => $item->descripcion(),
                 'subtotal' => Money::format($item->subtotal, $moneda),
             ])->all(),
         ];

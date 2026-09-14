@@ -7,8 +7,9 @@ import { Search, Plus, Minus, Trash2, Loader2, ShoppingBag, AlertTriangle } from
 import Dialogo from '../ui/Dialogo';
 import { getProducts } from '../../api/products';
 import { createOrder } from '../../api/orders';
-import type { Order, PaginatedResponse, Product } from '../../types';
+import type { Order, PaginatedResponse, Product, ProductVariant } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { claveDeLinea, datosDeVenta } from '../../utils/variants';
 
 /**
  * El padre lo monta solo cuando esta abierto, asi no hace falta un efecto que
@@ -20,12 +21,17 @@ interface NewOrderModalProps {
   currency?: string | null;
 }
 
-/** Línea del pedido en construcción. Guardamos el producto entero para poder mostrar precio y stock. */
-type Line = { product: Product; quantity: number };
+/**
+ * Línea del pedido en construcción. Guardamos el producto entero para poder
+ * mostrar precio y stock, y la variante vendida si la tiene (MOD-5): el mismo
+ * producto en 16 GB y en 32 GB son dos líneas.
+ */
+type Line = { product: Product; variant: ProductVariant | null; quantity: number };
 
-/** Precio que efectivamente se cobra: el de oferta cuando existe. Igual criterio que el servidor. */
-const priceOf = (product: Product): number =>
-  Number(product.sale_price !== null && product.sale_price !== undefined ? product.sale_price : product.price);
+const claveDe = (line: Line) => claveDeLinea(line.product.id, line.variant?.id);
+
+/** Precio que efectivamente se cobra: el de oferta cuando existe, de la variante si la hay. Igual criterio que el servidor. */
+const priceOf = (line: Pick<Line, 'product' | 'variant'>): number => datosDeVenta(line.product, line.variant).precio;
 
 export default function NewOrderModal({ onClose, onCreated, currency }: NewOrderModalProps) {
   const money = (n: number | string | null | undefined) => formatMoney(n, currency);
@@ -54,31 +60,32 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
   const results = productsPage?.data ?? [];
 
   const total = useMemo(
-    () => lines.reduce((sum, line) => sum + priceOf(line.product) * line.quantity, 0),
+    () => lines.reduce((sum, line) => sum + priceOf(line) * line.quantity, 0),
     [lines],
   );
 
-  const addProduct = (product: Product) => {
+  const addProduct = (product: Product, variant: ProductVariant | null = null) => {
+    const clave = claveDeLinea(product.id, variant?.id);
     setLines((current) => {
-      const existing = current.find((line) => line.product.id === product.id);
+      const existing = current.find((line) => claveDe(line) === clave);
       if (existing) {
         return current.map((line) =>
-          line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line,
+          claveDe(line) === clave ? { ...line, quantity: line.quantity + 1 } : line,
         );
       }
-      return [...current, { product, quantity: 1 }];
+      return [...current, { product, variant, quantity: 1 }];
     });
   };
 
-  const setQuantity = (productId: string, quantity: number) => {
+  const setQuantity = (clave: string, quantity: number) => {
     if (quantity < 1) return;
     setLines((current) =>
-      current.map((line) => (line.product.id === productId ? { ...line, quantity } : line)),
+      current.map((line) => (claveDe(line) === clave ? { ...line, quantity } : line)),
     );
   };
 
-  const removeLine = (productId: string) => {
-    setLines((current) => current.filter((line) => line.product.id !== productId));
+  const removeLine = (clave: string) => {
+    setLines((current) => current.filter((line) => claveDe(line) !== clave));
   };
 
   const createMutation = useMutation({
@@ -89,7 +96,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
         customer_email: customerEmail.trim() || null,
         customer_note: note.trim() || null,
         status,
-        items: lines.map((line) => ({ product_id: line.product.id, quantity: line.quantity })),
+        items: lines.map((line) => ({ product_id: line.product.id, variant_id: line.variant?.id ?? null, quantity: line.quantity })),
       }),
     onSuccess: (order) => {
       toast.success('Venta registrada');
@@ -105,7 +112,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
 
   // Vender más unidades de las que hay deja el stock en negativo. No se bloquea
   // (el dueño puede tener mercadería sin registrar) pero se avisa.
-  const linesOverStock = lines.filter((line) => line.quantity > line.product.stock);
+  const linesOverStock = lines.filter((line) => line.quantity > datosDeVenta(line.product, line.variant).stock);
 
   const canSubmit = customerName.trim().length > 0 && lines.length > 0 && !createMutation.isPending;
 
@@ -135,7 +142,29 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
               ) : results.length === 0 ? (
                 <div className="results-empty">Sin resultados</div>
               ) : (
-                results.map((product) => (
+                results.map((product) =>
+                  product.variants && product.variants.length > 0 ? (
+                    // MOD-5: con variantes se vende una de ellas; cada una es su botón.
+                    <div key={product.id} className="product-result-group">
+                      <span className="result-name">
+                        {product.name}
+                        {!product.is_active && <em className="result-flag">no publicado</em>}
+                      </span>
+                      {product.variants.map((variant) => (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          className="product-result variant-result"
+                          onClick={() => addProduct(product, variant)}
+                        >
+                          <span className="result-name">{variant.nombre}</span>
+                          <span className="result-meta">
+                            {money(priceOf({ product, variant }))} · {variant.stock} u.
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
                   <button
                     key={product.id}
                     type="button"
@@ -147,10 +176,11 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                       {!product.is_active && <em className="result-flag">no publicado</em>}
                     </span>
                     <span className="result-meta">
-                      {money(priceOf(product))} · {product.stock} u.
+                      {money(priceOf({ product, variant: null }))} · {product.stock} u.
                     </span>
                   </button>
-                ))
+                  ),
+                )
               )}
             </div>
           </div>
@@ -167,26 +197,29 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                 </div>
               ) : (
                 lines.map((line) => (
-                  <div key={line.product.id} className="order-line">
+                  <div key={claveDe(line)} className="order-line">
                     <div className="line-info">
-                      <span className="line-name">{line.product.name}</span>
-                      <span className="line-price">{money(priceOf(line.product) * line.quantity)}</span>
+                      <span className="line-name">
+                        {line.product.name}
+                        {line.variant && <span className="line-variant"> · {line.variant.nombre}</span>}
+                      </span>
+                      <span className="line-price">{money(priceOf(line) * line.quantity)}</span>
                     </div>
                     <div className="line-actions">
-                      <button type="button" onClick={() => setQuantity(line.product.id, line.quantity - 1)}>
+                      <button type="button" onClick={() => setQuantity(claveDe(line), line.quantity - 1)}>
                         <Minus size={13} />
                       </button>
                       <input
                         type="number"
                         min={1}
                         value={line.quantity}
-                        onChange={(e) => setQuantity(line.product.id, parseInt(e.target.value, 10) || 1)}
+                        onChange={(e) => setQuantity(claveDe(line), parseInt(e.target.value, 10) || 1)}
                         className="line-qty"
                       />
-                      <button type="button" onClick={() => setQuantity(line.product.id, line.quantity + 1)}>
+                      <button type="button" onClick={() => setQuantity(claveDe(line), line.quantity + 1)}>
                         <Plus size={13} />
                       </button>
-                      <button type="button" className="line-remove" onClick={() => removeLine(line.product.id)}>
+                      <button type="button" className="line-remove" onClick={() => removeLine(claveDe(line))}>
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -199,7 +232,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
               <p className="stock-warning">
                 <AlertTriangle size={14} />
                 Estás vendiendo más unidades de las registradas en{' '}
-                {linesOverStock.map((line) => line.product.name).join(', ')}. El stock quedará en negativo.
+                {linesOverStock.map((line) => (line.variant ? `${line.product.name} (${line.variant.nombre})` : line.product.name)).join(', ')}. El stock quedará en negativo.
               </p>
             )}
 

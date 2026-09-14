@@ -93,6 +93,12 @@ class Product extends Model
         $pending = StockNotification::withoutTenant()
             ->where('tenant_id', $this->tenant_id)
             ->where('product_id', $this->id)
+            // MOD-5: quien espera una variante concreta lo avisa la variante
+            // (`ProductVariant::notificarListaDeEspera()`). Aqui solo quien se
+            // apunto al producto entero —un producto sin variantes, o uno que las
+            // tuvo despues de que se apuntara—, que se da por servido en cuanto
+            // vuelve a haber algo.
+            ->whereNull('variant_id')
             ->whereNull('notified_at')
             ->get();
 
@@ -147,6 +153,53 @@ class Product extends Model
     public function stockNotifications(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(StockNotification::class);
+    }
+
+    public function variants(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Pone en la ficha el resumen de sus variantes (MOD-5).
+     *
+     * Con variantes, el precio y el stock de verdad viven en cada una; pero el
+     * catalogo ordena por precio, filtra "solo en stock", pinta la tarjeta y
+     * sugiere relacionados leyendo `products`. En vez de reescribir todo eso,
+     * `products` guarda un resumen: el precio (y la oferta) de la variante mas
+     * barata —lo que el comprador ve como "desde"— y la suma del stock.
+     *
+     * El stock negativo de una variante (una venta de mostrador por encima de lo
+     * registrado) cuenta como cero: no puede restarle disponibilidad a otra.
+     *
+     * Sin variantes no toca nada: la ficha conserva los valores que tuviera. Por
+     * eso quitar la ultima variante deja el ultimo resumen como precio y stock
+     * del producto, y hay que revisarlos.
+     *
+     * Hay que llamarlo despues de CUALQUIER cambio de precio o stock de una
+     * variante que no pase por el formulario: una venta, una devolucion, un
+     * ajuste de precios en lote.
+     */
+    public function sincronizarResumenDeVariantes(): void
+    {
+        // `withoutTenant()` con el filtro a mano, por el mismo motivo que la lista
+        // de espera: este calculo no puede dar vacio en silencio si algun dia se
+        // llama sin tienda resuelta.
+        $variantes = ProductVariant::withoutTenant()
+            ->where('product_id', $this->id)
+            ->get();
+
+        if ($variantes->isEmpty()) {
+            return;
+        }
+
+        $masBarata = $variantes->sortBy(fn (ProductVariant $v) => $v->precioVisible())->first();
+
+        $this->price = $masBarata->price;
+        $this->sale_price = $masBarata->sale_price;
+        $this->stock = $variantes->sum(fn (ProductVariant $v) => max(0, (int) $v->stock));
+
+        $this->save();
     }
 
     // Accessor útil para el frontend

@@ -102,6 +102,29 @@
   font-weight: 500;
 }
 
+/* Un producto con variantes (MOD-5): su nombre y, debajo, un botón por variante. */
+.product-result-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.variant-result {
+  padding: 0.4rem 0.6rem;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.line-variant {
+  color: var(--text-secondary);
+}
+
 .result-flag {
   margin-left: 0.4rem;
   font-size: 0.72rem;

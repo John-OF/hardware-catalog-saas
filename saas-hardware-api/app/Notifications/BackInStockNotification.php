@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Support\Money;
 use App\Support\StoreUrl;
 use Illuminate\Bus\Queueable;
@@ -35,20 +36,23 @@ class BackInStockNotification extends Notification implements ShouldQueue
      */
     public array $aviso;
 
-    public function __construct(Product $product, string $nombreCliente)
+    public function __construct(Product $product, string $nombreCliente, ?ProductVariant $variante = null)
     {
         $tenant = $product->tenant;
 
         // El precio que se anuncia es el que veria en el catalogo: el de oferta
         // cuando existe. Es el mismo criterio que aplica OrderPricing al cobrar.
-        $precio = $product->sale_price !== null ? $product->sale_price : $product->price;
+        // MOD-5: si esperaba una variante, el precio y el stock son los de ESA.
+        $precio = $variante
+            ? $variante->precioVisible()
+            : ($product->sale_price !== null ? $product->sale_price : $product->price);
 
         $this->aviso = [
             'cliente'  => $nombreCliente,
-            'producto' => $product->name,
+            'producto' => $variante ? "{$product->name} ({$variante->nombre})" : $product->name,
             'tienda'   => $tenant?->name ?? 'la tienda',
             'precio'   => Money::format($precio, $tenant?->currency),
-            'stock'    => (int) $product->stock,
+            'stock'    => (int) ($variante ? $variante->stock : $product->stock),
             'whatsapp' => $tenant?->whatsapp_number,
             'url'      => StoreUrl::forProduct($tenant, $product->id),
         ];
