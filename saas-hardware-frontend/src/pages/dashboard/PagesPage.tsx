@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FileText,
@@ -13,16 +12,13 @@ import { toast } from 'react-hot-toast';
 import { getPages, createPage, updatePage, deletePage } from '../../api/pages';
 import type { Page } from '../../types';
 import './PagesPage.css';
-import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import Dialogo from '../../components/ui/Dialogo';
 
 export default function PagesPage() {
   const queryClient = useQueryClient();
 
   // Modals & Forms State
   const [isOpen, setIsOpen] = useState(false);
-
-  // UI-9: con la ventana abierta la pagina de detras no se mueve.
-  useBloqueoDeScroll(isOpen);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
   
   const [title, setTitle] = useState('');
@@ -224,23 +220,16 @@ export default function PagesPage() {
         </div>
       )}
 
-      {/* Editor Modal. Va por portal para escapar del contexto de apilamiento
-          que crea la animacion de .dashboard-content, que dejaba la topbar del
-          panel por encima. El destino es .dashboard-layout y no <body> porque
-          la paleta del panel (clara y oscura) se define en ese elemento, no en
-          :root: colgarlo del body lo sacaba del tema del admin y le metia los
-          colores por defecto, que son los de la tienda. */}
-      {isOpen && createPortal(
-        <div className="pages-modal-overlay" onClick={closeModal}>
-          <div className="pages-modal glass-card" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h3>{editingPage ? 'Editar Página' : 'Nueva Página Informativa'}</h3>
-              <button onClick={closeModal} className="drawer-close">
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="drawer-form">
+      {/* Editor. El portal que antes se montaba aquí a mano lo pone ahora
+          <Dialogo> para todas las ventanas del panel (TEC-11). */}
+      {isOpen && (
+        <Dialogo
+          titulo={editingPage ? 'Editar Página' : 'Nueva Página Informativa'}
+          onCerrar={closeModal}
+          ancho={720}
+          className="page-pages"
+        >
+            <form onSubmit={handleSubmit} className="dialogo-cuerpo">
               <div className="form-group">
                 <label>Título de la Página</label>
                 <input
@@ -360,7 +349,7 @@ export default function PagesPage() {
                 </label>
               </div>
 
-              <div className="drawer-actions">
+              <div className="dialogo-acciones">
                 <button type="button" onClick={closeModal} className="btn-secondary">
                   Cancelar
                 </button>
@@ -379,9 +368,7 @@ export default function PagesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>,
-        document.querySelector('.dashboard-layout') ?? document.body
+        </Dialogo>
       )}
     </div>
   );

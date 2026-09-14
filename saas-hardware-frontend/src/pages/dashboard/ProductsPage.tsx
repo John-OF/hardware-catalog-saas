@@ -28,7 +28,7 @@ import {
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import { getPlan } from '../../api/plan';
-import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import Dialogo from '../../components/ui/Dialogo';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
@@ -75,9 +75,6 @@ export default function ProductsPage() {
   // no es algo que vaya a poder hacer esperando: no es de su rol.
   const puedeAdministrar = useEsAdmin() !== false;
   const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
-
-  // UI-9: con un modal abierto la pagina de detras no se mueve.
-  useBloqueoDeScroll(isModalOpen || isImportModalOpen || isPriceAdjustModalOpen);
   const [bulkPriceAdjustment, setBulkPriceAdjustment] = useState('');
 
   // Form inputs
@@ -815,16 +812,13 @@ export default function ProductsPage() {
 
       {/* Modal Drawer */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-drawer glass-card animate-scale-in wide-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h3>{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
-              <button onClick={closeModal} className="drawer-close">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="drawer-form scrollable-form">
+        <Dialogo
+          titulo={editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+          onCerrar={closeModal}
+          ancho={580}
+          className="page-products"
+        >
+            <form onSubmit={handleSubmit} className="dialogo-cuerpo">
               
               {/* Image Uploader */}
               <div className="form-group image-upload-group">
@@ -1159,7 +1153,7 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="drawer-actions">
+              <div className="dialogo-acciones">
                 <button type="button" onClick={closeModal} className="btn-secondary">
                   Cancelar
                 </button>
@@ -1169,30 +1163,18 @@ export default function ProductsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialogo>
       )}
 
       {isImportModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}>
-          <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
-            <header className="modal-header">
-              <div>
-                <h3>Importación Masiva de Productos (CSV)</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                  Sube una plantilla CSV para crear o actualizar componentes rápidamente.
-                </p>
-              </div>
-              <button 
-                className="close-btn" 
-                onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }} 
-                aria-label="Cerrar modal"
-              >
-                <X size={20} />
-              </button>
-            </header>
-
-            <form onSubmit={handleImportSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <Dialogo
+          titulo="Importación Masiva de Productos (CSV)"
+          subtitulo="Sube una plantilla CSV para crear o actualizar componentes rápidamente."
+          onCerrar={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}
+          ancho={650}
+          className="page-products"
+        >
+            <form onSubmit={handleImportSubmit} className="dialogo-cuerpo">
               <div className="customer-summary-card" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>Formato y Columnas Permitidas</h4>
                 <p>El archivo debe estar codificado en UTF-8 y tener como cabecera (primera fila):</p>
@@ -1254,44 +1236,35 @@ export default function ProductsPage() {
                 </div>
               )}
 
-              <div className="modal-actions-bar" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }} 
+              <div className="dialogo-acciones">
+                <button
+                  type="button"
+                  onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}
                   className="btn-secondary"
-                  style={{ flex: 1 }}
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={isImporting} 
+                <button
+                  type="submit"
+                  disabled={isImporting}
                   className="btn-primary"
-                  style={{ flex: 1 }}
                 >
                   {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
                   <span>{isImporting ? 'Importando...' : 'Iniciar Importación'}</span>
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialogo>
       )}
 
       {isPriceAdjustModalOpen && (
-        <div className="modal-overlay" onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}>
-          <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <header className="modal-header">
-              <h3>Ajustar Precios en Lote</h3>
-              <button 
-                className="close-btn" 
-                onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}
-              >
-                <X size={20} />
-              </button>
-            </header>
-
-            <form onSubmit={handleBulkPriceAdjustSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Dialogo
+          titulo="Ajustar Precios en Lote"
+          onCerrar={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}
+          ancho={400}
+          className="page-products"
+        >
+            <form onSubmit={handleBulkPriceAdjustSubmit} className="dialogo-cuerpo">
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Ajusta el precio de los <strong>{selectedProductIds.length}</strong> productos seleccionados por un porcentaje.
               </p>
@@ -1310,27 +1283,24 @@ export default function ProductsPage() {
                 />
               </div>
 
-              <div className="modal-actions-bar" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }} 
+              <div className="dialogo-acciones">
+                <button
+                  type="button"
+                  onClick={() => { setIsPriceAdjustModalOpen(false); setBulkPriceAdjustment(''); }}
                   className="btn-secondary"
-                  style={{ flex: 1 }}
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={bulkActionMutation.isPending} 
+                <button
+                  type="submit"
+                  disabled={bulkActionMutation.isPending}
                   className="btn-primary"
-                  style={{ flex: 1 }}
                 >
                   {bulkActionMutation.isPending ? <Loader2 className="spinner" size={16} /> : 'Aplicar'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialogo>
       )}
 
     </div>

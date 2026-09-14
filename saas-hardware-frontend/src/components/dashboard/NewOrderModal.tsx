@@ -3,7 +3,8 @@ import './NewOrderModal.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
-import { X, Search, Plus, Minus, Trash2, Loader2, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, Loader2, ShoppingBag, AlertTriangle } from 'lucide-react';
+import Dialogo from '../ui/Dialogo';
 import { getProducts } from '../../api/products';
 import { createOrder } from '../../api/orders';
 import type { Order, PaginatedResponse, Product } from '../../types';
@@ -109,17 +110,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
   const canSubmit = customerName.trim().length > 0 && lines.length > 0 && !createMutation.isPending;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content glass-card animate-scale-in new-order-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="modal-header">
-          <div>
-            <h3>Nueva venta de mostrador</h3>
-          </div>
-          <button className="close-btn" onClick={onClose} type="button" aria-label="Cerrar modal">
-            <X size={20} />
-          </button>
-        </header>
-
+    <Dialogo titulo="Nueva venta de mostrador" onCerrar={onClose} ancho={900}>
         <div className="new-order-body">
           {/* Buscador + resultados */}
           <div className="new-order-column">
@@ -313,8 +304,6 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
             </button>
           </div>
         </div>
-      </div>
-
-    </div>
+    </Dialogo>
   );
 }

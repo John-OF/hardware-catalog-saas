@@ -5,10 +5,7 @@
    estan prefijadas y no chocan con las de ninguna pagina (comprobado con
    el analisis de colisiones). */
 
-.modal-content.new-order-modal {
-  max-width: 900px;
-  width: 100%;
-}
+/* El ancho (900px) lo pasa el TSX a <Dialogo> (TEC-11). */
 
 .no-search {
   position: relative;
@@ -34,6 +31,12 @@
   grid-template-columns: 1fr 1.15fr;
   gap: 1.5rem;
   padding: 1.25rem 1.5rem;
+  /* <Dialogo> acota el alto a la ventana y no hace scroll él mismo: lo hace el
+     cuerpo, para que el pie con el total y los botones quede siempre a la vista. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .new-order-column {

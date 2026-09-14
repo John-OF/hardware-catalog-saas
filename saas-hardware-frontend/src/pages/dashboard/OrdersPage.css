@@ -236,61 +236,9 @@
   font-size: 0.85rem;
 }
 
-/* Modal styling */
-:where(.page-orders) .modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 150;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  backdrop-filter: blur(4px);
-}
-
-:where(.page-orders) .modal-content {
-  width: 100%;
-  max-width: 600px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-xl);
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  max-height: 90vh;
-}
-
-:where(.page-orders) .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-:where(.page-orders) .modal-header h3 {
-  font-size: 1.15rem;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-}
-
-:where(.page-orders) .close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-}
-
-:where(.page-orders) .modal-body {
-  padding: 1.5rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
+/* El detalle del pedido y la venta de mostrador son <Dialogo> (TEC-11): la caja,
+   la cabecera y los botones viven en components/ui/Dialogo.css. Aqui solo queda
+   el contenido del detalle. */
 :where(.page-orders) .customer-summary-card,
 :where(.page-orders) .items-summary-card {
   background: rgba(var(--overlay-mix), 0.015);
@@ -441,16 +389,6 @@
   font-size: 1.35rem;
   font-weight: 800;
   color: var(--primary);
-}
-
-:where(.page-orders) .modal-actions-bar {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-:where(.page-orders) .modal-actions-bar button {
-  flex: 1;
 }
 
 :where(.page-orders) .badge-info {

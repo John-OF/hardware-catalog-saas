@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import {
   Plus,
-  X,
   Loader2,
   Mail,
   MailCheck,
@@ -26,7 +25,7 @@ import {
 } from '../../api/users';
 import { getPlan } from '../../api/plan';
 import { useAuthStore } from '../../stores/authStore';
-import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import Dialogo from '../../components/ui/Dialogo';
 import type { PlanInfo, User } from '../../types';
 
 /**
@@ -59,9 +58,6 @@ export default function UsersPage() {
   // Colaborador por defecto: dar poder de administrador tiene que ser una
   // decisión, no lo que pasa si nadie toca el desplegable.
   const [rol, setRol] = useState<RolDePanel>('staff');
-
-  // UI-9: con la ventana abierta la pagina de detras no se mueve.
-  useBloqueoDeScroll(isModalOpen);
 
   const { data: usuarios = [], isLoading } = useQuery<User[]>({
     queryKey: ['teamUsers'],
@@ -292,16 +288,8 @@ export default function UsersPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-overlay" onClick={cerrarModal}>
-          <div className="modal-drawer glass-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h3>Invitar a alguien</h3>
-              <button onClick={cerrarModal} className="drawer-close">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={enviarInvitacion} className="drawer-form">
+        <Dialogo titulo="Invitar a alguien" onCerrar={cerrarModal} className="page-users">
+            <form onSubmit={enviarInvitacion} className="dialogo-cuerpo">
               <div className="form-group">
                 <label htmlFor="user-name">Nombre</label>
                 <input
@@ -350,7 +338,7 @@ export default function UsersPage() {
                 </p>
               </div>
 
-              <div className="drawer-actions">
+              <div className="dialogo-acciones">
                 <button type="button" onClick={cerrarModal} className="btn-secondary">
                   Cancelar
                 </button>
@@ -360,8 +348,7 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialogo>
       )}
     </div>
   );

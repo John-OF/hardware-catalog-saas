@@ -159,105 +159,23 @@
   background: var(--danger-glow);
 }
 
-/* Modal de edicion.
+/* Editor de pagina. Es <Dialogo> (TEC-11), que ya lo monta por portal en
+   .dashboard-layout: el portal que esta pagina hacia a mano para escapar del
+   contexto de apilamiento ahora lo hace el componente para todas. El diálogo
+   lleva la clase .page-pages, asi que estas reglas le siguen llegando. */
 
-   Va acotado a `.pages-modal-overlay` y no a `.page-pages` porque el modal se
-   monta con un portal, asi que queda fuera del arbol de la pagina: un selector
-   descendente de .page-pages no lo alcanzaria. El portal hace falta porque
-   .dashboard-content lleva `animation: fadeIn ... forwards`, que crea un
-   contexto de apilamiento; dentro de el, el z-index del overlay solo compite
-   con sus hermanos y la topbar del panel (z-index 10) le quedaba encima.
-
-   El portal apunta a `.dashboard-layout`, no a <body>: la paleta del panel
-   —clara y oscura— se define en ese elemento (index.css, "ADMIN PANEL"), no en
-   :root, asi que colgarlo del body lo dejaba sin tema del admin. Por eso aqui
-   solo se usan tokens (--bg-*, --text-*, --border, --primary...): los heredan
-   del layout y siguen al modo claro/oscuro del panel, sin tocar nada de la
-   personalizacion de la tienda. */
-
-:where(.pages-modal-overlay) {
-  position: fixed;
-  inset: 0;
-  /* El velo es el mismo en claro y en oscuro a proposito: atenua lo que hay
-     detras, no es una superficie del tema. Mismo valor que el resto de modales
-     del panel. */
-  background: rgba(15, 23, 42, 0.4);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-:where(.pages-modal-overlay) .pages-modal {
-  width: 100%;
-  max-width: 720px;
-  max-height: 90vh;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  padding: 2.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  overflow-y: auto;
-}
-
-:where(.pages-modal-overlay) .drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-:where(.pages-modal-overlay) .drawer-header h3 {
-  font-size: 1.35rem;
-  font-family: var(--font-heading);
-}
-
-:where(.pages-modal-overlay) .drawer-close {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0.25rem;
-  transition: var(--transition);
-}
-
-:where(.pages-modal-overlay) .drawer-close:hover {
-  color: var(--text-primary);
-}
-
-:where(.pages-modal-overlay) .drawer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-:where(.pages-modal-overlay) .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-:where(.pages-modal-overlay) .form-group label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-:where(.pages-modal-overlay) .helper-text {
+:where(.page-pages) .helper-text {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
 
-:where(.pages-modal-overlay) .rich-toolbar {
+:where(.page-pages) .rich-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
 }
 
-:where(.pages-modal-overlay) .rich-toolbar button {
+:where(.page-pages) .rich-toolbar button {
   padding: 0.35rem 0.7rem;
   font-size: 0.8rem;
   border-radius: var(--radius-sm);
@@ -268,43 +186,30 @@
   transition: var(--transition);
 }
 
-:where(.pages-modal-overlay) .rich-toolbar button:hover {
+:where(.page-pages) .rich-toolbar button:hover {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-glow);
 }
 
-:where(.pages-modal-overlay) .checkbox-group .switch-container {
+:where(.page-pages) .checkbox-group .switch-container {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
   cursor: pointer;
 }
 
-:where(.pages-modal-overlay) .switch-container input {
+:where(.page-pages) .switch-container input {
   margin-top: 0.2rem;
   cursor: pointer;
 }
 
-:where(.pages-modal-overlay) .switch-label {
+:where(.page-pages) .switch-label {
   font-size: 0.9rem;
   color: var(--text-primary);
 }
 
-:where(.pages-modal-overlay) .drawer-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: auto;
-  padding-top: 1rem;
-}
-
-:where(.pages-modal-overlay) .drawer-actions button {
-  flex: 1;
-  justify-content: center;
-}
-
-:where(.page-pages) .spinner,
-:where(.pages-modal-overlay) .spinner {
+:where(.page-pages) .spinner {
   animation: spin 1s linear infinite;
 }
 
@@ -318,14 +223,5 @@
   :where(.page-pages) .content-header button {
     width: 100%;
     justify-content: center;
-  }
-
-  :where(.pages-modal-overlay) {
-    padding: 1rem;
-  }
-
-  :where(.pages-modal-overlay) .pages-modal {
-    padding: 1.5rem;
-    max-height: 95vh;
   }
 }

@@ -1,0 +1,146 @@
+/* <Dialogo>, la ventana flotante del panel (TEC-11).
+
+   Global, como la hoja de cualquier componente: el diálogo va por portal fuera
+   del árbol de la página, así que un `:where(.page-x)` no lo alcanzaría. Las
+   clases llevan el prefijo `dialogo` para no chocar con las de ninguna página.
+
+   Sustituye a las copias de `.modal-overlay`, `.modal-drawer`, `.drawer-*`,
+   `.modal-content`, `.modal-header`, `.modal-body` y `.modal-actions-bar` que
+   tenían Productos, Categorías, Pedidos, Páginas y Equipo en sus hojas. */
+
+.dialogo-velo {
+  position: fixed;
+  inset: 0;
+  /* El velo es el mismo en claro y en oscuro a propósito: atenúa lo que hay
+     detrás, no es una superficie del tema. */
+  background: rgba(15, 23, 42, 0.4);
+  /* Por encima del aviso de verificación del panel (UI-7). */
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.dialogo {
+  width: 100%;
+  max-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  /* Lo que hace scroll es el cuerpo, no la tarjeta: la cabecera con la X se
+     queda siempre a la vista. */
+  overflow: hidden;
+}
+
+.dialogo-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialogo-cabecera h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+}
+
+.dialogo-subtitulo {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.dialogo-cerrar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.dialogo-cerrar:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.05);
+}
+
+.dialogo-cuerpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+  /* UI-9: al llegar al final, la rueda no sigue moviendo la página de detrás. */
+  overscroll-behavior: contain;
+}
+
+/* Campos de formulario dentro de cualquier diálogo. Con `:where()` para que
+   pesen lo mínimo (una clase): cualquier regla más concreta de una página o de
+   un componente —`.new-order-fields .form-group`, `.form-group.half`— gana sin
+   depender del orden en que carguen las hojas (el aviso de UI-5). */
+.dialogo :where(.form-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dialogo :where(.form-group > label) {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dialogo :where(.form-row) {
+  display: flex;
+  gap: 1rem;
+}
+
+.dialogo :where(.form-row .half) {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialogo-acciones {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.dialogo-acciones button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .dialogo-velo {
+    padding: 1rem;
+  }
+
+  .dialogo {
+    max-height: calc(100vh - 2rem);
+  }
+
+  .dialogo-cuerpo {
+    padding: 1.25rem;
+  }
+}

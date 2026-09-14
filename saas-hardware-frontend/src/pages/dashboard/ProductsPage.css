@@ -261,120 +261,9 @@
   color: var(--text-secondary);
 }
 
-/* Drawer Overlay */
-:where(.page-products) .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.4);
-  z-index: 200; /* Ensure overlay is on top of everything */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-:where(.page-products) .modal-drawer {
-  width: 100%;
-  max-width: 480px;
-  max-height: calc(85vh - 45px); /* Keep the card height bounded within viewport */
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-xl);
-  overflow: hidden; /* Hide overflow so that internal form scrolls */
-}
-
-:where(.page-products) .modal-drawer.wide-drawer {
-  max-width: 580px;
-}
-
-:where(.page-products) .drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 1rem;
-}
-
-:where(.page-products) .drawer-header h3 {
-  font-size: 1.25rem;
-  color: var(--text-primary);
-  font-family: var(--font-heading);
-  margin: 0;
-}
-
-:where(.page-products) .drawer-close {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: 50%;
-}
-
-:where(.page-products) .drawer-close:hover {
-  color: var(--text-primary);
-  background: rgba(var(--overlay-mix), 0.05);
-}
-
-:where(.page-products) .drawer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-:where(.page-products) .scrollable-form {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-  /* UI-9: al llegar al final, la rueda no sigue moviendo la pagina de detras. */
-  overscroll-behavior: contain;
-}
-
-:where(.page-products) .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-:where(.page-products) .form-group label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-:where(.page-products) .form-row {
-  display: flex;
-  gap: 1rem;
-  width: 100%;
-}
-
-:where(.page-products) .form-row .half {
-  flex: 1;
-}
-
-:where(.page-products) .drawer-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-:where(.page-products) .drawer-actions button {
-  flex: 1;
-}
+/* Las ventanas (nuevo/editar producto, importar CSV, ajustar precios) son
+   <Dialogo> y sus estilos base viven en components/ui/Dialogo.css (TEC-11).
+   Aqui solo queda lo propio de su contenido. */
 
 /* Image Dropzone styles */
 :where(.page-products) .image-upload-group label {
@@ -587,48 +476,7 @@
   color: var(--text-secondary);
 }
 
-/* Modal styling */
-
-:where(.page-products) .modal-content {
-  width: 100%;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-xl);
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  max-height: 90vh;
-}
-
-:where(.page-products) .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-:where(.page-products) .modal-header h3 {
-  font-size: 1.15rem;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-}
-
-:where(.page-products) .close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-}
-
-:where(.page-products) .modal-body {
-  padding: 1.5rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
+/* Recuadro de ayuda de la ventana de importar CSV. */
 :where(.page-products) .customer-summary-card {
   background: rgba(var(--overlay-mix), 0.02);
   border: 1px solid var(--border);
@@ -641,12 +489,6 @@
   color: var(--text-primary);
   margin-bottom: 1rem;
   font-family: var(--font-heading);
-}
-
-:where(.page-products) .modal-actions-bar {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
 }
 
 @media (max-width: 768px) {

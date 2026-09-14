@@ -15,8 +15,7 @@ import {
   ShoppingBag,
   Calendar,
   ChevronLeft,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
@@ -24,7 +23,7 @@ import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
-import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import Dialogo from '../../components/ui/Dialogo';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
@@ -35,9 +34,6 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const puedeAdministrar = useEsAdmin() !== false;
-
-  // UI-9: con el detalle abierto la lista de detras no se mueve.
-  useBloqueoDeScroll(selectedOrder !== null);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   // Fetch orders
@@ -346,21 +342,18 @@ export default function OrdersPage() {
 
       {/* Detail Modal / Drawer */}
       {selectedOrder && (
-        <div className="modal-overlay" onClick={() => setSelectedOrder(null)}>
-          <div className="modal-content glass-card animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-header">
-              <div>
-                <h3>Detalle del Pedido #{selectedOrder.number}</h3>
-                <span className={`badge ${getStatusBadgeClass(selectedOrder.status)}`}>
-                  {getStatusText(selectedOrder.status)}
-                </span>
-              </div>
-              <button className="close-btn" onClick={() => setSelectedOrder(null)} aria-label="Cerrar modal">
-                <X size={20} />
-              </button>
-            </header>
-
-            <div className="modal-body">
+        <Dialogo
+          titulo={`Detalle del Pedido #${selectedOrder.number}`}
+          subtitulo={
+            <span className={`badge ${getStatusBadgeClass(selectedOrder.status)}`}>
+              {getStatusText(selectedOrder.status)}
+            </span>
+          }
+          onCerrar={() => setSelectedOrder(null)}
+          ancho={600}
+          className="page-orders"
+        >
+            <div className="dialogo-cuerpo">
               {/* Customer summary */}
               <div className="customer-summary-card">
                 <h4>Información de Contacto</h4>
@@ -438,18 +431,16 @@ export default function OrdersPage() {
 
               {/* State updates inside details */}
               {selectedOrder.status === 'pending' && (
-                <div className="modal-actions-bar" style={{ display: 'flex', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <div className="dialogo-acciones">
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')}
                     className="btn-primary"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
                     <Loader2 size={16} className="spinner-hover" /> Preparar Pedido
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')}
                     className="btn-secondary"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
                     <XCircle size={16} /> Cancelar Pedido
                   </button>
@@ -457,26 +448,23 @@ export default function OrdersPage() {
               )}
 
               {selectedOrder.status === 'processing' && (
-                <div className="modal-actions-bar" style={{ display: 'flex', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <div className="dialogo-acciones">
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'attended')}
                     className="btn-primary"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
                     <Check size={16} /> Completar / Listo
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')}
                     className="btn-secondary"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
                     <XCircle size={16} /> Cancelar Pedido
                   </button>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </Dialogo>
       )}
 
     </div>

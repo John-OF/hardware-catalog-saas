@@ -371,10 +371,12 @@ src/
 │   ├── dashboard/  # NewOrderModal (venta de mostrador), VerifyEmailBanner, SupportBanner
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
-│   └── ui/         # CategoryIcon, ImageSourceField, ErrorBoundary, fallbacks
+│   └── ui/         # Dialogo (ventana flotante del panel), CategoryIcon, ImageSourceField,
+│                   # ErrorBoundary, fallbacks
 ├── stores/         # Zustand: authStore (admin), customerAuthStore (cliente),
 │                   # platformAuthStore, cartStore (por tienda), tenantStore
-├── hooks/          # useTenantBranding (título, favicon, meta/OG), useTenantTheme
+├── hooks/          # useTenantBranding (título, favicon, meta/OG), useTenantTheme,
+│                   # useBloqueoDeScroll
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes
 └── types/          # Tipos compartidos de la API
@@ -390,6 +392,11 @@ src/
 - **Ojo con la especificidad**: una regla `:where(.page-x) .clase-de-componente` **empata** con el
   CSS del componente y el desempate lo decide el orden de carga de los chunks. Ese tipo de regla va
   en la hoja del componente.
+- **Toda ventana flotante del panel es `<Dialogo>`** (`components/ui/Dialogo.tsx`), nunca un
+  overlay propio: va por portal a `.dashboard-layout` (si no, la barra superior y el menú quedan por
+  encima del velo), bloquea el scroll y cierra con Escape. Recibe en `className` la clase de la
+  página (`page-products`…) para que sus reglas `:where(.page-x)` sigan llegando al contenido, que es
+  `<form className="dialogo-cuerpo">` terminado en `<div className="dialogo-acciones">`.
 - El **branding por tienda** se aplica en tiempo de ejecución (`useTenantBranding`, `useTenantTheme`)
   a partir de lo que devuelve la API: variables CSS, modo claro/oscuro, título y favicon.
 - **Los filtros del catálogo viven en la URL**, no en estado local: un enlace compartido reproduce

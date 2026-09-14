@@ -6,9 +6,8 @@ import { toast } from 'react-hot-toast';
 import { 
   Plus, 
   Edit2, 
-  Trash2, 
-  X, 
-  FolderPlus, 
+  Trash2,
+  FolderPlus,
   Sliders, 
   Eye, 
   EyeOff, 
@@ -24,7 +23,7 @@ import {
   reorderCategories
 } from '../../api/categories';
 import CategoryIcon from '../../components/ui/CategoryIcon';
-import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import Dialogo from '../../components/ui/Dialogo';
 import { COMPONENT_TYPES, iconOfComponentType } from '../../utils/componentTypes';
 import type { Category, ComponentType } from '../../types';
 
@@ -36,9 +35,6 @@ export default function CategoriesPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
-  // UI-9: con la ventana abierta la pagina de detras no se mueve.
-  useBloqueoDeScroll(isModalOpen);
 
   // Form states
   const [name, setName] = useState('');
@@ -288,16 +284,12 @@ export default function CategoriesPage() {
 
       {/* Modal Drawer */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-drawer glass-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h3>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
-              <button onClick={closeModal} className="drawer-close">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="drawer-form">
+        <Dialogo
+          titulo={editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+          onCerrar={closeModal}
+          className="page-categories"
+        >
+            <form onSubmit={handleSubmit} className="dialogo-cuerpo">
               <div className="form-group">
                 <label htmlFor="cat-name">Nombre de Categoría</label>
                 <input
@@ -365,7 +357,7 @@ export default function CategoriesPage() {
                 </div>
               </div>
 
-              <div className="drawer-actions">
+              <div className="dialogo-acciones">
                 <button type="button" onClick={closeModal} className="btn-secondary">
                   Cancelar
                 </button>
@@ -375,8 +367,7 @@ export default function CategoriesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialogo>
       )}
 
     </div>

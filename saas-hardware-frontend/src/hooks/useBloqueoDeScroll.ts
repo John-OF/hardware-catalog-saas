@@ -17,9 +17,10 @@ import { useEffect } from 'react';
  * pixel, que es peor que una regla clara: **mientras hay un modal, la pagina no
  * se mueve**. Es lo que hace cualquier interfaz con dialogos.
  *
- * `overscroll-behavior: contain` en el propio modal (esta en las hojas de cada
- * pagina) tapa el caso del final del recorrido; esto tapa el resto, incluido el
- * fondo cuando el cursor no esta sobre el modal.
+ * `overscroll-behavior: contain` en el propio modal tapa el caso del final del
+ * recorrido; esto tapa el resto, incluido el fondo cuando el cursor no esta
+ * sobre el modal. En el panel ya no se llama a mano: lo hace `<Dialogo>`
+ * (TEC-11), que trae ambas cosas. Quedan las ventanas del catalogo publico.
  *
  * Restaura el valor que hubiera antes y no un `''` a ciegas, para no pisar un
  * bloqueo puesto por otro modal que siga abierto debajo.

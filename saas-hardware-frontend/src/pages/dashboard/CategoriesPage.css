@@ -168,90 +168,12 @@
   color: var(--danger);
 }
 
-/* Modal / Drawer Overlay */
-/* UI-7: esta ventana era la unica del panel que salia pegada al borde derecho y
-   a toda altura, mientras Productos, Pedidos y Paginas la centran. No era una
-   decision de diseno sino un resto de cuando se penso como "drawer": el TSX ya
-   la llama `modal-drawer` en todas partes, y las demas paginas se apartaron de
-   ese patron sin que esta lo hiciera.
-
-   Y el `z-index: 100` la dejaba POR DEBAJO del aviso de "confirma tu correo",
-   que se pinta encima de cualquier pantalla del panel: la ventana salia con la
-   esquina superior tapada. Productos ya usaba 200 con el comentario de que era
-   para quedar encima de todo; aqui se hace lo mismo en vez de inventar otro
-   numero. */
-:where(.page-categories) .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.4);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-:where(.page-categories) .modal-drawer {
-  width: 100%;
-  max-width: 480px;
-  /* Acotada al alto de la ventana y con scroll dentro: en un portatil bajo, a
-     toda altura se comia los botones de guardar. */
-  max-height: calc(100vh - 4rem);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  overflow-y: auto;
-  /* UI-9: al llegar al final, la rueda no sigue moviendo la pagina de detras. */
-  overscroll-behavior: contain;
-}
-
-:where(.page-categories) .drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-:where(.page-categories) .drawer-header h3 {
-  font-size: 1.35rem;
-  font-family: var(--font-heading);
-}
-
-:where(.page-categories) .drawer-close {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0.25rem;
-  transition: var(--transition);
-}
-
-:where(.page-categories) .drawer-close:hover {
-  color: var(--text-primary);
-}
-
-:where(.page-categories) .drawer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-:where(.page-categories) .form-row {
-  display: flex;
-  gap: 1.5rem;
-}
+/* La ventana de nueva/editar categoria es <Dialogo>: su caja, cabecera y
+   botones viven en components/ui/Dialogo.css (TEC-11). Aqui solo queda lo propio
+   de su contenido. */
 
 :where(.page-categories) .form-group.half {
   flex: 1;
-}
-
-:where(.page-categories) .checkbox-group {
-  justify-content: flex-end;
 }
 
 :where(.page-categories) .select-input {
@@ -309,16 +231,6 @@
 :where(.page-categories) .toggle-text {
   font-size: 0.9rem;
   color: var(--text-secondary);
-}
-
-:where(.page-categories) .drawer-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-:where(.page-categories) .drawer-actions button {
-  flex: 1;
 }
 
 @media (max-width: 580px) {
