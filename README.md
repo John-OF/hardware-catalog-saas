@@ -193,7 +193,7 @@ app/
 ├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
 │                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
 ├── Services/
-│   ├── ImageService.php    # Subida y optimización a WebP
+│   ├── ImageService.php    # Subida y optimización a WebP; borra solo archivos que nadie usa
 │   ├── OrderPricing.php    # Precios y total calculados en el servidor
 │   ├── ViewCounter.php     # Visitas acumuladas en caché
 │   └── DomainVerifier.php  # Comprueba el TXT del dominio propio
@@ -208,7 +208,7 @@ config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 53 archivos, 467 tests (+1 en tests/Unit)
+tests/Feature/         # 54 archivos, 474 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -313,7 +313,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 468 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 475 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -442,6 +442,9 @@ npm run lint      # ESLint
 - **Cambiar precio o stock de una variante fuera del formulario** (una venta, una devolución, un
   ajuste en lote) obliga a llamar después a `Product::sincronizarResumenDeVariantes()`, o el
   catálogo enseñará un precio y un stock que ya no son.
+- **Las fotos de producto se borran con `ImageService::borrarSiNadieLasUsa()`, después de cambiar la
+  base**, nunca borrando el archivo directamente: duplicar un producto comparte las URL con el
+  original, y borrar a ciegas le rompía las fotos al otro.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
 - **Rate limits con nombre, nunca `throttle:5,1` a secas**: un throttle sin nombre usa como clave

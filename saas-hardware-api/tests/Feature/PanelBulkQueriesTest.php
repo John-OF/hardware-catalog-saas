@@ -212,10 +212,15 @@ class PanelBulkQueriesTest extends TestCase
         );
 
         $respuesta->assertOk();
+        // Dos, y fijas: la carga de la galería con eager loading, y la de
+        // TEC-14 que comprueba, al final y de una vez para todas las URL, si otro
+        // producto (una copia hecha con "duplicar") sigue usando alguna foto antes
+        // de borrar su archivo. Lo que este test vigila es que no crezca con el
+        // número de productos, y con seis sigue siendo dos.
         $this->assertLessThanOrEqual(
-            1,
+            2,
             $consultas,
-            "Borrar 6 productos hizo {$consultas} consultas a product_images; con eager loading es una."
+            "Borrar 6 productos hizo {$consultas} consultas a product_images; deberían ser dos fijas, no una por producto."
         );
     }
 

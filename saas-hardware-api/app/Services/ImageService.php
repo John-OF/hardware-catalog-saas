@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Encoders\WebpEncoder;
@@ -68,23 +69,67 @@ class ImageService
     }
 
     /**
-     * Elimina las imágenes anteriores del storage.
+     * Borra del almacenamiento las fotos de producto que ya no use nadie (TEC-14).
+     *
+     * **Hay que llamarlo DESPUÉS de haber cambiado la base**, con las URL que
+     * acaban de quedar sueltas: la foto principal que se reemplazó, la galería o
+     * las variantes de un producto borrado, la foto de una variante quitada.
+     *
+     * Antes cada sitio borraba el archivo en cuanto su fila dejaba de apuntarle,
+     * sin mirar si otra fila apuntaba al mismo. Y eso pasa siempre tras duplicar
+     * un producto: la copia comparte las URL del original —foto principal,
+     * galería y variantes—, no los archivos. Borrar uno de los dos, o cambiarle la
+     * foto, dejaba al otro con las imágenes rotas. Aquí se mira primero: si alguna
+     * fila de productos, galería o variantes sigue usando la URL, el archivo se
+     * queda.
+     *
+     * Se prefirió esto a copiar los archivos al duplicar por dos motivos: arregla
+     * también los duplicados que ya existían, y no multiplica el espacio usado en
+     * el almacenamiento.
+     *
+     * Se busca en todas las tiendas y no solo en la actual: la ruta lleva el slug
+     * de la tienda, así que una URL no puede estar en otra, y no depender de tener
+     * tienda resuelta evita el fallo en cerrado de AUD-4 —que aquí sería borrar un
+     * archivo en uso por creer que nadie lo usa—.
+     *
+     * @param  array<int, string|null>  $urls
      */
-    public function deleteProductImages(?string $imageUrl, ?string $thumbUrl): void
+    public function borrarSiNadieLasUsa(array $urls): void
     {
-        $disk = $this->disco();
+        $urls = array_values(array_unique(array_filter($urls)));
 
-        foreach ([$imageUrl, $thumbUrl] as $url) {
-            if ($url) {
-                $path = parse_url($url, PHP_URL_PATH);
-                // Si la URL es local, quitar /storage/ para obtener el path correcto
-                $relativePath = ltrim($path, '/');
-                if (str_starts_with($relativePath, 'storage/')) {
-                    $relativePath = substr($relativePath, 8);
-                }
-                Storage::disk($disk)->delete($relativePath);
-            }
+        if ($urls === []) {
+            return;
         }
+
+        $enUso = collect();
+
+        // Una consulta por tabla, sea cual sea el número de URL: un borrado en
+        // lote de cincuenta productos cuesta lo mismo que uno (AUD-23).
+        foreach (['products', 'product_images', 'product_variants'] as $tabla) {
+            DB::table($tabla)
+                ->where(fn ($q) => $q->whereIn('image_url', $urls)->orWhereIn('thumbnail_url', $urls))
+                ->get(['image_url', 'thumbnail_url'])
+                ->each(function ($fila) use (&$enUso) {
+                    $enUso->push($fila->image_url, $fila->thumbnail_url);
+                });
+        }
+
+        foreach (array_diff($urls, $enUso->unique()->all()) as $url) {
+            $this->borrarArchivo($url);
+        }
+    }
+
+    private function borrarArchivo(string $url): void
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        // Si la URL es local, quitar /storage/ para obtener el path correcto
+        $relativePath = ltrim((string) $path, '/');
+        if (str_starts_with($relativePath, 'storage/')) {
+            $relativePath = substr($relativePath, 8);
+        }
+
+        Storage::disk($this->disco())->delete($relativePath);
     }
 
     /**

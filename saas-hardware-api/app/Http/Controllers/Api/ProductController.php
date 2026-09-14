@@ -130,9 +130,13 @@ class ProductController extends Controller
 
         [$data, $variantes] = $this->separarVariantes($request->validated());
 
+        // TEC-14: las fotos que dejan de usarse se juntan aquí y se borran al
+        // final, cuando la base ya no les apunta, y solo si nadie más las usa.
+        $sueltas = [];
+
         if ($request->hasFile('image')) {
-            // Eliminar imágenes anteriores
-            $this->imageService->deleteProductImages($product->image_url, $product->thumbnail_url);
+            $sueltas[] = $product->image_url;
+            $sueltas[] = $product->thumbnail_url;
 
             $tenant = app('currentTenant');
             $urls   = $this->imageService->uploadProductImage($request->file('image'), $tenant->slug);
@@ -145,7 +149,8 @@ class ProductController extends Controller
         foreach ($deletedIds as $imgId) {
             $imgModel = $product->images()->find($imgId);
             if ($imgModel) {
-                $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
+                $sueltas[] = $imgModel->image_url;
+                $sueltas[] = $imgModel->thumbnail_url;
                 $imgModel->delete();
             }
         }
@@ -170,26 +175,22 @@ class ProductController extends Controller
             $this->sincronizarVariantes($product, $variantes, $request);
         }
 
+        $this->imageService->borrarSiNadieLasUsa($sueltas);
+
         return response()->json($product->fresh()->load(['category', 'images', 'variants']));
     }
 
     public function destroy(Product $product): JsonResponse
     {
-        // Eliminar imagen principal
-        $this->imageService->deleteProductImages($product->image_url, $product->thumbnail_url);
-
-        // Eliminar imágenes de la galería
-        foreach ($product->images as $imgModel) {
-            $this->imageService->deleteProductImages($imgModel->image_url, $imgModel->thumbnail_url);
-        }
-
-        // Y las de sus variantes (MOD-5): las filas caen por cascada, los
-        // archivos no.
-        foreach ($product->variants as $variante) {
-            $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
-        }
+        // Las fotos se apuntan antes de borrar la fila —después ya no hay de
+        // dónde leerlas— y los archivos se borran después, cuando la galería y
+        // las variantes ya han caído por cascada: si una copia del producto
+        // (duplicar) sigue usándolos, se quedan (TEC-14).
+        $fotos = $this->fotosDe(collect([$product->load(['images', 'variants'])]));
 
         $product->delete();
+
+        $this->imageService->borrarSiNadieLasUsa($fotos);
 
         return response()->json(null, 204);
     }
@@ -497,17 +498,10 @@ class ProductController extends Controller
             // consultas solo para averiguar que imagenes tenian.
             $products = $query->with(['images', 'variants'])->get();
 
-            foreach ($products as $prod) {
-                $this->imageService->deleteProductImages($prod->image_url, $prod->thumbnail_url);
-
-                foreach ($prod->images as $img) {
-                    $this->imageService->deleteProductImages($img->image_url, $img->thumbnail_url);
-                }
-
-                foreach ($prod->variants as $variante) {
-                    $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
-                }
-            }
+            // TEC-14: como en `destroy`, los archivos se borran después del
+            // DELETE y solo los que nadie más usa. Borrar a la vez un producto y
+            // su copia sí borra las fotos: al terminar ya no queda ninguna fila.
+            $fotos = $this->fotosDe($products);
 
             if ($products->isNotEmpty()) {
                 // Y un solo DELETE en vez de uno por producto. Las filas hijas
@@ -516,6 +510,8 @@ class ProductController extends Controller
                 // `product_id` a null, exactamente igual que borrando de uno en
                 // uno: el historial de ventas no se toca.
                 Product::whereIn('id', $products->pluck('id'))->delete();
+
+                $this->imageService->borrarSiNadieLasUsa($fotos);
 
                 // El DELETE masivo no pasa por el hook `deleted` del modelo, que
                 // es quien sube la version de cache (AUD-6).
@@ -586,6 +582,11 @@ class ProductController extends Controller
 
     /**
      * Replica un producto existente junto con su galería.
+     *
+     * La copia apunta a los MISMOS archivos que el original —foto principal,
+     * galería y variantes—; no se copian. Es seguro porque ningún borrado quita un
+     * archivo que otra fila siga usando (`ImageService::borrarSiNadieLasUsa`,
+     * TEC-14): antes de eso, borrar uno de los dos rompía las fotos del otro.
      */
     public function duplicate(Product $product): JsonResponse
     {
@@ -721,6 +722,8 @@ class ProductController extends Controller
         $tenant = app('currentTenant');
         $existentes = $product->variants()->get()->keyBy('id');
         $conservadas = [];
+        // TEC-14: se borran al final, y solo si ninguna otra fila las usa.
+        $sueltas = [];
 
         foreach (array_values($entrada) as $posicion => $datos) {
             $variante = isset($datos['id']) ? $existentes->get($datos['id']) : null;
@@ -742,7 +745,8 @@ class ProductController extends Controller
             $foto = $request->file("variant_images.{$posicion}");
 
             if (($foto || ! empty($datos['remove_image'])) && $variante->image_url) {
-                $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
+                $sueltas[] = $variante->image_url;
+                $sueltas[] = $variante->thumbnail_url;
                 $variante->image_url = null;
                 $variante->thumbnail_url = null;
             }
@@ -757,12 +761,32 @@ class ProductController extends Controller
 
         foreach ($existentes as $id => $variante) {
             if (! in_array($id, $conservadas, true)) {
-                $this->imageService->deleteProductImages($variante->image_url, $variante->thumbnail_url);
+                $sueltas[] = $variante->image_url;
+                $sueltas[] = $variante->thumbnail_url;
                 $variante->delete();
             }
         }
 
+        $this->imageService->borrarSiNadieLasUsa($sueltas);
+
         $product->sincronizarResumenDeVariantes();
+    }
+
+    /**
+     * Todas las URL de fotos de unos productos: principal, galería y variantes.
+     * Para borrarlas después con `borrarSiNadieLasUsa()` (TEC-14).
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $productos  con `images` y `variants` cargadas
+     * @return array<int, string|null>
+     */
+    private function fotosDe(\Illuminate\Support\Collection $productos): array
+    {
+        return $productos->flatMap(fn (Product $p) => [
+            $p->image_url,
+            $p->thumbnail_url,
+            ...$p->images->flatMap(fn ($img) => [$img->image_url, $img->thumbnail_url]),
+            ...$p->variants->flatMap(fn ($v) => [$v->image_url, $v->thumbnail_url]),
+        ])->all();
     }
 
     private function invalidarCachePublica(): void
