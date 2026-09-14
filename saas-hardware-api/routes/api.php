@@ -21,20 +21,25 @@ use Illuminate\Support\Facades\Route;
 | Rutas públicas — Sin autenticación
 |--------------------------------------------------------------------------
 */
+
+// TEC-13: todos los throttle de este archivo van con NOMBRE (login,
+// auth_publica, escritura_publica…), definidos con sus topes en
+// AppServiceProvider::limitesPorFormulario(). No volver a `throttle:5,1` a
+// secas: sin nombre, todas esas rutas comparten un solo contador por IP.
 Route::post('/auth/register', [AuthController::class, 'register'])
-    ->middleware('throttle:5,1');
+    ->middleware('throttle:auth_publica');
 
 Route::post('/auth/login', [AuthController::class, 'login'])
-    ->middleware('throttle:5,1');
+    ->middleware('throttle:login');
 
 // Recuperación de contraseña del panel (SAAS-2). Sin auth: quien las usa es
 // justamente quien no puede entrar. El throttle por IP es bajo a propósito
 // porque son endpoints que aceptan correos arbitrarios.
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
-    ->middleware('throttle:5,1');
+    ->middleware('throttle:auth_publica');
 
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
-    ->middleware('throttle:5,1');
+    ->middleware('throttle:auth_publica');
 
 // Verificacion del correo del alta (FUN-5). Sin `auth:sanctum`: el enlace se
 // abre desde el correo, muchas veces en otro navegador o en el movil, donde no
@@ -45,7 +50,7 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
 // genera el enlace con `route()`, asi que si se renombra aqui hay que renombrarlo
 // alli el mismo dia o el alta empieza a mandar correos con un enlace roto.
 Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])
-    ->middleware(['signed', 'throttle:6,1'])
+    ->middleware(['signed', 'throttle:verificacion_correo'])
     ->name('verificacion.correo');
 
 // Catálogo público (consultado por el frontend sin login)
@@ -80,11 +85,11 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
     Route::get('/facets',    [PublicCatalogController::class, 'facets']);
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
     Route::post('/products/{product}/reviews', [PublicCatalogController::class, 'storeReview'])
-        ->middleware(['throttle:10,1', 'throttle:anonymous_reviews']);
+        ->middleware(['throttle:escritura_publica', 'throttle:anonymous_reviews']);
 
     // "Avísame cuando llegue" — registrar interés en un producto agotado
     Route::post('/products/{product}/notify-me', [PublicCatalogController::class, 'storeStockNotification'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:escritura_publica');
     
     // Páginas informativas públicas
     Route::get('/pages', [PublicCatalogController::class, 'pages']);
@@ -92,21 +97,21 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
 
     // Crear solicitud de pedido (público, limitado para evitar spam)
     Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:escritura_publica');
 
     // Autenticación de cliente
     Route::post('/auth/register', [PublicAuthController::class, 'register'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth_publica');
     Route::post('/auth/login', [PublicAuthController::class, 'login'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:login');
 
     // Recuperación de contraseña del CLIENTE (FUN-11). Mismo throttle bajo que
     // el resto de auth y el mismo motivo que el del panel: son endpoints sin
     // sesión que aceptan un correo arbitrario.
     Route::post('/auth/forgot-password', [PublicAuthController::class, 'forgotPassword'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth_publica');
     Route::post('/auth/reset-password', [PublicAuthController::class, 'resetPassword'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth_publica');
 
     // Rutas protegidas para clientes.
     //
@@ -132,7 +137,7 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
 | de todas las tiendas y no pertenece a ninguna.
 */
 Route::post('/platform/login', [PlatformController::class, 'login'])
-    ->middleware(['platform.ip', 'throttle:5,1']);
+    ->middleware(['platform.ip', 'throttle:login']);
 
 Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platform')->group(function () {
     Route::post('/logout', [PlatformController::class, 'logout']);
@@ -187,7 +192,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // al correo del usuario autenticado: no acepta direcciones sueltas, asi que
     // no vale ni para sondear altas ni para mandarle correo a un tercero.
     Route::post('/auth/email/resend', [AuthController::class, 'resendVerificationEmail'])
-        ->middleware('throttle:3,1');
+        ->middleware('throttle:reenvio_correo');
 
     // Estadísticas
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
@@ -244,7 +249,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
         // hay de un usuario. El controlador resuelve el {user} a mano y no por
         // route model binding, para no salirse de la tienda (ver su cabecera).
         Route::post('users/{user}/resend-invitation', [UserController::class, 'resend'])
-            ->middleware('throttle:3,1');
+            ->middleware('throttle:reenvio_correo');
         Route::apiResource('users', UserController::class)
             ->only(['index', 'store', 'update', 'destroy']);
     });

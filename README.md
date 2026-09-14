@@ -206,7 +206,7 @@ config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 50 archivos, 423 tests (+1 en tests/Unit)
+tests/Feature/         # 51 archivos, 432 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -216,7 +216,7 @@ tests/Feature/         # 50 archivos, 423 tests (+1 en tests/Unit)
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/api/auth/register` | Alta de tienda (tenant + admin) · 5/min |
-| POST | `/api/auth/login` | Login del panel (admin o staff) · 5/min |
+| POST | `/api/auth/login` | Login del panel (admin o staff) · 5/min por correo, 20/min por IP |
 | POST | `/api/auth/forgot-password` · `/reset-password` | Recuperación de contraseña · 5/min |
 | GET | `/api/auth/verify-email/{id}/{hash}` | Verificar correo (URL firmada) → redirige al SPA |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
@@ -235,7 +235,7 @@ tests/Feature/         # 50 archivos, 423 tests (+1 en tests/Unit)
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" · 10/min |
 | POST | `/orders` | Crear pedido · 10/min |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
-| POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min |
+| POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min (el login, por correo; 20/min por IP) |
 | POST | `/auth/forgot-password` · `/auth/reset-password` | Recuperar contraseña del cliente · 5/min |
 
 **Cliente autenticado** (Bearer + middleware `customer`, dentro de `/api/public/{slug}`):
@@ -311,7 +311,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 424 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 433 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -424,6 +424,11 @@ npm run lint      # ESLint
 - **Al añadir un sitio que cree algo limitado**, acordarse del gate; al añadir una consulta que mire
   por encima de las tiendas, `withoutTenant()` explícito.
 - **Los topes son de la creación, no del estado existente**: bajar de plan nunca borra nada.
+- **Rate limits con nombre, nunca `throttle:5,1` a secas**: un throttle sin nombre usa como clave
+  solo la IP, así que todas las rutas que lo llevan comparten un contador. Los limitadores
+  (`login`, `auth_publica`, `escritura_publica`, `verificacion_correo`, `reenvio_correo`) están en
+  `AppServiceProvider::limitesPorFormulario()`, con la ruta en la clave; el de login cuenta por
+  correo + IP.
 
 ---
 

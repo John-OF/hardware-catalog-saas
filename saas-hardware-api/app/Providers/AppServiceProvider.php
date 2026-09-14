@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -51,8 +51,74 @@ class AppServiceProvider extends ServiceProvider
             if ($request->user('sanctum')) {
                 return Limit::none();
             }
+
             // Límite de 60 por hora en desarrollo para facilitar pruebas cómodas
             return Limit::perHour(60)->by($request->ip());
+        });
+
+        $this->limitesPorFormulario();
+    }
+
+    /**
+     * TEC-13: cada formulario limitado con su propio contador.
+     *
+     * Antes estas rutas llevaban `throttle:5,1` / `throttle:10,1` a secas, y un
+     * throttle sin nombre usa como clave `sha1(dominio|IP)` -sin la ruta y sin el
+     * tope- y suma la peticion ANTES de ejecutarla, salga bien o mal. Resultado:
+     * login del panel, de plataforma y de clientes, registro, recuperacion de
+     * contrasenia, pedidos, resenias y avisos de stock llenaban un unico contador
+     * por IP. Cinco peticiones cualesquiera entre todos -un comprador en el wifi
+     * de la tienda fallando su contrasenia, o haciendo pedidos- dejaban al dueño
+     * sin poder entrar al panel durante un minuto.
+     *
+     * Ahora la clave lleva siempre la ruta (su plantilla, mas el slug de la tienda
+     * si lo hay: el id de un producto no, o bastaria cambiar de producto para
+     * tener otro cupo) y cada limitador tiene su nombre, que Laravel tambien mete
+     * en la clave. Los topes son los de antes; lo que cambia es a quien se le
+     * cuentan.
+     */
+    private function limitesPorFormulario(): void
+    {
+        $ruta = static fn (Request $request): string => ($request->route()?->uri() ?? $request->path())
+            .'|'.(string) $request->route('slug');
+
+        // Login (panel, plataforma y clientes): por CORREO + IP, como hace
+        // Fortify. Asi quien falla con su correo solo se bloquea a si mismo, y el
+        // dueño entra con el suyo desde la misma red. Ese limite solo, sin mas,
+        // dejaria probar 5 contrasenias por minuto contra CADA correo de una
+        // lista desde una sola IP; el segundo limite pone techo a eso, alto
+        // para que varias personas reales detras de un NAT no lleguen a el.
+        RateLimiter::for('login', function (Request $request) use ($ruta) {
+            $correo = mb_strtolower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(5)->by('correo|'.$ruta($request).'|'.$correo.'|'.$request->ip()),
+                Limit::perMinute(20)->by('ip|'.$ruta($request).'|'.$request->ip()),
+            ];
+        });
+
+        // Registro y recuperacion de contrasenia: por IP y ruta. No por correo:
+        // lo que se limita aqui es crear cuentas o mandar correos, y eso se
+        // repetiria cambiando de direccion.
+        RateLimiter::for('auth_publica', function (Request $request) use ($ruta) {
+            return Limit::perMinute(5)->by($ruta($request).'|'.$request->ip());
+        });
+
+        // Pedidos, resenias y "avisame" del catalogo: el 10/min de siempre, cada
+        // ruta con el suyo.
+        RateLimiter::for('escritura_publica', function (Request $request) use ($ruta) {
+            return Limit::perMinute(10)->by($ruta($request).'|'.$request->ip());
+        });
+
+        // El enlace de verificacion del correo (FUN-5).
+        RateLimiter::for('verificacion_correo', function (Request $request) use ($ruta) {
+            return Limit::perMinute(6)->by($ruta($request).'|'.$request->ip());
+        });
+
+        // Reenviar un correo desde el panel (verificacion, invitacion). Con sesion:
+        // por usuario, como ya hacia el throttle sin nombre, pero cada ruta aparte.
+        RateLimiter::for('reenvio_correo', function (Request $request) use ($ruta) {
+            return Limit::perMinute(3)->by($ruta($request).'|'.($request->user()?->getAuthIdentifier() ?? $request->ip()));
         });
     }
 
