@@ -11,6 +11,7 @@ use App\Models\Page;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Paginacion;
 use App\Support\PlanGate;
 use App\Support\Suplantacion;
 use Illuminate\Http\JsonResponse;
@@ -122,7 +123,7 @@ class PlatformController extends Controller
             ->when($request->input('status') === 'active', fn ($q) => $q->where('is_active', true))
             ->when($request->input('status') === 'suspended', fn ($q) => $q->where('is_active', false))
             ->orderByDesc('created_at')
-            ->paginate($request->integer('per_page', 20));
+            ->paginate(Paginacion::porPagina($request, 20));
 
         return response()->json($tenants);
     }
@@ -512,10 +513,9 @@ class PlatformController extends Controller
             ->when($request->filled('tenant_id'), fn ($q) => $q->where('tenant_id', $request->string('tenant_id')))
             ->when($request->filled('action'), fn ($q) => $q->where('action', $request->string('action')))
             ->orderByDesc('created_at')
-            // Con tope: es la tabla que más crece de la plataforma —una línea por
-            // cada acción del operador, para siempre— y un `per_page=100000`
-            // la volcaría entera, con su tienda cargada, en una sola respuesta.
-            ->paginate(min(max($request->integer('per_page', 30), 1), 100));
+            // Con tope (TEC-12): es la tabla que más crece de la plataforma —una
+            // línea por cada acción del operador, para siempre—.
+            ->paginate(Paginacion::porPagina($request, 30));
 
         return response()->json($logs);
     }

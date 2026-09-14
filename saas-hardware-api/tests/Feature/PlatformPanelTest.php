@@ -451,10 +451,11 @@ class PlatformPanelTest extends TestCase
             ->assertOk()
             ->assertJsonPath('per_page', 100);
 
-        // Y un valor sin sentido no rompe la paginación.
+        // Y un valor sin sentido no rompe la paginación: cae al valor por
+        // defecto del listado, no a una fila (TEC-12, `Paginacion::porPagina`).
         $this->asSuperAdmin()->getJson('/api/platform/logs?per_page=0')
             ->assertOk()
-            ->assertJsonPath('per_page', 1);
+            ->assertJsonPath('per_page', 30);
     }
 
     public function test_la_bitacora_no_la_ve_el_dueno_de_una_tienda(): void

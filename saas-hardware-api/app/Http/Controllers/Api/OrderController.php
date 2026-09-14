@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
+use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +53,7 @@ class OrderController extends Controller
         }
 
         // Paginación
-        $orders = $query->paginate($request->integer('per_page', 15));
+        $orders = $query->paginate(Paginacion::porPagina($request, 15));
 
         return response()->json($orders);
     }

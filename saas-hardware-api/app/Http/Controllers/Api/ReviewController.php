@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Review;
+use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,7 +42,7 @@ class ReviewController extends Controller
         }
 
         // Paginación
-        $reviews = $query->paginate($request->integer('per_page', 15));
+        $reviews = $query->paginate(Paginacion::porPagina($request, 15));
 
         return response()->json($reviews);
     }

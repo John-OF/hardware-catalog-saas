@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StockNotification;
+use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -44,7 +45,7 @@ class StockNotificationController extends Controller
             $query->where('product_id', $request->query('product_id'));
         }
 
-        $avisos = $query->paginate($request->integer('per_page', 20));
+        $avisos = $query->paginate(Paginacion::porPagina($request, 20));
 
         return response()->json($avisos);
     }
