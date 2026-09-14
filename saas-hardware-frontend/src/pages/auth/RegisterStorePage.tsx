@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Store, Link2, Phone, User, Mail, Lock, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
 import { registerStore } from '../../api/auth';
+import { avisarError } from '../../api/erroresDeFormulario';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
@@ -13,7 +14,7 @@ type FieldErrors = Record<string, string[]>;
 
 /** Forma mínima de un 422 de Laravel tal como llega por axios. */
 type ApiError = {
-  response?: { data?: { message?: string; errors?: FieldErrors } };
+  response?: { data?: { errors?: FieldErrors } };
 };
 
 /**
@@ -112,7 +113,7 @@ export default function RegisterStorePage() {
         toast.error('Revisa los datos marcados en rojo.');
       } else {
         console.error(error);
-        toast.error(response?.data?.message || 'No pudimos crear la tienda. Inténtalo de nuevo.');
+        avisarError(error, { contexto: 'panel' });
       }
     } finally {
       setIsLoading(false);

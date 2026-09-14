@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
+import { avisarError } from '../../api/erroresDeFormulario';
 import type { Product, Order } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { COUNTRY_CODES, deriveCountryCode } from '../../utils/phone';
@@ -118,9 +119,8 @@ export default function CustomerAccountModal({
       toast.success(`¡Bienvenido de vuelta, ${res.data.user.name}!`);
       fetchFavorites();
       fetchOrders();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Error en las credenciales.';
-      toast.error(errMsg);
+    } catch (err) {
+      avisarError(err, { contexto: 'catalogo', si422: 'Las credenciales son incorrectas.' });
     } finally {
       setLoading(false);
     }
@@ -150,9 +150,8 @@ export default function CustomerAccountModal({
       toast.success('Cuenta registrada correctamente.');
       fetchFavorites();
       fetchOrders();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Error al registrarse.';
-      toast.error(errMsg);
+    } catch (err) {
+      avisarError(err, { contexto: 'catalogo' });
     } finally {
       setLoading(false);
     }
@@ -170,9 +169,8 @@ export default function CustomerAccountModal({
       const res = await api.post(`/public/${tenantSlug}/auth/forgot-password`, { email });
       toast.success(res.data.message);
       setActiveTab('login');
-    } catch (err: any) {
-      const errMsg = err.response?.data?.message || 'No se pudo enviar el enlace. Inténtalo de nuevo.';
-      toast.error(errMsg);
+    } catch (err) {
+      avisarError(err, { contexto: 'catalogo' });
     } finally {
       setLoading(false);
     }
@@ -209,12 +207,8 @@ export default function CustomerAccountModal({
       setEmail(resetEmail ?? '');
       onResetConsumed?.();
       setActiveTab('login');
-    } catch (err: any) {
-      const errMsg = err.response?.data?.message
-        || err.response?.data?.errors?.email?.[0]
-        || err.response?.data?.errors?.password?.[0]
-        || 'El enlace no es válido o ya caducó. Solicita uno nuevo.';
-      toast.error(errMsg);
+    } catch (err) {
+      avisarError(err, { contexto: 'catalogo', si422: 'El enlace no es válido o ya caducó. Solicita uno nuevo.' });
     } finally {
       setLoading(false);
     }

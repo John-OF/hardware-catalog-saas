@@ -2,12 +2,10 @@ import './PlatformLoginPage.css';
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { platformLogin } from '../../api/platform';
+import { avisarError } from '../../api/erroresDeFormulario';
 import { usePlatformAuthStore } from '../../stores/platformAuthStore';
-
-type ApiError = { response?: { status?: number; data?: { message?: string } } };
 
 export default function PlatformLoginPage() {
   const navigate = useNavigate();
@@ -31,12 +29,8 @@ export default function PlatformLoginPage() {
       setPlatformAuth(token, user);
       navigate('/platform', { replace: true });
     } catch (error) {
-      const response = (error as ApiError).response;
-      toast.error(
-        response?.status === 429
-          ? 'Demasiados intentos. Espera un minuto.'
-          : 'Las credenciales son incorrectas.',
-      );
+      console.error(error);
+      avisarError(error, { contexto: 'plataforma', si422: 'Las credenciales son incorrectas.' });
     } finally {
       setIsLoading(false);
     }

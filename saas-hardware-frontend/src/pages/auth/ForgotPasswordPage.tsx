@@ -5,11 +5,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Mail, Loader2, KeyRound, MailCheck, ArrowLeft } from 'lucide-react';
 import { forgotPassword } from '../../api/auth';
-
-/** Forma mínima de un error de axios tal como lo devuelve la API. */
-type ApiError = {
-  response?: { status?: number; data?: { message?: string } };
-};
+import { avisarError } from '../../api/erroresDeFormulario';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -31,12 +27,7 @@ export default function ForgotPasswordPage() {
       setSent(true);
     } catch (error) {
       console.error(error);
-      const response = (error as ApiError).response;
-      const message =
-        response?.status === 429
-          ? 'Demasiados intentos. Espera un minuto y vuelve a probar.'
-          : response?.data?.message || 'No pudimos procesar la solicitud. Inténtalo de nuevo.';
-      toast.error(message);
+      avisarError(error, { contexto: 'panel' });
     } finally {
       setIsLoading(false);
     }

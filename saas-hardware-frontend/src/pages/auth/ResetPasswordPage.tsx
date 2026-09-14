@@ -5,12 +5,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Lock, Eye, EyeOff, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { resetPassword } from '../../api/auth';
+import { avisarError } from '../../api/erroresDeFormulario';
 
 /** Errores de validación del backend, por campo. */
 type FieldErrors = Record<string, string[]>;
 
 type ApiError = {
-  response?: { status?: number; data?: { message?: string; errors?: FieldErrors } };
+  response?: { data?: { errors?: FieldErrors } };
 };
 
 export default function ResetPasswordPage() {
@@ -56,11 +57,9 @@ export default function ResetPasswordPage() {
 
       if (validationErrors) {
         setErrors(validationErrors);
-      } else if (response?.status === 429) {
-        toast.error('Demasiados intentos. Espera un minuto y vuelve a probar.');
       } else {
         console.error(error);
-        toast.error(response?.data?.message || 'No pudimos cambiar la contraseña. Inténtalo de nuevo.');
+        avisarError(error, { contexto: 'panel' });
       }
     } finally {
       setIsLoading(false);

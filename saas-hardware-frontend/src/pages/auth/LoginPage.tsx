@@ -5,6 +5,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
 import { loginUser } from '../../api/auth';
+import { avisarError } from '../../api/erroresDeFormulario';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
@@ -75,10 +76,9 @@ export default function LoginPage() {
       
       // Redirigir al panel de control principal
       navigate('/dashboard', { replace: true });
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      const message = error.response?.data?.message || 'Las credenciales ingresadas son incorrectas.';
-      toast.error(message);
+      avisarError(error, { contexto: 'panel', si422: 'Las credenciales son incorrectas.' });
     } finally {
       setIsLoading(false);
     }
