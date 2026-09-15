@@ -52,7 +52,7 @@ jobs:
         run: php artisan test
 
   frontend:
-    name: Frontend (typecheck + build)
+    name: Frontend (typecheck + tests + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -73,6 +73,12 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      # INF-5: Vitest + Testing Library en jsdom. Carrito, checkout, variantes,
+      # mensajes de error de los formularios y guardas de sesion: lo que mas
+      # duele romper y hasta ahora solo se probaba a mano.
+      - name: Tests
+        run: npm test
 
       # El build tambien typechequea (`tsc -b`), pero ademas detecta imports rotos
       # y assets que faltan, que tsc solo no ve.

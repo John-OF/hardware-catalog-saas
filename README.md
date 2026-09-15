@@ -61,7 +61,7 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 ## Requisitos
 
 - PHP **8.3+** y Composer
-- Node.js **18+** y npm
+- Node.js **22.22+** (o 24.15+) y npm — lo piden Vitest y jsdom; el build solo necesitaría 20.19+
 - Una base de datos (MySQL/MariaDB; los tests corren en SQLite en memoria)
 - **Un worker de colas corriendo** (`php artisan queue:work`): los correos van por cola y sin él no
   sale ninguno
@@ -382,8 +382,11 @@ src/
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes, variants,
 │                   # variantesEnFormulario
-└── types/          # Tipos compartidos de la API
+├── types/          # Tipos compartidos de la API
+└── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
+
+Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartStore.ts`).
 
 ### Claves de diseño
 
@@ -423,7 +426,18 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
+npm test          # 69 tests (Vitest + Testing Library, jsdom)
+npm run test:watch
 ```
+
+**Qué cubren los tests de frontend:** el carrito (líneas por variante, total con el precio de la
+variante y su oferta, cambio de tienda), el checkout de `CartDrawer` (lo que se manda a
+`POST /orders`, el mensaje de WhatsApp con el número de pedido, y que un pedido rechazado no vacíe
+el carrito), la validación de variantes del formulario de producto, los mensajes de error de los
+formularios sin sesión (`erroresDeFormulario`), los interceptores de Axios (qué token va a cada
+ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, y `money`/`phone`. La red
+se sustituye en cada test; ninguno necesita la API levantada. Las páginas grandes (ficha, armador,
+formulario de producto) todavía no tienen tests.
 
 ---
 
