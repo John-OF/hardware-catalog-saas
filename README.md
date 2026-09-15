@@ -334,7 +334,7 @@ react-hot-toast. CSS propio, sin framework.
 
 | Ruta | Página |
 |---|---|
-| `/{slug}` · `/` | Catálogo (`/` resuelve la tienda por el dominio; sin ninguna que resolver, landing — `pages/marketing/LandingPage.tsx`, INF-1) |
+| `/{slug}` · `/` | Catálogo (`/` resuelve la tienda por el dominio; en un host de `VITE_PLATFORM_HOSTS`, landing — `pages/marketing/LandingPage.tsx`, INF-1/INF-9) |
 | `/{slug}/product/:id` · `/product/:id` | Ficha de producto |
 | `/{slug}/builder` · `/builder` | Armador de PC |
 | `/{slug}/p/:pageSlug` · `/p/:pageSlug` | Página informativa |
@@ -381,7 +381,7 @@ src/
 │                   # useBloqueoDeScroll
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes, variants,
-│                   # variantesEnFormulario
+│                   # variantesEnFormulario, plataforma (¿es el host del SaaS?)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -420,13 +420,14 @@ Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartSt
 |---|---|---|
 | `VITE_API_URL` | URL base de la API | `http://localhost:8000/api` |
 | `VITE_TURNSTILE_SITEKEY` | Site key del widget Turnstile | sin ella, el formulario de reseñas queda deshabilitado |
+| `VITE_PLATFORM_HOSTS` | Hosts de la propia plataforma, separados por comas (`plataforma.com,www.plataforma.com`). En ellos `/` es la landing; en cualquier otro host, `/` resuelve la tienda por dominio propio (INF-9). **En producción hay que ponerlo al hacer el build**, o la landing no sale nunca | `localhost,127.0.0.1` |
 
 ```bash
 npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 69 tests (Vitest + Testing Library, jsdom)
+npm test          # 76 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -435,7 +436,8 @@ variante y su oferta, cambio de tienda), el checkout de `CartDrawer` (lo que se 
 `POST /orders`, el mensaje de WhatsApp con el número de pedido, y que un pedido rechazado no vacíe
 el carrito), la validación de variantes del formulario de producto, los mensajes de error de los
 formularios sin sesión (`erroresDeFormulario`), los interceptores de Axios (qué token va a cada
-ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, y `money`/`phone`. La red
+ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
+plataforma (`utils/plataforma`), y `money`/`phone`. La red
 se sustituye en cada test; ninguno necesita la API levantada. Las páginas grandes (ficha, armador,
 formulario de producto) todavía no tienen tests.
 

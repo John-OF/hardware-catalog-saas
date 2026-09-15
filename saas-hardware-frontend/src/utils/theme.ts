@@ -29,6 +29,7 @@ import type { Tenant } from '../types';
 import { NEUTRAL_CLASSES, neutralClass } from './neutrals';
 import { SHAPE_CLASSES, shapeClasses } from './shape';
 import { loadGoogleFonts, resolveFonts } from './fonts';
+import { esHostDeLaPlataforma } from './plataforma';
 
 const STORAGE_PREFIX = 'theme:';
 export const FONT_LINK_ID = 'tenant-font';
@@ -66,13 +67,13 @@ export function storeThemeKey(
   pathname = window.location.pathname,
   hostname = window.location.hostname
 ): string | null {
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
   const firstSegment = pathname.split('/').filter(Boolean)[0] ?? '';
 
   if (NON_STORE_SEGMENTS.has(firstSegment)) return null;
-  // Dominio propio: la tienda es el dominio y la URL no lleva slug.
+  // Dominio propio: la tienda es el dominio y la URL no lleva slug. En el de la
+  // plataforma (INF-9) no hay tienda: es la landing.
   if (firstSegment === '' || STORE_SEGMENTS_WITHOUT_SLUG.has(firstSegment)) {
-    return isLocalhost ? null : `${STORAGE_PREFIX}domain:${hostname}`;
+    return esHostDeLaPlataforma(hostname) ? null : `${STORAGE_PREFIX}domain:${hostname}`;
   }
   return `${STORAGE_PREFIX}slug:${firstSegment}`;
 }

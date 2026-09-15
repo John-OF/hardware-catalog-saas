@@ -50,6 +50,7 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
+import { esHostDeLaPlataforma } from '../../utils/plataforma';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -203,12 +204,10 @@ export default function CatalogPage() {
   // AUD-14: aqui solo se DECIDE; la landing se devuelve mas abajo, despues de
   // todos los hooks. Ver el comentario que acompaña al return.
   //
-  // INF-1: hasta que exista una forma real de distinguir "el dominio de la
-  // propia plataforma" de "un dominio propio que todavia no resolvio nadie"
-  // (algo que en produccion tendria que mirar contra `FRONTEND_URL`, no
-  // contra el hostname), la señal sigue siendo la de siempre: local sin slug.
-  const isSaaSBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const esLandingDeLaPlataforma = isSaaSBase && !slug;
+  // INF-9: sin slug, la landing solo va en el dominio de la plataforma; en
+  // cualquier otro host se resuelve la tienda por su dominio propio. Antes se
+  // comparaba con `localhost` y en produccion la landing no salia nunca.
+  const esLandingDeLaPlataforma = esHostDeLaPlataforma(currentDomain) && !slug;
 
   // Fetch Tenant Info
   const { data: tenant, isLoading: isLoadingTenant, isError: isErrorTenant } = useQuery<Tenant>({
@@ -221,8 +220,8 @@ export default function CatalogPage() {
       }
     },
     // Mientras se muestra la landing no hay tienda que resolver: sin esto, se
-    // habria estrenado una peticion a `resolve-domain` con 'localhost' que
-    // solo puede fallar. Las demas consultas ya estaban apagadas por su
+    // habria estrenado una peticion a `resolve-domain` con el host de la
+    // plataforma, que solo puede fallar. Las demas consultas ya estaban apagadas por su
     // cuenta, porque cuelgan de `resolvedSlug`.
     enabled: !esLandingDeLaPlataforma,
   });
