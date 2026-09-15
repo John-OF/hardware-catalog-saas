@@ -1,0 +1,212 @@
+/* Estilos de <ActivityPage> (INF-3).
+
+   Acotados con :where(.page-activity), como las demas paginas del panel (TEC-6):
+   .page-header, .state-card, .pagination-bar... se llaman igual en media docena
+   de hojas. `.glass-card` y `.premium-input` son del sistema de diseno y no se
+   redefinen aqui (UI-5). */
+
+:where(.page-activity).activity-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-activity) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-activity) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+/* Filtros */
+
+:where(.page-activity) .filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-activity) .filter-select {
+  width: 220px;
+  cursor: pointer;
+}
+
+:where(.page-activity) .filter-select option {
+  background-color: var(--bg-select-option);
+  color: var(--text-primary);
+}
+
+/* Estados */
+
+:where(.page-activity) .state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+:where(.page-activity) .state-card h3 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-activity) .state-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 46ch;
+}
+
+:where(.page-activity) .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+/* Lista. Una lista y no una tabla: la descripcion es la columna importante y
+   una frase larga en una celda obliga a scroll horizontal en el movil. */
+
+:where(.page-activity) .list-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+:where(.page-activity) .activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+:where(.page-activity) .activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-activity) .activity-item:last-child {
+  border-bottom: none;
+}
+
+:where(.page-activity) .activity-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+:where(.page-activity) .activity-actor {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+:where(.page-activity) .activity-gone {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+:where(.page-activity) .activity-role,
+:where(.page-activity) .activity-area {
+  padding: 0.1rem 0.5rem;
+  border-radius: 50px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+:where(.page-activity) .activity-area {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-glow);
+}
+
+:where(.page-activity) .activity-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+:where(.page-activity) .activity-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Paginacion */
+
+:where(.page-activity) .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:where(.page-activity) .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-activity) .pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-activity) .page-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-activity) .page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-activity) .page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  :where(.page-activity) .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  :where(.page-activity) .filter-select {
+    width: 100%;
+  }
+
+  :where(.page-activity) .activity-time {
+    margin-left: 0;
+    width: 100%;
+  }
+}

@@ -20,6 +20,7 @@ import {
   BarChart3,
   MessageSquare,
   Bell,
+  History,
   Sun,
   Moon
 } from 'lucide-react';
@@ -144,6 +145,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
     if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
     if (location.pathname.includes('/dashboard/users')) return 'Equipo';
+    if (location.pathname.includes('/dashboard/activity')) return 'Actividad';
     return 'Dashboard';
   };
 
@@ -266,6 +268,18 @@ export default function DashboardPage() {
             >
               <UsersIcon size={20} />
               <span>Equipo</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
+
+          {esAdmin !== false && (
+            <NavLink
+              to="/dashboard/activity"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <History size={20} />
+              <span>Actividad</span>
               <ChevronRight className="nav-arrow" size={16} />
             </NavLink>
           )}

@@ -308,6 +308,35 @@ export interface StockNotification {
   variant?: Pick<ProductVariant, 'id' | 'options' | 'nombre' | 'stock' | 'price' | 'sale_price'> | null;
 }
 
+/** Áreas de la actividad del panel (INF-3): lo que va antes del punto en `action`. */
+export type AreaDeActividad =
+  | 'producto'
+  | 'pedido'
+  | 'categoria'
+  | 'pagina'
+  | 'resena'
+  | 'espera'
+  | 'equipo'
+  | 'configuracion';
+
+/**
+ * Una línea de la actividad del panel de tienda (INF-3). La descripción llega
+ * ya redactada: se escribió el día que pasó y no se recompone al pintar.
+ */
+export interface ActividadDelPanel {
+  id: string;
+  /** Verbo estable, `area.accion` (p. ej. `producto.editado`). */
+  action: string;
+  description: string;
+  /** Copia del correo en el momento: sigue ahí aunque la cuenta se borre. */
+  actor_email: string | null;
+  actor_role: 'admin' | 'staff' | null;
+  /** La cuenta, si sigue existiendo. */
+  actor: { id: string; name: string } | null;
+  context: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

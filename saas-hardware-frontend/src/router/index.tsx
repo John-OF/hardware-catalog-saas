@@ -58,6 +58,7 @@ const PagesPage = lazy(() => import('../pages/dashboard/PagesPage'));
 const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
 const WaitlistPage = lazy(() => import('../pages/dashboard/WaitlistPage'));
 const UsersPage = lazy(() => import('../pages/dashboard/UsersPage'));
+const ActivityPage = lazy(() => import('../pages/dashboard/ActivityPage'));
 
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
@@ -133,6 +134,7 @@ export const router = createBrowserRouter([
       { path: 'settings',   element: <SoloAdmin><SettingsPage /></SoloAdmin> },
       { path: 'pages',      element: <SoloAdmin><PagesPage /></SoloAdmin> },
       { path: 'users',      element: <SoloAdmin><UsersPage /></SoloAdmin> },
+      { path: 'activity',   element: <SoloAdmin><ActivityPage /></SoloAdmin> },
     ],
   },
 

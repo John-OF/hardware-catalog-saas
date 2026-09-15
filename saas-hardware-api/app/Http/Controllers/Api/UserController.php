@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\ActivityLog;
 use App\Models\User;
 use App\Notifications\TeamInvitationNotification;
+use App\Support\Bitacora;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -145,6 +147,12 @@ class UserController extends Controller
 
         $this->enviarInvitacion($usuario, $tenant->name, (string) $request->user()->name);
 
+        Bitacora::anotar(
+            ActivityLog::EQUIPO_INVITADO,
+            "Invitó a {$usuario->name} ({$usuario->email}) como {$this->etiquetaDeRol($usuario->role)}.",
+            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role],
+        );
+
         return response()->json(new UserResource($usuario), 201);
     }
 
@@ -166,6 +174,12 @@ class UserController extends Controller
         ], [
             'role.in' => 'Elige un rol válido: administrador o colaborador.',
         ]);
+
+        $antes = [
+            'name'      => $usuario->name,
+            'role'      => $this->etiquetaDeRol($usuario->role),
+            'is_active' => (bool) $usuario->is_active,
+        ];
 
         $seApaga   = array_key_exists('is_active', $data) && ! $data['is_active'];
         $cambiaRol = isset($data['role']) && $data['role'] !== $usuario->role;
@@ -208,7 +222,22 @@ class UserController extends Controller
             $usuario->tokens()->delete();
         }
 
-        return response()->json(new UserResource($usuario->fresh()));
+        $actualizado = $usuario->fresh();
+        $cambios = Bitacora::cambios($antes, [
+            'name'      => $actualizado->name,
+            'role'      => $this->etiquetaDeRol($actualizado->role),
+            'is_active' => (bool) $actualizado->is_active,
+        ], ['name' => 'nombre', 'role' => 'rol', 'is_active' => 'activo']);
+
+        if ($cambios !== []) {
+            Bitacora::anotar(
+                ActivityLog::EQUIPO_EDITADO,
+                "Cambió a {$actualizado->email}: ".Bitacora::resumirCambios($cambios).'.',
+                ['usuario_id' => $actualizado->id, 'email' => $actualizado->email, 'cambios' => $cambios],
+            );
+        }
+
+        return response()->json(new UserResource($actualizado));
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -223,6 +252,12 @@ class UserController extends Controller
             $usuario->tokens()->delete();
             $usuario->delete();
         });
+
+        Bitacora::anotar(
+            ActivityLog::EQUIPO_BORRADO,
+            "Quitó del equipo a {$usuario->name} ({$usuario->email}), que era {$this->etiquetaDeRol($usuario->role)}.",
+            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role],
+        );
 
         return response()->json(null, 204);
     }
@@ -241,6 +276,12 @@ class UserController extends Controller
             $usuario,
             (string) app('currentTenant')->name,
             (string) $request->user()->name,
+        );
+
+        Bitacora::anotar(
+            ActivityLog::EQUIPO_REINVITADO,
+            "Reenvió la invitación a {$usuario->email}.",
+            ['usuario_id' => $usuario->id, 'email' => $usuario->email],
         );
 
         return response()->json([
@@ -301,6 +342,11 @@ class UserController extends Controller
         if ($usuario->role === 'admin' && $usuario->is_active && $activos <= 1) {
             abort(422, 'Esta tienda se quedaría sin ningún administrador activo.');
         }
+    }
+
+    private function etiquetaDeRol(string $rol): string
+    {
+        return $rol === 'admin' ? 'administrador' : 'colaborador';
     }
 
     private function enviarInvitacion(User $usuario, string $tienda, string $invitadoPor): void

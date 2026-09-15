@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
+use App\Models\ActivityLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Category;
 use App\Services\ImageService;
+use App\Support\Bitacora;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +96,12 @@ class ProductController extends Controller
             $this->sincronizarVariantes($product, $variantes, $request);
         }
 
+        Bitacora::anotar(
+            ActivityLog::PRODUCTO_CREADO,
+            "Creó el producto «{$product->name}».",
+            ['producto_id' => $product->id],
+        );
+
         return response()->json($product->fresh()->load(['category', 'images', 'variants']), 201);
     }
 
@@ -129,6 +137,10 @@ class ProductController extends Controller
         }
 
         [$data, $variantes] = $this->separarVariantes($request->validated());
+
+        // INF-3: foto de antes, sobre una copia recién leída para no dejarle al
+        // `$product` de este método relaciones cargadas que luego quedarían viejas.
+        $antes = $this->fotoParaBitacora($product->fresh());
 
         // TEC-14: las fotos que dejan de usarse se juntan aquí y se borran al
         // final, cuando la base ya no les apunta, y solo si nadie más las usa.
@@ -177,6 +189,8 @@ class ProductController extends Controller
 
         $this->imageService->borrarSiNadieLasUsa($sueltas);
 
+        $this->anotarEdicion($antes, $product->fresh());
+
         return response()->json($product->fresh()->load(['category', 'images', 'variants']));
     }
 
@@ -191,6 +205,12 @@ class ProductController extends Controller
         $product->delete();
 
         $this->imageService->borrarSiNadieLasUsa($fotos);
+
+        Bitacora::anotar(
+            ActivityLog::PRODUCTO_BORRADO,
+            "Borró el producto «{$product->name}».",
+            ['producto_id' => $product->id, 'sku' => $product->sku],
+        );
 
         return response()->json(null, 204);
     }
@@ -457,6 +477,12 @@ class ProductController extends Controller
         // guardaba fila a fila.
         if ($successCount > 0) {
             $this->invalidarCachePublica();
+
+            Bitacora::anotar(
+                ActivityLog::PRODUCTO_IMPORTADOS,
+                "Importó {$successCount} productos por CSV.",
+                ['importados' => $successCount, 'avisos' => count($errors)],
+            );
         }
 
         return response()->json([
@@ -516,6 +542,12 @@ class ProductController extends Controller
                 // El DELETE masivo no pasa por el hook `deleted` del modelo, que
                 // es quien sube la version de cache (AUD-6).
                 $this->invalidarCachePublica();
+
+                $this->anotarLote(
+                    "Borró en lote {$products->count()} productos",
+                    $data,
+                    ['accion' => 'delete', 'cantidad' => $products->count(), 'productos' => $products->pluck('name')->take(50)->all()],
+                );
             }
 
             return response()->json(['message' => 'Productos eliminados en lote con éxito.']);
@@ -528,15 +560,19 @@ class ProductController extends Controller
         // se veía al instante: desde el panel no había forma de entender por qué.
         // Se hace igual que en `reorder`, que ya lo resolvía así.
         if ($action === 'activate') {
-            $query->update(['is_active' => true]);
+            $afectados = $query->update(['is_active' => true]);
             $this->invalidarCachePublica();
+
+            $this->anotarLote("Publicó en lote {$afectados} productos", $data, ['accion' => 'activate', 'cantidad' => $afectados]);
 
             return response()->json(['message' => 'Productos publicados en lote con éxito.']);
         }
 
         if ($action === 'deactivate') {
-            $query->update(['is_active' => false]);
+            $afectados = $query->update(['is_active' => false]);
             $this->invalidarCachePublica();
+
+            $this->anotarLote("Ocultó en lote {$afectados} productos", $data, ['accion' => 'deactivate', 'cantidad' => $afectados]);
 
             return response()->json(['message' => 'Productos ocultados en lote con éxito.']);
         }
@@ -573,6 +609,13 @@ class ProductController extends Controller
                 }
                 $prod->save();
             }
+
+            $signo = $percentage > 0 ? '+' : '';
+            $this->anotarLote(
+                "Ajustó los precios un {$signo}{$percentage}% en {$products->count()} productos",
+                $data,
+                ['accion' => 'adjust_price', 'porcentaje' => $percentage, 'cantidad' => $products->count()],
+            );
 
             return response()->json(['message' => "Precios ajustados un {$percentage}% con éxito en lote."]);
         }
@@ -620,6 +663,12 @@ class ProductController extends Controller
             $copia->product_id = $newProduct->id;
             $copia->save();
         }
+
+        Bitacora::anotar(
+            ActivityLog::PRODUCTO_DUPLICADO,
+            "Duplicó «{$product->name}» (la copia queda oculta).",
+            ['producto_id' => $product->id, 'copia_id' => $newProduct->id],
+        );
 
         return response()->json($newProduct->load(['category', 'images', 'variants']), 201);
     }
@@ -717,6 +766,125 @@ class ProductController extends Controller
      *
      * @param  array<int, array<string, mixed>>  $entrada
      */
+    /**
+     * Lo que se compara de un producto antes y después de editarlo (INF-3).
+     *
+     * @return array<string, mixed>
+     */
+    private function fotoParaBitacora(Product $product): array
+    {
+        $product->load(['category', 'images', 'variants']);
+
+        return [
+            'name'        => $product->name,
+            'brand'       => $product->brand,
+            'sku'         => $product->sku,
+            'price'       => $product->price,
+            'sale_price'  => $product->sale_price,
+            'stock'       => $product->stock,
+            'is_active'   => (bool) $product->is_active,
+            'status'      => $product->status === 'draft' ? 'borrador' : 'publicado',
+            'category'    => $product->category?->name,
+            // De estos tres solo se dice que cambiaron, no de qué a qué: un texto
+            // largo o una lista de fotos no caben en una línea de bitácora.
+            'description' => md5((string) $product->getRawOriginal('description')),
+            'specs'       => md5((string) json_encode($product->specs)),
+            'fotos'       => md5($product->image_url.'|'.$product->images->pluck('image_url')->implode('|')),
+            'variantes'   => $product->variants->mapWithKeys(fn (ProductVariant $v) => [$v->id => [
+                'nombre'     => $v->nombre,
+                'price'      => $v->price,
+                'sale_price' => $v->sale_price,
+                'stock'      => $v->stock,
+            ]])->all(),
+        ];
+    }
+
+    /**
+     * Una línea por edición, con lo que cambió. Guardar sin tocar nada no anota.
+     *
+     * Con variantes, el precio y el stock de la ficha son un resumen que se
+     * recalcula solo (MOD-5): se anotan los de cada variante, que es lo que cambió
+     * de verdad, y no el resumen, que diría dos veces lo mismo.
+     *
+     * @param  array<string, mixed>  $antes
+     */
+    private function anotarEdicion(array $antes, Product $product): void
+    {
+        $despues = $this->fotoParaBitacora($product);
+        $conVariantes = $antes['variantes'] !== [] || $despues['variantes'] !== [];
+
+        $campos = [
+            'name' => 'nombre', 'brand' => 'marca', 'sku' => 'SKU', 'category' => 'categoría',
+            'is_active' => 'visible', 'status' => 'estado',
+        ];
+
+        if (! $conVariantes) {
+            $campos += ['price' => 'precio', 'sale_price' => 'oferta', 'stock' => 'stock'];
+        }
+
+        $cambios = Bitacora::cambios($antes, $despues, $campos);
+        // Lo que se dice sin "de → a": variantes que entran o salen y campos largos.
+        $sinValor = [];
+
+        foreach ($despues['variantes'] as $id => $variante) {
+            if (! isset($antes['variantes'][$id])) {
+                $sinValor[] = "añadió la variante {$variante['nombre']}";
+
+                continue;
+            }
+
+            $deVariante = Bitacora::cambios($antes['variantes'][$id], $variante, [
+                'price' => 'precio', 'sale_price' => 'oferta', 'stock' => 'stock',
+            ]);
+
+            foreach ($deVariante as $etiqueta => $par) {
+                $cambios["{$etiqueta} de {$variante['nombre']}"] = $par;
+            }
+        }
+
+        foreach (array_diff_key($antes['variantes'], $despues['variantes']) as $variante) {
+            $sinValor[] = "quitó la variante {$variante['nombre']}";
+        }
+
+        foreach (['description' => 'descripción', 'specs' => 'especificaciones', 'fotos' => 'fotos'] as $campo => $etiqueta) {
+            if ($antes[$campo] !== $despues[$campo]) {
+                $sinValor[] = $etiqueta;
+            }
+        }
+
+        if ($cambios === [] && $sinValor === []) {
+            return;
+        }
+
+        $resumen = collect([Bitacora::resumirCambios($cambios)])
+            ->merge($sinValor)
+            ->filter()
+            ->implode(', ');
+
+        Bitacora::anotar(
+            ActivityLog::PRODUCTO_EDITADO,
+            "Editó «{$product->name}»: {$resumen}.",
+            ['producto_id' => $product->id, 'cambios' => $cambios, 'otros' => $sinValor],
+        );
+    }
+
+    /**
+     * Las acciones en lote dicen a qué se aplicaron: una selección o una categoría entera.
+     *
+     * @param  array<string, mixed>  $data  lo validado en `bulkAction`
+     * @param  array<string, mixed>  $contexto
+     */
+    private function anotarLote(string $descripcion, array $data, array $contexto): void
+    {
+        if (empty($data['product_ids']) && ! empty($data['category_id'])) {
+            $categoria = Category::find($data['category_id']);
+            $descripcion .= $categoria ? " de la categoría «{$categoria->name}»" : '';
+            $contexto['categoria_id'] = $data['category_id'];
+        }
+
+        Bitacora::anotar(ActivityLog::PRODUCTO_LOTE, $descripcion.'.', $contexto);
+    }
+
     private function sincronizarVariantes(Product $product, array $entrada, Request $request): void
     {
         $tenant = app('currentTenant');

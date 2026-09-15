@@ -353,7 +353,10 @@ class PlatformController extends Controller
                 ->take(5)
                 ->get(['id', 'number', 'customer_name', 'status', 'total', 'created_at']),
 
+            // Solo lo del operador (INF-3): lo que hace el equipo dentro de su
+            // panel se ve entrando como soporte, en su propia pantalla.
             'bitacora' => ActivityLog::deTienda($tenant->id)
+                ->dePlataforma()
                 ->orderByDesc('created_at')
                 ->take(10)
                 ->get(),
@@ -506,7 +509,7 @@ class PlatformController extends Controller
      */
     public function logs(Request $request): JsonResponse
     {
-        $logs = ActivityLog::query()
+        $logs = ActivityLog::dePlataforma()
             // La tienda puede haberse borrado (la clave es `nullOnDelete`); para
             // ese caso el nombre está guardado dentro de `context`.
             ->with('tenant:id,name,slug')

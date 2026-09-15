@@ -101,6 +101,21 @@ npm run dev                   # http://localhost:5173
 
 `composer dev` levanta servidor, cola, logs y Vite a la vez, que es la forma corta de lo anterior.
 
+### Al desplegar una versión nueva
+
+**Cada entorno tiene su propia base de datos**: una migración aplicada en local no existe en
+producción. En cada despliegue, en el servidor:
+
+```bash
+php artisan migrate --force   # --force porque en producción pide confirmación
+```
+
+**Antes de que el código nuevo reciba tráfico, o a la vez.** El código cuenta con las columnas de sus
+migraciones: si sube sin ellas, falla. Hoy hay dos casos con consecuencias graves:
+`add_is_published_to_tenants_table` (sin ella, todo el catálogo público da error) y
+`add_origen_to_activity_logs_table` (sin ella fallan suspender una tienda, cambiarle el plan o entrar
+como soporte). `php artisan migrate:status` dice cuáles faltan.
+
 ---
 
 ## Arquitectura multi-tenant
@@ -169,6 +184,7 @@ app/
 │   │   ├── ReviewController.php            # Moderación
 │   │   ├── StockNotificationController.php # Lista de espera
 │   │   ├── PageController.php              # Páginas informativas
+│   │   ├── ActivityController.php          # Actividad del panel: quién cambió qué (INF-3)
 │   │   ├── DashboardController.php         # Métricas
 │   │   ├── PlanController.php              # Plan, límites y consumo
 │   │   ├── PlatformController.php          # Panel del operador
@@ -199,6 +215,7 @@ app/
 │   └── DomainVerifier.php  # Comprueba el TXT del dominio propio
 └── Support/
     ├── PlanGate.php        # Aplica los límites del plan
+    ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
     ├── Money.php           # Formato de moneda por tienda
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
@@ -208,7 +225,7 @@ config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 54 archivos, 474 tests (+1 en tests/Unit)
+tests/Feature/         # 55 archivos, 487 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -267,6 +284,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
 | CRUD | `/api/pages` | Páginas informativas | No |
 | GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto), cambiar rol, activar, eliminar | No |
+| GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página) | No |
 
 **Plataforma** (Bearer + rol `superadmin` + lista de IPs):
 
@@ -275,7 +293,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | POST | `/api/platform/login` · `/logout` | Sesión del operador |
 | GET | `/api/platform/me` · `/tenants` | Perfil y listado de tiendas |
 | GET | `/api/platform/stats` | Resumen del negocio: altas, estados, reparto por plan y totales |
-| GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`) |
+| GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`); no incluye la actividad de las tiendas |
 | GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora |
 | PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar y cambiar plan |
 | POST | `/api/platform/tenants/{tenant}/password-reset` | Mandar recuperación al dueño |
@@ -313,7 +331,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 475 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 488 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -347,6 +365,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
 | `/dashboard` | Resumen con métricas |
 | `/dashboard/products` · `/categories` · `/orders` · `/pages` · `/reviews` · `/waitlist` | Gestión |
+| `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 | `/platform/login` | Acceso del operador del SaaS |
 | `/platform` · `/platform/tenants` · `/platform/tenants/:id` · `/platform/logs` | Panel del operador: resumen, tiendas, ficha y bitácora (layout en `PlatformLayout`) |
@@ -364,7 +383,7 @@ src/
 ├── pages/
 │   ├── auth/       # Login, RegisterStore, ForgotPassword, ResetPassword
 │   ├── dashboard/  # Overview, Products, Categories, Orders, Pages, Reviews,
-│   │               # Waitlist, Settings (layout en DashboardPage)
+│   │               # Waitlist, Users, Activity, Settings (layout en DashboardPage)
 │   ├── platform/   # PlatformLogin, PlatformLayout, PlatformOverview, Platform (tiendas),
 │   │               # PlatformTenant (ficha), PlatformLogs
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
@@ -427,7 +446,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 76 tests (Vitest + Testing Library, jsdom)
+npm test          # 80 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -463,6 +482,11 @@ formulario de producto) todavía no tienen tests.
   original, y borrar a ciegas le rompía las fotos al otro.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
+- **Toda ruta nueva del panel que escribe decide si anota en la actividad.** Se anota con
+  `App\Support\Bitacora::anotar()` después de guardar (nunca tumba la acción si falla). Si la ruta no
+  debe anotar, va en `SIN_ANOTAR` de `BitacoraDeTiendaTest` con su motivo; si no está en ninguna de
+  las dos listas, ese test se pone en rojo. `ActivityLog` separa la actividad de las tiendas
+  (`origen = tienda`) de la del operador (`plataforma`), y cada pantalla lee solo la suya.
 - **Rate limits con nombre, nunca `throttle:5,1` a secas**: un throttle sin nombre usa como clave
   solo la IP, así que todas las rutas que lo llevan comparten un contador. Los limitadores
   (`login`, `auth_publica`, `escritura_publica`, `verificacion_correo`, `reenvio_correo`) están en

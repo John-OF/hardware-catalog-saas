@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
+use App\Support\Bitacora;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -122,6 +124,12 @@ class OrderController extends Controller
             return $order;
         });
 
+        Bitacora::anotar(
+            ActivityLog::PEDIDO_MOSTRADOR,
+            "Registró la venta de mostrador #{$order->number} a nombre de {$order->customer_name} ({$this->etiquetaDeEstado($order->status)}).",
+            ['pedido_id' => $order->id, 'numero' => $order->number, 'total' => $order->total],
+        );
+
         return response()->json($order->load('items'), 201);
     }
 
@@ -166,6 +174,12 @@ class OrderController extends Controller
             // Fuera de la transacción a propósito: el cambio de estado ya está
             // guardado y no puede deshacerse porque falle un correo.
             $this->notifyCustomerOfStatusChange($order);
+
+            Bitacora::anotar(
+                ActivityLog::PEDIDO_ESTADO,
+                "Pasó el pedido #{$order->number} de {$this->etiquetaDeEstado($oldStatus)} a {$this->etiquetaDeEstado($newStatus)}.",
+                ['pedido_id' => $order->id, 'numero' => $order->number, 'antes' => $oldStatus, 'despues' => $newStatus],
+            );
         }
 
         return response()->json($order->load('items'));
@@ -183,7 +197,26 @@ class OrderController extends Controller
             $order->delete();
         });
 
+        Bitacora::anotar(
+            ActivityLog::PEDIDO_BORRADO,
+            "Borró el pedido #{$order->number} de {$order->customer_name} ({$this->etiquetaDeEstado($order->status)}"
+                .($order->status === 'attended' ? ', se devolvió su stock' : '').').',
+            ['pedido_id' => $order->id, 'numero' => $order->number, 'total' => $order->total, 'estado' => $order->status],
+        );
+
         return response()->json(null, 204);
+    }
+
+    /** Cómo se llama cada estado en la bitácora (INF-3): lo lee el dueño, no el código. */
+    private function etiquetaDeEstado(string $estado): string
+    {
+        return match ($estado) {
+            'pending'    => 'pendiente',
+            'processing' => 'en proceso',
+            'attended'   => 'atendido',
+            'cancelled'  => 'cancelado',
+            default      => $estado,
+        };
     }
 
     /**

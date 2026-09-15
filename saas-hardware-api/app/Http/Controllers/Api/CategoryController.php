@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCategoryRequest;
+use App\Models\ActivityLog;
 use App\Models\Category;
+use App\Support\Bitacora;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -27,6 +29,12 @@ class CategoryController extends Controller
         // No pasar 'id' manualmente — HasUuids + newUniqueId() genera UUID v7 automáticamente
         $category = Category::create($request->validated());
 
+        Bitacora::anotar(
+            ActivityLog::CATEGORIA_CREADA,
+            "Creó la categoría «{$category->name}».",
+            ['categoria_id' => $category->id],
+        );
+
         return response()->json($category, 201);
     }
 
@@ -46,13 +54,34 @@ class CategoryController extends Controller
             unset($datos['component_type']);
         }
 
+        $antes = $category->getAttributes();
         $category->update($datos);
+
+        $cambios = Bitacora::cambios($antes, $category->getAttributes(), [
+            'name' => 'nombre', 'component_type' => 'tipo de pieza', 'icon' => 'icono', 'is_active' => 'activa',
+        ]);
+
+        if ($cambios !== []) {
+            Bitacora::anotar(
+                ActivityLog::CATEGORIA_EDITADA,
+                "Editó la categoría «{$category->name}»: ".Bitacora::resumirCambios($cambios).'.',
+                ['categoria_id' => $category->id, 'cambios' => $cambios],
+            );
+        }
+
         return response()->json($category);
     }
 
     public function destroy(Category $category): JsonResponse
     {
         $category->delete();
+
+        Bitacora::anotar(
+            ActivityLog::CATEGORIA_BORRADA,
+            "Borró la categoría «{$category->name}».",
+            ['categoria_id' => $category->id],
+        );
+
         return response()->json(null, 204);
     }
 

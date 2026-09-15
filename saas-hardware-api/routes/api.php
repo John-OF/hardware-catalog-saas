@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -252,5 +253,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
             ->middleware('throttle:reenvio_correo');
         Route::apiResource('users', UserController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Actividad del panel: quién cambió qué (INF-3). Solo admin: es lo que
+        // hace el resto del equipo. Lo que escribe cada ruta está en
+        // App\Support\Bitacora y lo vigila BitacoraDeTiendaTest.
+        Route::get('activity', [ActivityController::class, 'index']);
     });
 });

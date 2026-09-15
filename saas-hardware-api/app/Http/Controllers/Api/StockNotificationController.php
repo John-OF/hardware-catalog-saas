@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\StockNotification;
+use App\Support\Bitacora;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,17 +70,47 @@ class StockNotificationController extends Controller
             'notified' => 'required|boolean',
         ]);
 
+        $estabaAvisado = $stockNotification->notified_at !== null;
+
         $stockNotification->update([
             'notified_at' => $data['notified'] ? now() : null,
         ]);
 
-        return response()->json($stockNotification->load('product:id,name,stock,price,sale_price,thumbnail_url'));
+        $stockNotification->load('product:id,name,stock,price,sale_price,thumbnail_url');
+
+        if ($estabaAvisado !== (bool) $data['notified']) {
+            Bitacora::anotar(
+                ActivityLog::ESPERA_MARCADA,
+                ($data['notified'] ? 'Marcó como avisado' : 'Volvió a dejar pendiente')
+                    ." a {$stockNotification->customer_name}, que espera «{$this->queEspera($stockNotification)}».",
+                ['espera_id' => $stockNotification->id, 'avisado' => (bool) $data['notified']],
+            );
+        }
+
+        return response()->json($stockNotification);
     }
 
     public function destroy(StockNotification $stockNotification): JsonResponse
     {
+        $stockNotification->loadMissing(['product:id,name', 'variant']);
         $stockNotification->delete();
 
+        Bitacora::anotar(
+            ActivityLog::ESPERA_BORRADA,
+            "Quitó de la lista de espera a {$stockNotification->customer_name}, que esperaba «{$this->queEspera($stockNotification)}».",
+            ['espera_id' => $stockNotification->id, 'contacto' => $stockNotification->customer_contact],
+        );
+
         return response()->json(null, 204);
+    }
+
+    /** "Kingston Fury (32 GB)", o el aviso de que el producto ya no existe. */
+    private function queEspera(StockNotification $espera): string
+    {
+        $espera->loadMissing(['product:id,name', 'variant']);
+
+        $nombre = $espera->product?->name ?? 'un producto borrado';
+
+        return $espera->variant ? "{$nombre} ({$espera->variant->nombre})" : $nombre;
     }
 }

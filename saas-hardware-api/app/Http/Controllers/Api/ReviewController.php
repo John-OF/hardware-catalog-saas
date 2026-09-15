@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Review;
+use App\Support\Bitacora;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,11 +58,23 @@ class ReviewController extends Controller
             'is_approved' => 'required|boolean',
         ]);
 
+        $estabaAprobada = (bool) $review->is_approved;
+
         $review->update([
             'is_approved' => $data['is_approved'],
         ]);
 
-        return response()->json($review->load('product:id,name,image_url'));
+        $review->load('product:id,name,image_url');
+
+        if ($estabaAprobada !== (bool) $data['is_approved']) {
+            Bitacora::anotar(
+                ActivityLog::RESENA_MODERADA,
+                ($data['is_approved'] ? 'Aprobó' : 'Ocultó')." la reseña de {$review->customer_name} ({$review->rating}★) en «{$this->nombreDelProducto($review)}».",
+                ['resena_id' => $review->id, 'aprobada' => (bool) $data['is_approved']],
+            );
+        }
+
+        return response()->json($review);
     }
 
     /**
@@ -68,7 +82,20 @@ class ReviewController extends Controller
      */
     public function destroy(Review $review): JsonResponse
     {
+        $review->loadMissing('product:id,name');
         $review->delete();
+
+        Bitacora::anotar(
+            ActivityLog::RESENA_BORRADA,
+            "Borró la reseña de {$review->customer_name} ({$review->rating}★) en «{$this->nombreDelProducto($review)}».",
+            ['resena_id' => $review->id, 'comentario' => mb_strimwidth((string) $review->comment, 0, 200, '…')],
+        );
+
         return response()->json(null, 204);
+    }
+
+    private function nombreDelProducto(Review $review): string
+    {
+        return $review->product?->name ?? 'un producto borrado';
     }
 }

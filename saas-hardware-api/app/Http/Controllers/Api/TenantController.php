@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Tenant;
 use App\Services\DomainVerifier;
 use App\Services\ImageService;
+use App\Support\Bitacora;
 use App\Support\PlanGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -204,6 +206,8 @@ class TenantController extends Controller
         // Las claves de archivo no son columnas del modelo: quitarlas antes de guardar.
         unset($data['logo'], $data['banner'], $data['favicon']);
 
+        $antes = $tenant->only(['name', 'whatsapp_number', 'currency', 'custom_domain', 'primary_color', 'logo_url', 'theme']);
+
         try {
             DB::transaction(function () use ($tenant, $data) {
                 if (array_key_exists('custom_domain', $data)) {
@@ -227,7 +231,50 @@ class TenantController extends Controller
         // Invalidar la caché pública del tenant para que el branding se refleje al instante
         Cache::forget("tenant:{$tenant->slug}");
 
+        $this->anotarConfiguracion($antes, $tenant->fresh());
+
         return response()->json($tenant->fresh());
+    }
+
+    /**
+     * Una línea con lo que cambió de la configuración (INF-3).
+     *
+     * Los datos de la tienda se anotan con su valor de antes y de después; la
+     * apariencia (el JSON `theme`: colores, portada, letras, pie…) y el logo solo
+     * se nombran, porque son decenas de claves o una URL que no dicen nada leídas.
+     *
+     * @param  array<string, mixed>  $antes
+     */
+    private function anotarConfiguracion(array $antes, Tenant $tenant): void
+    {
+        $cambios = Bitacora::cambios($antes, $tenant->only(array_keys($antes)), [
+            'name'            => 'nombre',
+            'whatsapp_number' => 'WhatsApp',
+            'currency'        => 'moneda',
+            'custom_domain'   => 'dominio propio',
+        ]);
+
+        $otros = [];
+
+        if (($antes['primary_color'] ?? null) !== $tenant->primary_color || ($antes['theme'] ?? []) != ($tenant->theme ?? [])) {
+            $otros[] = 'apariencia';
+        }
+
+        if (($antes['logo_url'] ?? null) !== $tenant->logo_url) {
+            $otros[] = 'logo';
+        }
+
+        if ($cambios === [] && $otros === []) {
+            return;
+        }
+
+        $resumen = collect([Bitacora::resumirCambios($cambios)])->merge($otros)->filter()->implode(', ');
+
+        Bitacora::anotar(
+            ActivityLog::CONFIGURACION_EDITADA,
+            "Cambió la configuración de la tienda: {$resumen}.",
+            ['cambios' => $cambios, 'otros' => $otros],
+        );
     }
 
     /**
@@ -323,6 +370,14 @@ class TenantController extends Controller
 
         $tenant->forceFill(['custom_domain_verified_at' => now()])->save();
         Cache::forget("tenant:{$tenant->slug}");
+
+        // Solo el que sale bien: los intentos fallidos son "todavía no propagó",
+        // y anotarlos llenaría la bitácora de reintentos sin nada que auditar.
+        Bitacora::anotar(
+            ActivityLog::CONFIGURACION_DOMINIO,
+            "Verificó el dominio propio {$tenant->custom_domain}.",
+            ['dominio' => $tenant->custom_domain],
+        );
 
         return response()->json([
             'verified' => true,

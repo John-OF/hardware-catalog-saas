@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Page;
+use App\Support\Bitacora;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +41,12 @@ class PageController extends Controller
 
         $page = Page::create($data);
 
+        Bitacora::anotar(
+            ActivityLog::PAGINA_CREADA,
+            "Creó la página «{$page->title}».",
+            ['pagina_id' => $page->id, 'slug' => $page->slug],
+        );
+
         return response()->json($page, 201);
     }
 
@@ -64,7 +72,25 @@ class PageController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
+        $antes = $page->getAttributes();
         $page->update($data);
+        $despues = $page->getAttributes();
+
+        $cambios = Bitacora::cambios($antes, $despues, [
+            'title' => 'título', 'slug' => 'dirección', 'is_active' => 'visible',
+        ]);
+        // El contenido no cabe en una línea: solo se dice que cambió.
+        $otros = Bitacora::cambios($antes, $despues, ['content' => 'contenido']) !== [] ? ['contenido'] : [];
+
+        if ($cambios !== [] || $otros !== []) {
+            $resumen = collect([Bitacora::resumirCambios($cambios)])->merge($otros)->filter()->implode(', ');
+
+            Bitacora::anotar(
+                ActivityLog::PAGINA_EDITADA,
+                "Editó la página «{$page->title}»: {$resumen}.",
+                ['pagina_id' => $page->id, 'cambios' => $cambios, 'otros' => $otros],
+            );
+        }
 
         return response()->json($page);
     }
@@ -72,6 +98,13 @@ class PageController extends Controller
     public function destroy(Page $page): JsonResponse
     {
         $page->delete();
+
+        Bitacora::anotar(
+            ActivityLog::PAGINA_BORRADA,
+            "Borró la página «{$page->title}».",
+            ['pagina_id' => $page->id, 'slug' => $page->slug],
+        );
+
         return response()->json(null, 204);
     }
 }
