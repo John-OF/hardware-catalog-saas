@@ -396,6 +396,19 @@
   color: var(--primary);
 }
 
+/* MOD-1: la línea de entrega va pegada al total, no como otro corte con su
+   propio margen — es un dato de apoyo, no otra sección. */
+:where(.page-orders) .detail-delivery-row {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+:where(.page-orders) .detail-delivery-row span:last-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 :where(.page-orders) .badge-info {
   background: rgba(14, 165, 233, 0.15);
   color: #0ea5e9;

@@ -9,6 +9,12 @@ export interface CreateOrderPayload {
   customer_note?: string;
   /** `variant_id` obligatorio para un producto con variantes (MOD-5). */
   items: { product_id: string; variant_id?: string | null; quantity: number }[];
+  /**
+   * MOD-1. Solo el método viaja; el costo lo calcula el servidor con
+   * `tenant.delivery_cost` en ese momento — mandarlo desde aquí no cobraría
+   * nada ni valdría como oferta. Se omite si la tienda no tiene envío.
+   */
+  delivery_method?: 'pickup' | 'delivery';
 }
 
 export const getPublicTenant = async (slug: string): Promise<Tenant> => {

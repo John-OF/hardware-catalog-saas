@@ -2,12 +2,13 @@ import './CartDrawer.css';
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { X, Trash2, Plus, Minus, ShoppingCart, Loader2, Send } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingCart, Loader2, Send, Store, Truck, Wallet } from 'lucide-react';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
 import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { metodosDePagoActivos } from '../../utils/paymentMethods';
 import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
 import { claveDeLinea, datosDeVenta, nombreConVariante } from '../../utils/variants';
 
@@ -38,6 +39,15 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
 
+  // Envío (MOD-1). Nace en "recojo" a propósito: es la opción que nunca
+  // cobra, así que un comprador que no toca nada no ve subir el total.
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
+  const conEnvio = tenant?.delivery_enabled ?? false;
+  const costoEnvio = conEnvio && deliveryMethod === 'delivery' ? Number(tenant.delivery_cost) : 0;
+  const totalConEnvio = totalAmount + costoEnvio;
+
+  const metodosDePago = metodosDePagoActivos(tenant?.payment_methods);
+
   const { user, isAuthenticated: isCustomerAuthenticated } = useCustomerAuthStore();
 
   useEffect(() => {
@@ -55,17 +65,36 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
     }
   }, [isCustomerAuthenticated, user, open]);
 
-  const buildWhatsappMessage = (orderNumber: number) => {
+  /**
+   * `total` llega del pedido ya creado, no se recalcula aquí: es lo que de
+   * verdad va a cobrar la tienda (incluido el envío, calculado en el
+   * servidor) y no puede desalinearse de `totalConEnvio`.
+   */
+  const buildWhatsappMessage = (orderNumber: number, total: number) => {
     const lines = items.map((i) => {
       const { precio } = datosDeVenta(i.product, i.variant);
       return `• ${i.quantity} x ${nombreConVariante(i.product.name, i.variant?.nombre)} — ${money(precio * i.quantity)}`;
     });
+
+    // MOD-1: solo se menciona si la tienda de verdad tiene envío. "Recojo en
+    // tienda" con una sola opción posible no le dice nada nuevo a nadie.
+    const lineaDeEnvio = conEnvio
+      ? `Entrega: ${deliveryMethod === 'delivery' ? `Delivery (${money(costoEnvio)})` : 'Recojo en tienda'}\n`
+      : '';
+
+    // MOD-3: cómo pagar, para que no tenga que preguntarlo por chat.
+    const lineaDePago = metodosDePago.length > 0
+      ? `\nFormas de pago: ${metodosDePago.map((m) => m.etiqueta + (m.detalle ? ` (${m.detalle})` : '')).join(', ')}\n`
+      : '';
+
     return (
       `Hola ${tenant.name}, quiero hacer este pedido:\n\n` +
       `${lines.join('\n')}\n\n` +
-      `*Total: ${money(totalAmount)}*\n\n` +
+      `*Total: ${money(total)}*\n\n` +
       `Nombre: ${name}\n` +
+      lineaDeEnvio +
       (note ? `Nota: ${note}\n` : '') +
+      lineaDePago +
       // FUN-3: el correlativo de la tienda. Antes iba un trozo del UUID, que ni
       // el comprador podía leer en voz alta ni el dueño buscar en el panel.
       `\n(Pedido #${orderNumber})`
@@ -85,9 +114,15 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         customer_email: email.trim() || undefined,
         customer_note: note || undefined,
         items: items.map((i) => ({ product_id: i.product.id, variant_id: i.variant?.id ?? null, quantity: i.quantity })),
+        // MOD-1: solo se manda si la tienda tiene envío — mandar un método sin
+        // que exista la opción no vale nada, y así el backend distingue "no
+        // ofrece envío" de "no eligió".
+        delivery_method: conEnvio ? deliveryMethod : undefined,
       });
 
-      const text = encodeURIComponent(buildWhatsappMessage(order.number));
+      // El total del pedido creado, no `totalConEnvio`: es lo que el
+      // servidor de verdad cobró.
+      const text = encodeURIComponent(buildWhatsappMessage(order.number, Number(order.total)));
       const cleanPhone = tenant.whatsapp_number.replace(/[^0-9]/g, '');
       window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
 
@@ -97,6 +132,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       setPhone('');
       setEmail('');
       setNote('');
+      setDeliveryMethod('pickup');
       onClose();
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? 'No se pudo enviar el pedido. Intenta de nuevo.';
@@ -170,9 +206,38 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
             </div>
 
             <form className="cart-checkout" onSubmit={handleSubmit}>
+              {/* MOD-1: solo si la tienda tiene envío. Va antes del total
+                  para que el comprador vea subir el número justo al elegir. */}
+              {conEnvio && (
+                <div className="cart-delivery">
+                  <span className="cart-delivery-label">Entrega</span>
+                  <div className="cart-delivery-options">
+                    <label className={`cart-delivery-option ${deliveryMethod === 'pickup' ? 'active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="delivery_method"
+                        checked={deliveryMethod === 'pickup'}
+                        onChange={() => setDeliveryMethod('pickup')}
+                      />
+                      <Store size={15} />
+                      <span>Recojo en tienda</span>
+                    </label>
+                    <label className={`cart-delivery-option ${deliveryMethod === 'delivery' ? 'active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="delivery_method"
+                        checked={deliveryMethod === 'delivery'}
+                        onChange={() => setDeliveryMethod('delivery')}
+                      />
+                      <Truck size={15} />
+                      <span>Delivery (+{money(tenant.delivery_cost)})</span>
+                    </label>
+                  </div>
+                </div>
+              )}
               <div className="cart-total">
                 <span>Total</span>
-                <strong>{money(totalAmount)}</strong>
+                <strong>{money(totalConEnvio)}</strong>
               </div>
               <input className="premium-input" placeholder="Tu nombre" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
               <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -213,6 +278,22 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
               />
               <p className="cart-field-hint">Si lo dejas, te enviamos la confirmacion y te avisamos cuando tu pedido este listo.</p>
               <textarea className="premium-input" placeholder="Nota (opcional): forma de entrega, dudas..." value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} />
+
+              {/* MOD-3: informativo. El pago se coordina por WhatsApp; esto
+                  solo evita que el comprador tenga que preguntarlo. */}
+              {metodosDePago.length > 0 && (
+                <div className="cart-payment-methods">
+                  <span className="cart-payment-methods-label"><Wallet size={14} /> Formas de pago</span>
+                  <ul>
+                    {metodosDePago.map((m) => (
+                      <li key={m.clave}>
+                        <strong>{m.etiqueta}</strong>{m.detalle && ` · ${m.detalle}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <button type="submit" className="btn-primary cart-submit" disabled={sending}>
                 {sending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
                 {sending ? 'Enviando...' : 'Enviar pedido por WhatsApp'}

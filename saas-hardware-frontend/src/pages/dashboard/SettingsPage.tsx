@@ -24,7 +24,12 @@ import {
   Megaphone,
   ShieldCheck,
   ShieldAlert,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  Smartphone,
+  Landmark,
+  Banknote,
+  Truck,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
@@ -61,6 +66,7 @@ import type { SocialKey } from '../../utils/branding';
 import { THEME_PRESETS, matchingPreset } from '../../utils/themePresets';
 import type { ThemePreset } from '../../utils/themePresets';
 import type {
+  PaymentMethods,
   TenantAnnouncementStyle,
   TenantCardStyle,
   TenantColorMode,
@@ -78,6 +84,19 @@ const LAYOUT_LABELS: Record<TenantLayout, string> = {
   grid: 'Tarjetas',
   compact: 'Compacta',
   list: 'Lista',
+};
+
+/**
+ * Los cuatro métodos con todos sus campos en '' (MOD-3), para que el
+ * formulario los tenga siempre controlados: sin esto, un input pasaría de
+ * no-controlado (sin `tenant` todavía) a controlado en cuanto llegara la
+ * respuesta de `GET /tenant`, que React avisa por consola como error.
+ */
+const PAYMENT_METHODS_VACIOS: Required<PaymentMethods> = {
+  yape: { enabled: false, phone: '', holder_name: '' },
+  plin: { enabled: false, phone: '', holder_name: '' },
+  transferencia: { enabled: false, bank: '', account_number: '', account_type: 'ahorros', holder_name: '', cci: '' },
+  efectivo: { enabled: false },
 };
 
 /**
@@ -130,6 +149,26 @@ export default function SettingsPage() {
   
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
+
+  // Pago y envío (MOD-3, MOD-1). Los cuatro métodos siempre presentes en el
+  // estado —aunque el tenant no haya guardado ninguno— para que los campos
+  // sean controlados desde el primer render y no salten de no-controlado a
+  // controlado en cuanto llega `tenant`.
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethods>(PAYMENT_METHODS_VACIOS);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
+  const [deliveryCost, setDeliveryCost] = useState('0');
+
+  /** Cambia un campo de un método sin tocar los otros tres. */
+  const setMetodo = <M extends keyof PaymentMethods>(
+    metodo: M,
+    campo: keyof NonNullable<PaymentMethods[M]>,
+    valor: string | boolean,
+  ) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [metodo]: { ...prev[metodo], [campo]: valor },
+    }));
+  };
   // FUN-6: aparte de isSaving, porque comprobar el TXT es una accion propia,
   // no parte de "Guardar cambios" -no manda nada nuevo, solo pregunta si lo
   // que ya se guardo se puede demostrar.
@@ -170,7 +209,20 @@ export default function SettingsPage() {
     setPrimaryColor(tenant.primary_color ?? '#2563eb');
     setCustomDomain(tenant.custom_domain ?? '');
     setCurrency(tenant.currency ?? DEFAULT_CURRENCY);
-    
+
+    // MOD-3: se completa cada método por separado y no de un tirón, porque
+    // `GET /tenant` sólo trae las claves que alguna vez se guardaron —una
+    // tienda que nunca tocó "efectivo" no lo trae, y sin esto el checkbox
+    // saldría sin marcar Y sin controlar a la vez.
+    setPaymentMethods({
+      yape: { ...PAYMENT_METHODS_VACIOS.yape, ...tenant.payment_methods?.yape },
+      plin: { ...PAYMENT_METHODS_VACIOS.plin, ...tenant.payment_methods?.plin },
+      transferencia: { ...PAYMENT_METHODS_VACIOS.transferencia, ...tenant.payment_methods?.transferencia },
+      efectivo: { ...PAYMENT_METHODS_VACIOS.efectivo, ...tenant.payment_methods?.efectivo },
+    });
+    setDeliveryEnabled(tenant.delivery_enabled ?? false);
+    setDeliveryCost(tenant.delivery_cost != null ? String(tenant.delivery_cost) : '0');
+
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
     setColorMode(th.color_mode ?? 'dark');
@@ -308,6 +360,9 @@ export default function SettingsPage() {
       logo_url: logoUrl || null,
       custom_domain: customDomain || null,
       currency,
+      payment_methods: paymentMethods,
+      delivery_enabled: deliveryEnabled,
+      delivery_cost: deliveryCost || '0',
       theme: {
         hero_style: heroStyle,
         hero_title: heroTitle || null,
@@ -508,6 +563,204 @@ export default function SettingsPage() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Pago y envío (MOD-3, MOD-1) */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <Wallet size={18} />
+          <div>
+            <h3>Pago y envío</h3>
+            <p>
+              Cómo te puede pagar el comprador y si repartes a domicilio. El pedido se
+              sigue cerrando por WhatsApp: esto solo se lo enseña antes de escribirte, no
+              cobra nada por sí solo.
+            </p>
+          </div>
+        </div>
+
+        <div className="payment-methods-list">
+          <div className="payment-method-card">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={paymentMethods.yape?.enabled ?? false}
+                onChange={(e) => setMetodo('yape', 'enabled', e.target.checked)}
+              />
+              <Smartphone size={16} />
+              <span>Yape</span>
+            </label>
+            {paymentMethods.yape?.enabled && (
+              <div className="settings-grid payment-method-fields">
+                <div className="form-group">
+                  <label>Número de Yape</label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.yape?.phone ?? ''}
+                    onChange={(e) => setMetodo('yape', 'phone', e.target.value)}
+                    maxLength={20}
+                    placeholder="987654321"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>A nombre de <span className="optional">(opcional)</span></label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.yape?.holder_name ?? ''}
+                    onChange={(e) => setMetodo('yape', 'holder_name', e.target.value)}
+                    maxLength={150}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="payment-method-card">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={paymentMethods.plin?.enabled ?? false}
+                onChange={(e) => setMetodo('plin', 'enabled', e.target.checked)}
+              />
+              <Smartphone size={16} />
+              <span>Plin</span>
+            </label>
+            {paymentMethods.plin?.enabled && (
+              <div className="settings-grid payment-method-fields">
+                <div className="form-group">
+                  <label>Número de Plin</label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.plin?.phone ?? ''}
+                    onChange={(e) => setMetodo('plin', 'phone', e.target.value)}
+                    maxLength={20}
+                    placeholder="987654321"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>A nombre de <span className="optional">(opcional)</span></label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.plin?.holder_name ?? ''}
+                    onChange={(e) => setMetodo('plin', 'holder_name', e.target.value)}
+                    maxLength={150}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="payment-method-card">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={paymentMethods.transferencia?.enabled ?? false}
+                onChange={(e) => setMetodo('transferencia', 'enabled', e.target.checked)}
+              />
+              <Landmark size={16} />
+              <span>Transferencia bancaria</span>
+            </label>
+            {paymentMethods.transferencia?.enabled && (
+              <div className="settings-grid payment-method-fields">
+                <div className="form-group">
+                  <label>Banco</label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.transferencia?.bank ?? ''}
+                    onChange={(e) => setMetodo('transferencia', 'bank', e.target.value)}
+                    maxLength={100}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Tipo de cuenta</label>
+                  <select
+                    className="premium-input"
+                    value={paymentMethods.transferencia?.account_type ?? 'ahorros'}
+                    onChange={(e) => setMetodo('transferencia', 'account_type', e.target.value)}
+                  >
+                    <option value="ahorros">Ahorros</option>
+                    <option value="corriente">Corriente</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Número de cuenta</label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.transferencia?.account_number ?? ''}
+                    onChange={(e) => setMetodo('transferencia', 'account_number', e.target.value)}
+                    maxLength={40}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>CCI <span className="optional">(opcional)</span></label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.transferencia?.cci ?? ''}
+                    onChange={(e) => setMetodo('transferencia', 'cci', e.target.value)}
+                    maxLength={40}
+                  />
+                </div>
+                <div className="form-group full">
+                  <label>A nombre de <span className="optional">(opcional)</span></label>
+                  <input
+                    className="premium-input"
+                    value={paymentMethods.transferencia?.holder_name ?? ''}
+                    onChange={(e) => setMetodo('transferencia', 'holder_name', e.target.value)}
+                    maxLength={150}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="payment-method-card">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={paymentMethods.efectivo?.enabled ?? false}
+                onChange={(e) => setMetodo('efectivo', 'enabled', e.target.checked)}
+              />
+              <Banknote size={16} />
+              <span>Efectivo contra entrega</span>
+            </label>
+          </div>
+        </div>
+
+        <hr className="settings-divider" />
+
+        <div className="settings-grid">
+          <div className="form-group full">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={deliveryEnabled}
+                onChange={(e) => setDeliveryEnabled(e.target.checked)}
+              />
+              <Truck size={16} />
+              <span>Envío a domicilio</span>
+            </label>
+            <span className="helper-text">
+              Sin esto, el comprador solo puede recoger en tienda. Un precio fijo para
+              toda la ciudad, sin zonas por ahora.
+            </span>
+          </div>
+          {deliveryEnabled && (
+            <div className="form-group">
+              <label>Costo de envío</label>
+              <input
+                className="premium-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={deliveryCost}
+                onChange={(e) => setDeliveryCost(e.target.value)}
+              />
+              <span className="helper-text">
+                Se cobra en cada pedido con delivery: {formatMoney(deliveryCost || 0, currency)}.
+              </span>
             </div>
           )}
         </div>

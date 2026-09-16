@@ -15,7 +15,10 @@ vi.mock('react-hot-toast', () => {
   return { toast, default: toast };
 });
 
-const pedidoCreado = (number: number) => ({ id: 'o-1', number }) as Order;
+// `total` es el que de verdad manda: el mensaje de WhatsApp lo usa a él y no
+// recalcula el carrito en el cliente, para no desalinearse de lo que cobró
+// el servidor (por ejemplo, con envío sumado — MOD-1).
+const pedidoCreado = (number: number, total = 0) => ({ id: 'o-1', number, total }) as Order;
 
 const abrirCarrito = (onClose = vi.fn()) => {
   render(<CartDrawer open onClose={onClose} slug="tienda-demo" tenant={unaTienda()} />);
@@ -64,7 +67,7 @@ describe('CartDrawer (checkout)', () => {
   it('manda el pedido con la variante de cada línea y abre WhatsApp con el número del pedido', async () => {
     const user = userEvent.setup();
     const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
-    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(42));
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(42, 459.8));
     llenarCarrito();
     const { onClose } = abrirCarrito();
 
@@ -206,5 +209,109 @@ describe('CartDrawer (checkout)', () => {
     await user.click(within(lineaDe16).getByRole('button', { name: 'Menos' }));
     expect(screen.queryByText('16 GB')).not.toBeInTheDocument();
     expect(useCartStore.getState().items.map((i) => i.product.id)).toEqual(['p-cpu']);
+  });
+
+  // -------------------------------------------------------- MOD-1: envío
+
+  it('sin envío activado no hay nada que elegir y no se manda delivery_method', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(1, 200));
+    useCartStore.getState().addItem('tienda-demo', unProducto({ price: 200 }));
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda({ delivery_enabled: false })} />);
+
+    expect(screen.queryByText('Entrega')).not.toBeInTheDocument();
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    expect(vi.mocked(createPublicOrder).mock.calls[0][1].delivery_method).toBeUndefined();
+  });
+
+  it('con envío activado, "recojo" es la opción de entrada y no suma nada', () => {
+    llenarCarrito();
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda({ delivery_enabled: true, delivery_cost: 15 })} />);
+
+    expect(screen.getByRole('radio', { name: /Recojo en tienda/ })).toBeChecked();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
+  });
+
+  it('elegir delivery suma el costo al total y lo manda al crear el pedido', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    // El total que de verdad cobra el servidor: 459.80 + 15 de envío.
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(7, 474.8));
+    llenarCarrito();
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda({ delivery_enabled: true, delivery_cost: 15 })} />);
+
+    await user.click(screen.getByRole('radio', { name: /Delivery/ }));
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$474.80');
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    expect(vi.mocked(createPublicOrder).mock.calls[0][1].delivery_method).toBe('delivery');
+
+    const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string);
+    const mensaje = url.searchParams.get('text');
+    expect(mensaje).toContain('Entrega: Delivery ($15.00)');
+    // El total del mensaje es el del pedido creado, no un recálculo local.
+    expect(mensaje).toContain('*Total: $474.80*');
+  });
+
+  // ---------------------------------------------------- MOD-3: métodos de pago
+
+  it('sin métodos de pago activos, no se muestra el bloque ni se menciona en el mensaje', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(3, 200));
+    useCartStore.getState().addItem('tienda-demo', unProducto({ price: 200 }));
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda({ payment_methods: null })} />);
+
+    expect(screen.queryByText('Formas de pago')).not.toBeInTheDocument();
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string);
+    expect(url.searchParams.get('text')).not.toContain('Formas de pago');
+  });
+
+  it('enseña solo los métodos activos y los suma al mensaje de WhatsApp', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(9, 200));
+    useCartStore.getState().addItem('tienda-demo', unProducto({ price: 200 }));
+    render(
+      <CartDrawer
+        open
+        onClose={vi.fn()}
+        slug="tienda-demo"
+        tenant={unaTienda({
+          payment_methods: {
+            yape: { enabled: true, phone: '987654321', holder_name: 'Ana' },
+            plin: { enabled: false, phone: '999888777' },
+            efectivo: { enabled: true },
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Formas de pago')).toBeInTheDocument();
+    expect(screen.getByText('Yape')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === 'Yape · 987654321 · Ana')).toBeInTheDocument();
+    expect(screen.getByText('Efectivo contra entrega')).toBeInTheDocument();
+    expect(screen.queryByText('Plin')).not.toBeInTheDocument();
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string);
+    const mensaje = url.searchParams.get('text');
+    expect(mensaje).toContain('Formas de pago: Yape (987654321 · Ana), Efectivo contra entrega');
   });
 });

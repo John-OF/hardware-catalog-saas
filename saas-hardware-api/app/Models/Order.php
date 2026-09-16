@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
-    use HasUuids, BelongsToTenant;
+    use BelongsToTenant, HasUuids;
 
     public function newUniqueId(): string
     {
@@ -24,10 +24,15 @@ class Order extends Model
     protected $fillable = [
         'tenant_id', 'user_id', 'customer_name', 'customer_phone',
         'customer_email', 'customer_note', 'status', 'total',
+        // MOD-1: 'pickup'/'delivery'/null (null = venta de mostrador, o un
+        // pedido de antes de este cambio). `delivery_cost` es el snapshot de
+        // lo que costaba el envío ESE día; ver la migración.
+        'delivery_method', 'delivery_cost',
     ];
 
     protected $casts = [
-        'total'  => 'decimal:2',
+        'total' => 'decimal:2',
+        'delivery_cost' => 'decimal:2',
         'number' => 'integer',
     ];
 

@@ -427,6 +427,19 @@ export default function OrdersPage() {
                   ))}
                 </div>
 
+                {/* MOD-1: null en venta de mostrador y en pedidos de antes de
+                    este cambio, así que no se enseña nada en esos casos. */}
+                {selectedOrder.delivery_method && (
+                  <div className="detail-total-row detail-delivery-row">
+                    <span>Entrega</span>
+                    <span>
+                      {selectedOrder.delivery_method === 'delivery'
+                        ? `Delivery (${money(selectedOrder.delivery_cost)})`
+                        : 'Recojo en tienda'}
+                    </span>
+                  </div>
+                )}
+
                 <div className="detail-total-row">
                   <span>Total del Pedido</span>
                   <strong>{money(selectedOrder.total)}</strong>

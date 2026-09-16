@@ -44,11 +44,11 @@ class TenantController extends Controller
         $tenant = app('currentTenant');
 
         $data = $request->validate([
-            'name'            => 'sometimes|string|max:200',
+            'name' => 'sometimes|string|max:200',
             'whatsapp_number' => 'sometimes|string|max:20',
-            'primary_color'   => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
-            'logo_url'        => 'sometimes|nullable|url|max:500',
-            'logo'            => 'nullable|image|mimes:jpeg,png,webp|max:2048',
+            'primary_color' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'logo_url' => 'sometimes|nullable|url|max:500',
+            'logo' => 'nullable|image|mimes:jpeg,png,webp|max:2048',
 
             // Cerrojo de FUN-6: un closure y no `unique:tenants,custom_domain`
             // a secas, porque "ocupado" ya no es una pregunta binaria. Un
@@ -84,46 +84,72 @@ class TenantController extends Controller
 
             // Moneda de la tienda (OWN-1). La whitelist sale de config/currencies.php,
             // que es la misma lista que ofrece el selector de Configuración.
-            'currency'        => ['sometimes', 'string', Rule::in(array_keys(config('currencies')))],
+            'currency' => ['sometimes', 'string', Rule::in(array_keys(config('currencies')))],
+
+            // Métodos de pago visibles para el comprador (MOD-3). Cuatro fijos,
+            // por eso van con nombre y no como un array libre: un método
+            // inventado no tendría ni formulario ni traducción en el catálogo.
+            // Ninguno es obligatorio y ninguno pide el otro — una tienda puede
+            // enseñar solo "efectivo contra entrega" y no llenar nada más.
+            'payment_methods' => 'sometimes|nullable|array',
+            'payment_methods.yape.enabled' => 'sometimes|boolean',
+            'payment_methods.yape.phone' => 'nullable|string|max:20',
+            'payment_methods.yape.holder_name' => 'nullable|string|max:150',
+            'payment_methods.plin.enabled' => 'sometimes|boolean',
+            'payment_methods.plin.phone' => 'nullable|string|max:20',
+            'payment_methods.plin.holder_name' => 'nullable|string|max:150',
+            'payment_methods.transferencia.enabled' => 'sometimes|boolean',
+            'payment_methods.transferencia.bank' => 'nullable|string|max:100',
+            'payment_methods.transferencia.account_number' => 'nullable|string|max:40',
+            // CCI opcional: los depósitos entre cuentas del mismo banco no lo piden.
+            'payment_methods.transferencia.cci' => 'nullable|string|max:40',
+            'payment_methods.transferencia.account_type' => 'nullable|in:ahorros,corriente',
+            'payment_methods.transferencia.holder_name' => 'nullable|string|max:150',
+            'payment_methods.efectivo.enabled' => 'sometimes|boolean',
+
+            // Envío (MOD-1). Un solo precio, sin zonas: lo que hoy hace falta es
+            // distinguir "recojo en tienda" de "delivery", no tarifar por distrito.
+            'delivery_enabled' => 'sometimes|boolean',
+            'delivery_cost' => 'sometimes|numeric|min:0|max:99999.99',
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
-            'banner'          => 'nullable|image|mimes:jpeg,png,webp|max:5120',
+            'banner' => 'nullable|image|mimes:jpeg,png,webp|max:5120',
             // Sin SVG (TEC-7): un .svg puede llevar <script> dentro y se sirve
             // desde el mismo origen que la tienda, así que aceptarlo es aceptar
             // que un dueño suba JS ejecutable. Los formatos de favicon de verdad
             // son png e ico.
-            'favicon'         => 'nullable|file|mimes:png,ico|max:512',
+            'favicon' => 'nullable|file|mimes:png,ico|max:512',
 
             // Personalización visual de la tienda (theme JSON)
-            'theme'               => 'sometimes|nullable|array',
-            'theme.hero_title'    => 'nullable|string|max:120',
+            'theme' => 'sometimes|nullable|array',
+            'theme.hero_title' => 'nullable|string|max:120',
             'theme.hero_subtitle' => 'nullable|string|max:240',
-            'theme.banner_url'    => 'nullable|url|max:500',
+            'theme.banner_url' => 'nullable|url|max:500',
 
             // Estilo de portada (PERS-5). Cada valor es una disposicion distinta
             // del mismo contenido; las medidas estan en el frontend
             // (CatalogPage + src/utils/hero.ts). Ojo: no todos los estilos usan
             // `banner_url` igual, y `minimal` no lo pinta — pero se guarda
             // siempre, para que cambiar de estilo no borre la imagen.
-            'theme.hero_style'    => 'nullable|in:classic,centered,split,minimal',
+            'theme.hero_style' => 'nullable|in:classic,centered,split,minimal',
 
-            'theme.accent_color'  => 'nullable|regex:/^#[0-9A-Fa-f]{6}$/',
-            'theme.color_mode'    => 'nullable|in:dark,light',
+            'theme.accent_color' => 'nullable|regex:/^#[0-9A-Fa-f]{6}$/',
+            'theme.color_mode' => 'nullable|in:dark,light',
 
             // Tono neutral de la tienda (PERS-2). La paleta vive en el frontend
             // (index.css + src/utils/neutrals.ts); aquí solo se valida la clave
             // para no guardar en el JSON un valor que ninguna hoja de estilos
             // sepa pintar. Al añadir un tono hay que ampliar esta lista también.
-            'theme.neutral'       => 'nullable|in:slate,zinc,stone,navy,plum',
+            'theme.neutral' => 'nullable|in:slate,zinc,stone,navy,plum',
 
             // Forma de la tienda (PERS-4). Igual que el tono: las medidas viven
             // en el frontend (index.css + src/utils/shape.ts) y aquí solo se
             // valida la clave.
-            'theme.radius'        => 'nullable|in:sharp,soft,round',
-            'theme.card_style'    => 'nullable|in:glass,solid,flat',
-            'theme.density'       => 'nullable|in:compact,normal,comfortable',
+            'theme.radius' => 'nullable|in:sharp,soft,round',
+            'theme.card_style' => 'nullable|in:glass,solid,flat',
+            'theme.density' => 'nullable|in:compact,normal,comfortable',
 
-            'theme.layout'        => 'nullable|in:grid,compact,list',
+            'theme.layout' => 'nullable|in:grid,compact,list',
 
             // Tipografía (PERS-6). `font` era una pareja cerrada: un solo valor
             // decidía la letra de los títulos y la del texto. Desde 10.3 son dos
@@ -133,28 +159,28 @@ class TenantController extends Controller
             // mientras su dueño no entre a Configuración (ver resolveFonts en
             // src/utils/fonts.ts). Si se quitara de aquí, la primera vez que
             // esas tiendas guardasen cualquier otra cosa perderían su letra.
-            'theme.font'          => 'nullable|in:sans,serif,mono,heading',
+            'theme.font' => 'nullable|in:sans,serif,mono,heading',
 
             // El catálogo de familias vive en src/utils/fonts.ts, que es también
             // de donde salen los dos selectores. Al añadir una familia hay que
             // ampliar estas dos listas o el dueño se come un 422 al guardar.
-            'theme.font_heading'  => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
-            'theme.font_body'     => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
+            'theme.font_heading' => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
+            'theme.font_body' => 'nullable|in:inter,outfit,space-grotesk,montserrat,playfair,lora,merriweather,fira-code',
 
-            'theme.sections'      => 'nullable|string',
+            'theme.sections' => 'nullable|string',
 
             // Branding de la pestaña del navegador (título y favicon)
-            'theme.page_title'    => 'nullable|string|max:60',
+            'theme.page_title' => 'nullable|string|max:60',
 
             // Elementos de marca (PERS-7). La franja se muestra si hay texto:
             // no hay un booleano de encendido, así que vaciar `announcement` es
             // lo que la apaga (ver src/utils/branding.ts).
-            'theme.announcement'       => 'nullable|string|max:120',
+            'theme.announcement' => 'nullable|string|max:120',
             'theme.announcement_style' => 'nullable|in:primary,accent,neutral',
 
             'theme.footer_address' => 'nullable|string|max:160',
-            'theme.footer_hours'   => 'nullable|string|max:120',
-            'theme.footer_tax_id'  => 'nullable|string|max:40',
+            'theme.footer_hours' => 'nullable|string|max:120',
+            'theme.footer_tax_id' => 'nullable|string|max:40',
 
             // `url:http,https` y no `url` a secas: estos tres son los únicos
             // campos del theme que acaban en un href, y de un enlace a una red
@@ -163,9 +189,9 @@ class TenantController extends Controller
             // comprobado en TenantBrandingTest), pero deja pasar cosas como
             // ftp://, y no conviene que la seguridad de un href dependa de los
             // detalles internos de una regla de propósito general.
-            'theme.footer_facebook'  => 'nullable|url:http,https|max:200',
+            'theme.footer_facebook' => 'nullable|url:http,https|max:200',
             'theme.footer_instagram' => 'nullable|url:http,https|max:200',
-            'theme.footer_tiktok'    => 'nullable|url:http,https|max:200',
+            'theme.footer_tiktok' => 'nullable|url:http,https|max:200',
         ]);
 
         // Dominio propio: funcion de plan (SAAS-3). Se comprueba despues de
@@ -185,8 +211,28 @@ class TenantController extends Controller
             $data['theme'] = array_merge($tenant->theme ?? [], $data['theme']);
         }
 
+        // Igual que el theme: el formulario manda los cuatro métodos completos
+        // cada vez que guarda, así que un merge a nivel superior basta y no hace
+        // falta fusionar campo a campo dentro de cada uno.
+        if (isset($data['payment_methods'])) {
+            // La regla `boolean` de arriba VALIDA que "0"/"1" sirvan, pero no
+            // los convierte: `$request->validate()` devuelve el string tal
+            // cual llegó. Sin este cast, "enabled": "0" se guardaría en el
+            // JSON literal, y en el navegador "0" es un string con contenido
+            // -verdadero-, así que un método apagado volvía a aparecer
+            // marcado la próxima vez que se abriera Configuración.
+            foreach ($data['payment_methods'] as &$metodo) {
+                if (array_key_exists('enabled', $metodo)) {
+                    $metodo['enabled'] = filter_var($metodo['enabled'], FILTER_VALIDATE_BOOLEAN);
+                }
+            }
+            unset($metodo);
+
+            $data['payment_methods'] = array_merge($tenant->payment_methods ?? [], $data['payment_methods']);
+        }
+
         if ($request->hasFile('logo')) {
-            $urls = $this->imageService->uploadProductImage($request->file('logo'), $tenant->slug . '/logo');
+            $urls = $this->imageService->uploadProductImage($request->file('logo'), $tenant->slug.'/logo');
             $data['logo_url'] = $urls['image_url'];
         }
 
@@ -194,7 +240,7 @@ class TenantController extends Controller
         // tal cual. Ambos viven dentro del JSON theme, así que partimos del
         // theme enviado (o el actual) y le inyectamos la URL resultante.
         if ($request->hasFile('banner')) {
-            $urls = $this->imageService->uploadProductImage($request->file('banner'), $tenant->slug . '/banner');
+            $urls = $this->imageService->uploadProductImage($request->file('banner'), $tenant->slug.'/banner');
             $data['theme'] = array_merge($data['theme'] ?? $tenant->theme ?? [], ['banner_url' => $urls['image_url']]);
         }
 
@@ -206,7 +252,10 @@ class TenantController extends Controller
         // Las claves de archivo no son columnas del modelo: quitarlas antes de guardar.
         unset($data['logo'], $data['banner'], $data['favicon']);
 
-        $antes = $tenant->only(['name', 'whatsapp_number', 'currency', 'custom_domain', 'primary_color', 'logo_url', 'theme']);
+        $antes = $tenant->only([
+            'name', 'whatsapp_number', 'currency', 'custom_domain', 'primary_color', 'logo_url', 'theme',
+            'payment_methods', 'delivery_enabled', 'delivery_cost',
+        ]);
 
         try {
             DB::transaction(function () use ($tenant, $data) {
@@ -248,10 +297,12 @@ class TenantController extends Controller
     private function anotarConfiguracion(array $antes, Tenant $tenant): void
     {
         $cambios = Bitacora::cambios($antes, $tenant->only(array_keys($antes)), [
-            'name'            => 'nombre',
+            'name' => 'nombre',
             'whatsapp_number' => 'WhatsApp',
-            'currency'        => 'moneda',
-            'custom_domain'   => 'dominio propio',
+            'currency' => 'moneda',
+            'custom_domain' => 'dominio propio',
+            'delivery_enabled' => 'envío a domicilio',
+            'delivery_cost' => 'costo de envío',
         ]);
 
         $otros = [];
@@ -262,6 +313,12 @@ class TenantController extends Controller
 
         if (($antes['logo_url'] ?? null) !== $tenant->logo_url) {
             $otros[] = 'logo';
+        }
+
+        // Se nombra y no se detalla, como la apariencia: son cuentas y números
+        // de teléfono, y el resumen de una línea no es el sitio para volcarlos.
+        if (($antes['payment_methods'] ?? []) != ($tenant->payment_methods ?? [])) {
+            $otros[] = 'métodos de pago';
         }
 
         if ($cambios === [] && $otros === []) {
@@ -300,9 +357,9 @@ class TenantController extends Controller
 
         if (blank($nuevoDominio)) {
             $tenant->forceFill([
-                'custom_domain_token'        => null,
+                'custom_domain_token' => null,
                 'custom_domain_requested_at' => null,
-                'custom_domain_verified_at'  => null,
+                'custom_domain_verified_at' => null,
             ])->save();
 
             return;
@@ -315,16 +372,16 @@ class TenantController extends Controller
         Tenant::where('custom_domain', $nuevoDominio)
             ->where('id', '!=', $tenant->id)
             ->update([
-                'custom_domain'               => null,
-                'custom_domain_token'         => null,
-                'custom_domain_requested_at'  => null,
-                'custom_domain_verified_at'   => null,
+                'custom_domain' => null,
+                'custom_domain_token' => null,
+                'custom_domain_requested_at' => null,
+                'custom_domain_verified_at' => null,
             ]);
 
         $tenant->forceFill([
-            'custom_domain_token'        => Str::random(32),
+            'custom_domain_token' => Str::random(32),
             'custom_domain_requested_at' => now(),
-            'custom_domain_verified_at'  => null,
+            'custom_domain_verified_at' => null,
         ])->save();
     }
 
@@ -351,7 +408,7 @@ class TenantController extends Controller
         if ($tenant->custom_domain_verified_at) {
             return response()->json([
                 'verified' => true,
-                'message'  => 'Este dominio ya está verificado.',
+                'message' => 'Este dominio ya está verificado.',
             ]);
         }
 
@@ -364,7 +421,7 @@ class TenantController extends Controller
         if (! $verificador->tieneRegistroTxt($host, $valorEsperado)) {
             return response()->json([
                 'verified' => false,
-                'message'  => "No encontramos el registro TXT en {$host}. Puede tardar unas horas en propagarse desde que lo agregas.",
+                'message' => "No encontramos el registro TXT en {$host}. Puede tardar unas horas en propagarse desde que lo agregas.",
             ], 422);
         }
 
@@ -381,8 +438,8 @@ class TenantController extends Controller
 
         return response()->json([
             'verified' => true,
-            'message'  => 'Dominio verificado: ya sirve el catálogo de esta tienda.',
-            'tenant'   => $tenant->fresh(),
+            'message' => 'Dominio verificado: ya sirve el catálogo de esta tienda.',
+            'tenant' => $tenant->fresh(),
         ]);
     }
 }

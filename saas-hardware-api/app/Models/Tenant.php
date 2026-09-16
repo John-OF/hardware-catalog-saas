@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Spatie\Multitenancy\Contracts\IsTenant;
+use Illuminate\Support\Str;
 use Spatie\Multitenancy\Concerns\UsesMultitenancyConfig;
+use Spatie\Multitenancy\Contracts\IsTenant;
 use Spatie\Multitenancy\Models\Concerns\ImplementsTenant;
 
 class Tenant extends Model implements IsTenant
@@ -17,22 +18,51 @@ class Tenant extends Model implements IsTenant
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
     {
-        return (string) \Illuminate\Support\Str::uuid7();
+        return (string) Str::uuid7();
     }
 
     protected $fillable = [
         'slug', 'name', 'logo_url', 'primary_color', 'theme',
         'whatsapp_number', 'plan', 'is_active', 'is_published', 'custom_domain', 'currency',
+        'payment_methods', 'delivery_enabled', 'delivery_cost',
     ];
 
     protected $casts = [
-        'is_active'                   => 'boolean',
-        'is_published'                => 'boolean',
-        'theme'                       => 'array',
-        'custom_domain_requested_at'  => 'datetime',
-        'custom_domain_verified_at'   => 'datetime',
-        'trial_ends_at'               => 'datetime',
+        'is_active' => 'boolean',
+        'is_published' => 'boolean',
+        'theme' => 'array',
+        'payment_methods' => 'array',
+        'delivery_enabled' => 'boolean',
+        'delivery_cost' => 'decimal:2',
+        'custom_domain_requested_at' => 'datetime',
+        'custom_domain_verified_at' => 'datetime',
+        'trial_ends_at' => 'datetime',
     ];
+
+    /**
+     * Los métodos de pago que la tienda puede enseñar al comprador (MOD-3).
+     *
+     * Cuatro, fijos: no es una pasarela (eso es `SAAS-3`, y cobra a la tienda,
+     * no al comprador de la tienda), es solo dónde pone el dueño su Yape, su
+     * cuenta o si acepta efectivo contra entrega. Los campos de cada uno están
+     * en `TenantController::update()` (la validación) y en `PaymentMethodsForm`
+     * del frontend.
+     */
+    public const METODOS_DE_PAGO = ['yape', 'plin', 'transferencia', 'efectivo'];
+
+    /**
+     * Los métodos que la tienda activó, con sus datos. Nunca los que están
+     * apagados: mostrar un Yape a medio llenar es peor que no mostrar Yape.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function metodosDePagoActivos(): array
+    {
+        return collect($this->payment_methods ?? [])
+            ->only(self::METODOS_DE_PAGO)
+            ->filter(fn ($datos) => is_array($datos) && ($datos['enabled'] ?? false))
+            ->all();
+    }
 
     /**
      * Cuánto dura la prueba de una tienda nueva (FUN-16).

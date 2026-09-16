@@ -45,12 +45,17 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
 
         $this->pedido = [
             'referencia' => '#'.$order->number,
-            'cliente'    => $order->customer_name,
-            'tienda'     => $tenant?->name ?? 'la tienda',
-            'whatsapp'   => $tenant?->whatsapp_number,
-            'url'        => StoreUrl::forTenant($tenant),
-            'total'      => Money::format($order->total, $moneda),
-            'lineas'     => $order->items->map(fn ($item) => [
+            'cliente' => $order->customer_name,
+            'tienda' => $tenant?->name ?? 'la tienda',
+            'whatsapp' => $tenant?->whatsapp_number,
+            'url' => StoreUrl::forTenant($tenant),
+            'entrega' => match ($order->delivery_method) {
+                'delivery' => 'Delivery ('.Money::format($order->delivery_cost, $moneda).')',
+                'pickup' => 'Recojo en tienda',
+                default => null,
+            },
+            'total' => Money::format($order->total, $moneda),
+            'lineas' => $order->items->map(fn ($item) => [
                 'cantidad' => $item->quantity,
                 'producto' => $item->descripcion(),
                 'subtotal' => Money::format($item->subtotal, $moneda),
@@ -76,6 +81,10 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
 
         foreach ($this->pedido['lineas'] as $linea) {
             $mail->line("{$linea['cantidad']} x {$linea['producto']} — {$linea['subtotal']}");
+        }
+
+        if ($this->pedido['entrega']) {
+            $mail->line("Entrega: {$this->pedido['entrega']}");
         }
 
         $mail->line("**Total: {$this->pedido['total']}**");

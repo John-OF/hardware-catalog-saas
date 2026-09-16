@@ -1,5 +1,5 @@
 import api from './axios';
-import type { Tenant, TenantTheme } from '../types';
+import type { PaymentMethods, Tenant, TenantTheme } from '../types';
 
 export interface UpdateTenantPayload {
   name?: string;
@@ -9,6 +9,11 @@ export interface UpdateTenantPayload {
   custom_domain?: string | null;
   currency?: string;
   theme?: TenantTheme;
+  /** MOD-3. Se manda el objeto completo: el backend hace merge por método, no por campo. */
+  payment_methods?: PaymentMethods;
+  /** MOD-1. */
+  delivery_enabled?: boolean;
+  delivery_cost?: number | string;
   // Archivos opcionales: si se envían, el backend los sube y usa su URL.
   logoFile?: File | null;
   bannerFile?: File | null;
@@ -40,6 +45,27 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
       // del backend convierte '' en null, preservando el "limpiar campo".
       fd.append(`theme[${key}]`, value == null ? '' : String(value));
     });
+  }
+
+  // payment_methods[metodo][campo]=valor, igual que el theme. `enabled` va
+  // como '1'/'0': la regla `boolean` de Laravel no acepta '' (a diferencia de
+  // los campos de texto, que sí la aceptan vía ConvertEmptyStringsToNull). Es
+  // el mismo criterio que ya usa `is_active` en productos.
+  if (payload.payment_methods) {
+    Object.entries(payload.payment_methods).forEach(([metodo, datos]) => {
+      if (!datos) return;
+      Object.entries(datos).forEach(([campo, valor]) => {
+        const texto = campo === 'enabled' ? (valor ? '1' : '0') : (valor == null ? '' : String(valor));
+        fd.append(`payment_methods[${metodo}][${campo}]`, texto);
+      });
+    });
+  }
+
+  if (payload.delivery_enabled !== undefined) {
+    fd.append('delivery_enabled', payload.delivery_enabled ? '1' : '0');
+  }
+  if (payload.delivery_cost !== undefined) {
+    fd.append('delivery_cost', String(payload.delivery_cost));
   }
 
   if (payload.logoFile) fd.append('logo', payload.logoFile);

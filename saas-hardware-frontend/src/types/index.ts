@@ -106,6 +106,32 @@ export interface Tenant {
   trial_ends_at: string | null;
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
+  /**
+   * Métodos de pago que la tienda le enseña al comprador (MOD-3). No es una
+   * pasarela: el checkout sigue cerrándose por WhatsApp, esto es solo dónde
+   * pagarle. Desde el catálogo público solo llegan los que están `enabled`;
+   * desde el panel (`GET /tenant`) llegan los cuatro, encendidos o no, para
+   * poder editarlos. `null` es "nunca configuró ninguno".
+   */
+  payment_methods: PaymentMethods | null;
+  /** Envío a domicilio (MOD-1): un precio fijo, sin zonas. Si está apagado, la única opción es recojo en tienda. */
+  delivery_enabled: boolean;
+  delivery_cost: number | string;
+}
+
+/** Los cuatro métodos fijos de `Tenant::METODOS_DE_PAGO`. Ninguno es obligatorio. */
+export interface PaymentMethods {
+  yape?: { enabled: boolean; phone?: string | null; holder_name?: string | null };
+  plin?: { enabled: boolean; phone?: string | null; holder_name?: string | null };
+  transferencia?: {
+    enabled: boolean;
+    bank?: string | null;
+    account_number?: string | null;
+    account_type?: 'ahorros' | 'corriente' | null;
+    holder_name?: string | null;
+    cci?: string | null;
+  };
+  efectivo?: { enabled: boolean };
 }
 
 /**
@@ -280,6 +306,14 @@ export interface Order {
   customer_email: string | null;
   customer_note: string | null;
   status: 'pending' | 'processing' | 'attended' | 'cancelled';
+  /**
+   * Cómo llega el pedido (MOD-1). `null` en la venta de mostrador —el
+   * cliente está delante— y en los pedidos de antes de este cambio.
+   * `delivery_cost` es un snapshot: lo que costaba el envío ESE día, no lo
+   * que cueste hoy en `tenant.delivery_cost`.
+   */
+  delivery_method?: 'pickup' | 'delivery' | null;
+  delivery_cost?: number | string;
   total: number;
   items: OrderItem[];
   items_count?: number;

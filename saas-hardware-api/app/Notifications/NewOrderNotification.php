@@ -52,11 +52,18 @@ class NewOrderNotification extends Notification implements ShouldQueue
             // un trozo del UUID: casaba con la tabla del panel, pero no había forma
             // de decirlo en voz alta ni de buscarlo.
             'referencia' => '#'.$order->number,
-            'cliente'    => $order->customer_name,
-            'telefono'   => $order->customer_phone,
-            'nota'       => $order->customer_note,
-            'total'      => Money::format($order->total, $moneda),
-            'lineas'     => $order->items->map(fn ($item) => [
+            'cliente' => $order->customer_name,
+            'telefono' => $order->customer_phone,
+            'nota' => $order->customer_note,
+            // MOD-1: null en la venta de mostrador y en lo de antes de este
+            // cambio, así que el correo no dice nada si no hay nada que decir.
+            'entrega' => match ($order->delivery_method) {
+                'delivery' => 'Delivery ('.Money::format($order->delivery_cost, $moneda).')',
+                'pickup' => 'Recojo en tienda',
+                default => null,
+            },
+            'total' => Money::format($order->total, $moneda),
+            'lineas' => $order->items->map(fn ($item) => [
                 'cantidad' => $item->quantity,
                 'producto' => $item->descripcion(),
                 'subtotal' => Money::format($item->subtotal, $moneda),
@@ -82,6 +89,10 @@ class NewOrderNotification extends Notification implements ShouldQueue
 
         if ($this->pedido['nota']) {
             $mail->line("Nota del cliente: {$this->pedido['nota']}");
+        }
+
+        if ($this->pedido['entrega']) {
+            $mail->line("Entrega: {$this->pedido['entrega']}");
         }
 
         $mail->line('---');

@@ -225,7 +225,7 @@ config/plans.php       # La matriz de planes y límites
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 55 archivos, 487 tests (+1 en tests/Unit)
+tests/Feature/         # 56 archivos, 506 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -252,7 +252,7 @@ tests/Feature/         # 55 archivos, 487 tests (+1 en tests/Unit)
 | GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
-| POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes · 10/min |
+| POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes; `delivery_method` (`pickup`/`delivery`) opcional — el costo lo calcula el servidor, nunca lo que mande el cliente (MOD-1) · 10/min |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
 | POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min (el login, por correo; 20/min por IP) |
 | POST | `/auth/forgot-password` · `/auth/reset-password` | Recuperar contraseña del cliente · 5/min |
@@ -274,7 +274,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | Sí |
 | GET | `/api/dashboard/stats` | Métricas | Sí |
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
-| GET · PUT | `/api/tenant` | Configuración y branding | Solo `GET` |
+| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3) y `delivery_enabled`/`delivery_cost` (MOD-1) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]` | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
@@ -331,7 +331,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 488 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 507 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -400,7 +400,8 @@ src/
 │                   # useBloqueoDeScroll
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes, variants,
-│                   # variantesEnFormulario, plataforma (¿es el host del SaaS?)
+│                   # variantesEnFormulario, plataforma (¿es el host del SaaS?),
+│                   # paymentMethods (qué mostrarle al comprador)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -446,7 +447,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 80 tests (Vitest + Testing Library, jsdom)
+npm test          # 97 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -456,9 +457,11 @@ variante y su oferta, cambio de tienda), el checkout de `CartDrawer` (lo que se 
 el carrito), la validación de variantes del formulario de producto, los mensajes de error de los
 formularios sin sesión (`erroresDeFormulario`), los interceptores de Axios (qué token va a cada
 ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
-plataforma (`utils/plataforma`), y `money`/`phone`. La red
-se sustituye en cada test; ninguno necesita la API levantada. Las páginas grandes (ficha, armador,
-formulario de producto) todavía no tienen tests.
+plataforma (`utils/plataforma`), el envío y los métodos de pago en el checkout (`utils/paymentMethods`,
+la selección de entrega y su costo en `CartDrawer`), que el `FormData` de Configuración mande
+booleanos de verdad (`api/tenant`), y `money`/`phone`. La red se sustituye en cada test; ninguno
+necesita la API levantada. Las páginas grandes (ficha, armador, formulario de producto) todavía no
+tienen tests.
 
 ---
 
@@ -480,6 +483,14 @@ formulario de producto) todavía no tienen tests.
 - **Las fotos de producto se borran con `ImageService::borrarSiNadieLasUsa()`, después de cambiar la
   base**, nunca borrando el archivo directamente: duplicar un producto comparte las URL con el
   original, y borrar a ciegas le rompía las fotos al otro.
+- **Un booleano en `FormData` (Configuración, productos) va como `'1'`/`'0'`, nunca `''`.** A
+  diferencia de un campo de texto —donde `''` sirve para "vaciar" y el middleware
+  `ConvertEmptyStringsToNull` lo convierte en `null`—, la regla `boolean` de Laravel valida `''` como
+  inválido, y sin convertir el valor en el backend antes de guardar, un string como `"0"` se guarda
+  literal en una columna JSON — y en el navegador **`"0"` es verdadero** (cualquier string no vacío
+  lo es). Es el fallo real que encontró `MOD-3`: un método de pago recién apagado volvía a aparecer
+  marcado al recargar Configuración. Si el dato se guarda dentro de un JSON (como `payment_methods`),
+  conviértelo con `filter_var($valor, FILTER_VALIDATE_BOOLEAN)` antes de guardar.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
 - **Toda ruta nueva del panel que escribe decide si anota en la actividad.** Se anota con

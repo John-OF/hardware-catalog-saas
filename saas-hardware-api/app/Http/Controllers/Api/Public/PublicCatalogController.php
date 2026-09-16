@@ -4,15 +4,19 @@ namespace App\Http\Controllers\Api\Public;
 
 use App\Enums\ComponentType;
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Order;
-use App\Models\OrderItem;
+use App\Models\Page;
 use App\Models\Product;
+use App\Models\Review;
+use App\Models\StockNotification;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderPlacedNotification;
 use App\Services\OrderPricing;
 use App\Services\ViewCounter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -32,6 +36,7 @@ class PublicCatalogController extends Controller
      */
     private const COLUMNAS_PUBLICAS_TENANT = [
         'id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency',
+        'payment_methods', 'delivery_enabled', 'delivery_cost',
     ];
 
     public function resolveDomain(Request $request): JsonResponse
@@ -59,9 +64,14 @@ class PublicCatalogController extends Controller
             ->select(self::COLUMNAS_PUBLICAS_TENANT)
             ->first();
 
-        if (!$tenant) {
+        if (! $tenant) {
             return response()->json(['message' => 'No se encontró ninguna tienda asociada a este dominio.'], 404);
         }
+
+        // MOD-3: solo los métodos ENCENDIDOS, y con sus datos. Un método
+        // apagado puede tener campos a medio llenar de una vez que el dueño
+        // lo probó y se arrepintió; no es asunto de nadie fuera del panel.
+        $tenant->payment_methods = $tenant->metodosDePagoActivos();
 
         return response()->json($tenant);
     }
@@ -69,11 +79,14 @@ class PublicCatalogController extends Controller
     public function tenant(string $slug): JsonResponse
     {
         $tenant = Cache::remember("tenant:{$slug}", 300, function () use ($slug) {
-            return Tenant::where('slug', $slug)
+            $modelo = Tenant::where('slug', $slug)
                 ->where('is_active', true)
                 ->select(self::COLUMNAS_PUBLICAS_TENANT)
-                ->firstOrFail()
-                ->toArray();
+                ->firstOrFail();
+
+            $modelo->payment_methods = $modelo->metodosDePagoActivos();
+
+            return $modelo->toArray();
         });
 
         return response()->json($tenant);
@@ -89,7 +102,7 @@ class PublicCatalogController extends Controller
         $vistas->record('tenants', $tenant->id);
 
         // Obtener la versión de caché actual para el tenant (soporte de invalidación en driver file)
-        $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn() => 1);
+        $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn () => 1);
 
         // AUD-7: los filtros de spec se contrastan contra las specs que existen
         // de verdad ANTES de tocar nada más. Ver `specsFiltrables()`.
@@ -113,19 +126,19 @@ class PublicCatalogController extends Controller
         $componentType = ComponentType::tryFrom((string) $request->query('component_type'));
         $criterios['component_type'] = $componentType?->value;
 
-        $cacheKey = "catalog:{$slug}:v{$version}:" . md5(json_encode($criterios));
+        $cacheKey = "catalog:{$slug}:v{$version}:".md5(json_encode($criterios));
 
         $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request, $specs, $componentType) {
             return Product::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->where('status', 'published')
                 ->with(['category:id,name,icon', 'images', 'variants'])
-                ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
-                ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
-                ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
-                ->when($componentType, fn($q) => $q->whereHas(
+                ->withAvg(['reviews' => fn ($q) => $q->where('is_approved', true)], 'rating')
+                ->withCount(['reviews' => fn ($q) => $q->where('is_approved', true)])
+                ->when($request->category_id, fn ($q) => $q->where('category_id', $request->category_id))
+                ->when($componentType, fn ($q) => $q->whereHas(
                     'category',
-                    fn($c) => $c->where('component_type', $componentType->value)
+                    fn ($c) => $c->where('component_type', $componentType->value)
                 ))
                 // El comprador busca tanto por modelo como por marca ("Kingston"),
                 // asi que el termino se prueba contra name, brand y sku.
@@ -155,7 +168,7 @@ class PublicCatalogController extends Controller
                 // busqueda de verdad (Meilisearch/Typesense via Scout), que sabe de
                 // prefijos y de erratas. Queda escrito para no volver a levantarlo.
                 ->when($request->search, function ($q) use ($request) {
-                    $termino = '%' . $request->search . '%';
+                    $termino = '%'.$request->search.'%';
 
                     $q->where(function ($sub) use ($termino) {
                         $sub->where('name', 'like', $termino)
@@ -166,10 +179,10 @@ class PublicCatalogController extends Controller
                             ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', $termino));
                     });
                 })
-                ->when($request->in_stock, fn($q) => $q->where('stock', '>', 0))
+                ->when($request->in_stock, fn ($q) => $q->where('stock', '>', 0))
                 ->when($specs, function ($q) use ($specs) {
                     foreach ($specs as $key => $value) {
-                        $q->where('specs->' . $key, $value);
+                        $q->where('specs->'.$key, $value);
                     }
                 })
                 ->tap(fn ($q) => $this->applyCatalogSort($q, $request->query('sort')))
@@ -327,18 +340,18 @@ class PublicCatalogController extends Controller
      * Sin `sort` (o con uno desconocido) se mantiene el orden manual que el dueño
      * definió arrastrando productos (`sort_order`), que es el de siempre.
      */
-    private function applyCatalogSort(\Illuminate\Database\Eloquent\Builder $query, ?string $sort): void
+    private function applyCatalogSort(Builder $query, ?string $sort): void
     {
         // El precio que ve el comprador es el de oferta cuando existe, así que se
         // ordena por ese mismo valor y no por `price` a secas.
         $precioVisible = 'COALESCE(sale_price, price)';
 
         match ($sort) {
-            'price_asc'  => $query->orderByRaw("{$precioVisible} ASC"),
+            'price_asc' => $query->orderByRaw("{$precioVisible} ASC"),
             'price_desc' => $query->orderByRaw("{$precioVisible} DESC"),
-            'newest'     => $query->orderByDesc('created_at'),
-            'name'       => $query->orderBy('name'),
-            default      => $query->orderBy('sort_order')->orderByDesc('created_at'),
+            'newest' => $query->orderByDesc('created_at'),
+            'name' => $query->orderBy('name'),
+            default => $query->orderBy('sort_order')->orderByDesc('created_at'),
         };
 
         // Desempate estable: sin esto, dos productos al mismo precio pueden
@@ -359,9 +372,9 @@ class PublicCatalogController extends Controller
             ->where('id', $productId)
             ->where('is_active', true)
             ->where('status', 'published')
-            ->with(['category', 'images', 'variants', 'reviews' => fn($q) => $q->where('is_approved', true)->orderByDesc('created_at')])
-            ->withAvg(['reviews' => fn($q) => $q->where('is_approved', true)], 'rating')
-            ->withCount(['reviews' => fn($q) => $q->where('is_approved', true)])
+            ->with(['category', 'images', 'variants', 'reviews' => fn ($q) => $q->where('is_approved', true)->orderByDesc('created_at')])
+            ->withAvg(['reviews' => fn ($q) => $q->where('is_approved', true)], 'rating')
+            ->withCount(['reviews' => fn ($q) => $q->where('is_approved', true)])
             ->firstOrFail();
 
         // Misma historia que en el catalogo: acumulado en cache, no un UPDATE
@@ -376,7 +389,7 @@ class PublicCatalogController extends Controller
         $userReview = null;
 
         if ($cliente || $visitorId) {
-            $userReview = \App\Models\Review::where('product_id', $product->id)
+            $userReview = Review::where('product_id', $product->id)
                 ->where(function ($q) use ($cliente, $visitorId) {
                     if ($cliente) {
                         $q->where('user_id', $cliente->id);
@@ -429,7 +442,7 @@ class PublicCatalogController extends Controller
         // el dato, las sugerencias siguen siendo las correctas, sólo que sin
         // priorizar. No decide qué se enseña, a diferencia de lo de arriba.
         $specsString = json_encode($product->specs ?? []);
-        $productString = strtolower($product->name . ' ' . $specsString);
+        $productString = strtolower($product->name.' '.$specsString);
 
         $socket = null;
         if (preg_match('/(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)/i', $productString, $matches)) {
@@ -444,7 +457,7 @@ class PublicCatalogController extends Controller
         if ($socket || $ramType) {
             $complementaryProducts = $complementaryProducts->sortByDesc(function ($p) use ($socket, $ramType) {
                 $pSpecs = json_encode($p->specs ?? []);
-                $pString = strtolower($p->name . ' ' . $pSpecs);
+                $pString = strtolower($p->name.' '.$pSpecs);
                 $score = 0;
                 if ($socket && str_contains($pString, strtolower($socket))) {
                     $score += 10;
@@ -452,6 +465,7 @@ class PublicCatalogController extends Controller
                 if ($ramType && str_contains($pString, strtolower($ramType))) {
                     $score += 5;
                 }
+
                 return $score;
             });
         }
@@ -492,13 +506,13 @@ class PublicCatalogController extends Controller
      * de clientes es abierto, o sea que un token de "algun usuario" no acredita
      * nada; lo que acredita es un token de ESTA tienda.
      *
-     * @return \App\Models\User|null
+     * @return User|null
      */
     private function clienteDeLaTienda(Request $request, Tenant $tenant)
     {
         $user = $request->user('sanctum');
 
-        if (!$user || $user->tenant_id !== $tenant->id || $user->role !== 'customer' || !$user->is_active) {
+        if (! $user || $user->tenant_id !== $tenant->id || $user->role !== 'customer' || ! $user->is_active) {
             return null;
         }
 
@@ -515,12 +529,12 @@ class PublicCatalogController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'customer_name'   => 'required|string|max:150',
-            'customer_email'  => 'nullable|email|max:150',
-            'customer_phone'  => 'nullable|string|max:30',
-            'rating'          => 'required|integer|min:1|max:5',
-            'comment'         => 'nullable|string|max:1000',
-            'visitor_id'      => 'nullable|string|max:100',
+            'customer_name' => 'required|string|max:150',
+            'customer_email' => 'nullable|email|max:150',
+            'customer_phone' => 'nullable|string|max:30',
+            'rating' => 'required|integer|min:1|max:5',
+            'comment' => 'nullable|string|max:1000',
+            'visitor_id' => 'nullable|string|max:100',
             'turnstile_token' => 'required|string',
         ]);
 
@@ -550,7 +564,7 @@ class PublicCatalogController extends Controller
 
         $visitorId = $data['visitor_id'] ?? $request->header('X-Visitor-Id');
 
-        $existingReview = \App\Models\Review::where('product_id', $product->id)
+        $existingReview = Review::where('product_id', $product->id)
             ->where(function ($q) use ($cliente, $visitorId) {
                 if ($cliente) {
                     $q->where('user_id', $cliente->id);
@@ -571,13 +585,13 @@ class PublicCatalogController extends Controller
 
         if ($customerPhone) {
             $cleanPhone = preg_replace('/[^0-9]/', '', $customerPhone);
-            
-            if (!empty($cleanPhone)) {
-                $verifiedPurchase = \App\Models\Order::where('tenant_id', $tenant->id)
+
+            if (! empty($cleanPhone)) {
+                $verifiedPurchase = Order::where('tenant_id', $tenant->id)
                     ->where('status', 'attended')
                     ->where(function ($q) use ($customerPhone, $cleanPhone) {
                         $q->where('customer_phone', $customerPhone)
-                          ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}"]);
+                            ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}"]);
                     })
                     ->whereHas('items', function ($iq) use ($product) {
                         $iq->where('product_id', $product->id);
@@ -598,18 +612,18 @@ class PublicCatalogController extends Controller
         }
 
         $review = $product->reviews()->create([
-            'tenant_id'         => $tenant->id,
+            'tenant_id' => $tenant->id,
             // Un usuario de otra tienda se guarda como anónimo: colgar la reseña
             // de su user_id dejaría una fila de esta tienda apuntando a un
             // usuario de otra, que es la referencia cruzada que se quiere evitar.
-            'user_id'           => $cliente?->id,
-            'visitor_id'        => $cliente ? null : $visitorId,
-            'customer_name'     => $data['customer_name'],
-            'customer_email'    => $data['customer_email'] ?? null,
-            'rating'            => $data['rating'],
-            'comment'           => $data['comment'] ?? null,
+            'user_id' => $cliente?->id,
+            'visitor_id' => $cliente ? null : $visitorId,
+            'customer_name' => $data['customer_name'],
+            'customer_email' => $data['customer_email'] ?? null,
+            'rating' => $data['rating'],
+            'comment' => $data['comment'] ?? null,
             'verified_purchase' => $verifiedPurchase,
-            'is_approved'       => $isApproved,
+            'is_approved' => $isApproved,
         ]);
 
         $message = $isApproved
@@ -617,9 +631,9 @@ class PublicCatalogController extends Controller
             : 'Tu reseña ha sido enviada. Se mostrará en el catálogo una vez aprobada por la tienda.';
 
         return response()->json([
-            'review'      => $review,
-            'message'     => $message,
-            'is_approved' => $isApproved
+            'review' => $review,
+            'message' => $message,
+            'is_approved' => $isApproved,
         ], 201);
     }
 
@@ -639,7 +653,7 @@ class PublicCatalogController extends Controller
         $esLocal = app()->isLocal();
 
         if (blank($secretKey)) {
-            if (!$esLocal) {
+            if (! $esLocal) {
                 Log::error('TURNSTILE_SECRET_KEY no configurada; se rechaza la reseña.');
 
                 return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
@@ -661,15 +675,15 @@ class PublicCatalogController extends Controller
             }
 
             $response = $http->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
-                'secret'   => $secretKey,
+                'secret' => $secretKey,
                 'response' => $token,
                 'remoteip' => $ip,
             ]);
 
-            if (!$response->json('success')) {
+            if (! $response->json('success')) {
                 Log::warning('Turnstile verification failed', [
                     'response' => $response->json(),
-                    'ip'       => $ip,
+                    'ip' => $ip,
                 ]);
 
                 return response()->json(['message' => 'Validación anti-bot (Turnstile) fallida. Recarga e inténtalo de nuevo.'], 422);
@@ -678,7 +692,7 @@ class PublicCatalogController extends Controller
             Log::error('Turnstile connection exception', ['error' => $e->getMessage()]);
 
             // En local dejamos pasar ante un fallo de red para no trabar las pruebas.
-            if (!$esLocal) {
+            if (! $esLocal) {
                 return response()->json(['message' => 'Error al verificar protección anti-bot.'], 502);
             }
 
@@ -707,9 +721,9 @@ class PublicCatalogController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'customer_name'    => 'required|string|max:150',
+            'customer_name' => 'required|string|max:150',
             'customer_contact' => 'required|string|max:150', // teléfono o email
-            'variant_id'       => 'nullable|uuid',
+            'variant_id' => 'nullable|uuid',
         ]);
 
         // MOD-5: con variantes, el cliente espera UNA de ellas (la agotada que
@@ -736,14 +750,14 @@ class PublicCatalogController extends Controller
         }
 
         // Registro idempotente: si ya estaba anotado (y aún sin avisar), no duplicar
-        $notification = \App\Models\StockNotification::firstOrCreate(
+        $notification = StockNotification::firstOrCreate(
             [
-                'product_id'       => $product->id,
-                'variant_id'       => $variante?->id,
+                'product_id' => $product->id,
+                'variant_id' => $variante?->id,
                 'customer_contact' => $data['customer_contact'],
             ],
             [
-                'tenant_id'     => $tenant->id,
+                'tenant_id' => $tenant->id,
                 'customer_name' => $data['customer_name'],
             ]
         );
@@ -752,7 +766,7 @@ class PublicCatalogController extends Controller
         if (! $notification->wasRecentlyCreated && $notification->notified_at !== null) {
             $notification->update([
                 'customer_name' => $data['customer_name'],
-                'notified_at'   => null,
+                'notified_at' => null,
             ]);
         }
 
@@ -766,7 +780,7 @@ class PublicCatalogController extends Controller
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
         $categories = Cache::remember("tenant:{$slug}:public_categories", 300, function () use ($tenant) {
-            return \App\Models\Category::where('tenant_id', $tenant->id)
+            return Category::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->get()
@@ -785,36 +799,60 @@ class PublicCatalogController extends Controller
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
         $data = $request->validate([
-            'customer_name'      => 'required|string|max:200',
-            'customer_phone'     => 'required|string|max:30',
+            'customer_name' => 'required|string|max:200',
+            'customer_phone' => 'required|string|max:30',
             // FUN-2: opcional. Obligarlo garantizaría la confirmación pero añade
             // fricción en el único paso donde se pierden ventas; quien lo deja
             // recibe correo y quien no, se queda como estaba.
-            'customer_email'     => 'nullable|email|max:200',
-            'customer_note'      => 'nullable|string|max:1000',
-            'items'              => 'required|array|min:1|max:100',
+            'customer_email' => 'nullable|email|max:200',
+            'customer_note' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1|max:100',
             'items.*.product_id' => 'required|uuid',
             'items.*.variant_id' => 'nullable|uuid',
-            'items.*.quantity'   => 'required|integer|min:1|max:999',
+            'items.*.quantity' => 'required|integer|min:1|max:999',
+            // MOD-1: solo el MÉTODO viaja desde el navegador. El costo nunca —
+            // se lee de `tenant.delivery_cost` aquí abajo, o un comprador podría
+            // mandar "delivery" con costo 0 y pedir gratis lo que la tienda cobra.
+            'delivery_method' => 'nullable|in:pickup,delivery',
         ]);
 
         // Precios y total se calculan en el servidor: no se confía en lo que
         // manda el cliente. `soloVisibles: true` porque desde el catálogo solo
         // se puede comprar lo que está publicado.
-        ['lines' => $lineItems, 'total' => $total] = $pricing->build($tenant, $data['items'], soloVisibles: true);
+        ['lines' => $lineItems, 'total' => $itemsTotal] = $pricing->build($tenant, $data['items'], soloVisibles: true);
+
+        // `delivery` solo cuenta si la tienda de verdad tiene el envío
+        // encendido; si lo apagó después de que el comprador cargara la
+        // página, un `delivery_method: 'delivery'` suelto no debe cobrar nada
+        // ni quedar anotado como si la tienda lo ofreciera.
+        $entrega = null;
+        $costoEnvio = 0.0;
+
+        if ($tenant->delivery_enabled) {
+            $entrega = ($data['delivery_method'] ?? null) === 'delivery' ? 'delivery' : 'pickup';
+            $costoEnvio = $entrega === 'delivery' ? (float) $tenant->delivery_cost : 0.0;
+        } elseif (($data['delivery_method'] ?? null) === 'pickup') {
+            // Sin envío activado no hay nada que elegir, pero "recojo en
+            // tienda" es un dato honesto igual: no cobra nada.
+            $entrega = 'pickup';
+        }
+
+        $total = round($itemsTotal + $costoEnvio, 2);
 
         $userId = auth('sanctum')->id();
 
-        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total, $userId) {
+        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total, $entrega, $costoEnvio, $userId) {
             $order = Order::create([
-                'tenant_id'      => $tenant->id,
-                'user_id'        => $userId,
-                'customer_name'  => $data['customer_name'],
+                'tenant_id' => $tenant->id,
+                'user_id' => $userId,
+                'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'],
                 'customer_email' => $data['customer_email'] ?? null,
-                'customer_note'  => $data['customer_note'] ?? null,
-                'status'         => 'pending',
-                'total'          => $total,
+                'customer_note' => $data['customer_note'] ?? null,
+                'status' => 'pending',
+                'total' => $total,
+                'delivery_method' => $entrega,
+                'delivery_cost' => $costoEnvio,
             ]);
 
             $order->items()->createMany($lineItems);
@@ -855,9 +893,9 @@ class PublicCatalogController extends Controller
             Notification::send($equipo, new NewOrderNotification($order));
         } catch (\Throwable $e) {
             Log::error('No se pudo avisar del pedido nuevo', [
-                'order_id'  => $order->id,
+                'order_id' => $order->id,
                 'tenant_id' => $tenant->id,
-                'error'     => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -883,9 +921,9 @@ class PublicCatalogController extends Controller
                 ->notify(new OrderPlacedNotification($order));
         } catch (\Throwable $e) {
             Log::error('No se pudo confirmar el pedido al comprador', [
-                'order_id'  => $order->id,
+                'order_id' => $order->id,
                 'tenant_id' => $order->tenant_id,
-                'error'     => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -894,7 +932,7 @@ class PublicCatalogController extends Controller
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
-        $pages = \App\Models\Page::where('tenant_id', $tenant->id)
+        $pages = Page::where('tenant_id', $tenant->id)
             ->where('is_active', true)
             ->select(['id', 'title', 'slug'])
             ->get();
@@ -906,7 +944,7 @@ class PublicCatalogController extends Controller
     {
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
-        $page = \App\Models\Page::where('tenant_id', $tenant->id)
+        $page = Page::where('tenant_id', $tenant->id)
             ->where('slug', $pageSlug)
             ->where('is_active', true)
             ->firstOrFail();

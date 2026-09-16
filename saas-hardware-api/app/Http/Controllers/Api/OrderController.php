@@ -47,7 +47,7 @@ class OrderController extends Controller
 
             $query->where(function ($q) use ($search, $numero, $esNumero) {
                 $q->where('customer_name', 'like', "%{$search}%")
-                  ->orWhere('customer_phone', 'like', "%{$search}%");
+                    ->orWhere('customer_phone', 'like', "%{$search}%");
 
                 if ($esNumero) {
                     $q->orWhere('number', (int) $numero);
@@ -74,7 +74,7 @@ class OrderController extends Controller
         $tenant = app('currentTenant');
 
         $data = $request->validate([
-            'customer_name'  => 'required|string|max:200',
+            'customer_name' => 'required|string|max:200',
             // Opcional, al revés que en el checkout público: en el mostrador el
             // cliente paga y se va, y a menudo no deja teléfono.
             'customer_phone' => 'nullable|string|max:30',
@@ -84,17 +84,17 @@ class OrderController extends Controller
             // para lo que viene después: un encargo que se deja pendiente avisa
             // solo cuando pasa a listo.
             'customer_email' => 'nullable|email|max:200',
-            'customer_note'  => 'nullable|string|max:1000',
+            'customer_note' => 'nullable|string|max:1000',
             // 'cancelled' no tiene sentido al crear.
-            'status'              => 'required|string|in:pending,processing,attended',
-            'items'               => 'required|array|min:1|max:100',
-            'items.*.product_id'  => 'required|uuid',
-            'items.*.variant_id'  => 'nullable|uuid',
-            'items.*.quantity'    => 'required|integer|min:1|max:999',
+            'status' => 'required|string|in:pending,processing,attended',
+            'items' => 'required|array|min:1|max:100',
+            'items.*.product_id' => 'required|uuid',
+            'items.*.variant_id' => 'nullable|uuid',
+            'items.*.quantity' => 'required|integer|min:1|max:999',
         ], [
             'customer_name.required' => 'Escribe a nombre de quién va la venta.',
-            'items.required'         => 'Agrega al menos un producto.',
-            'items.min'              => 'Agrega al menos un producto.',
+            'items.required' => 'Agrega al menos un producto.',
+            'items.min' => 'Agrega al menos un producto.',
         ]);
 
         // `soloVisibles: false`: el dueño vende lo que tiene físicamente, aunque
@@ -103,13 +103,13 @@ class OrderController extends Controller
 
         $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total) {
             $order = Order::create([
-                'tenant_id'      => $tenant->id,
-                'customer_name'  => $data['customer_name'],
+                'tenant_id' => $tenant->id,
+                'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'customer_email' => $data['customer_email'] ?? null,
-                'customer_note'  => $data['customer_note'] ?? null,
-                'status'         => $data['status'],
-                'total'          => $total,
+                'customer_note' => $data['customer_note'] ?? null,
+                'status' => $data['status'],
+                'total' => $total,
             ]);
 
             $order->items()->createMany($lineItems);
@@ -211,11 +211,11 @@ class OrderController extends Controller
     private function etiquetaDeEstado(string $estado): string
     {
         return match ($estado) {
-            'pending'    => 'pendiente',
+            'pending' => 'pendiente',
             'processing' => 'en proceso',
-            'attended'   => 'atendido',
-            'cancelled'  => 'cancelado',
-            default      => $estado,
+            'attended' => 'atendido',
+            'cancelled' => 'cancelado',
+            default => $estado,
         };
     }
 
@@ -254,10 +254,10 @@ class OrderController extends Controller
                 ->notify(new OrderStatusChangedNotification($order));
         } catch (\Throwable $e) {
             Log::error('No se pudo avisar al comprador del cambio de estado', [
-                'order_id'  => $order->id,
+                'order_id' => $order->id,
                 'tenant_id' => $order->tenant_id,
-                'estado'    => $order->status,
-                'error'     => $e->getMessage(),
+                'estado' => $order->status,
+                'error' => $e->getMessage(),
             ]);
         }
     }
