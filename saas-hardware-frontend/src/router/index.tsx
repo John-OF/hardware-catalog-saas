@@ -54,6 +54,7 @@ const ProductsPage = lazy(() => import('../pages/dashboard/ProductsPage'));
 const CategoriesPage = lazy(() => import('../pages/dashboard/CategoriesPage'));
 const SettingsPage = lazy(() => import('../pages/dashboard/SettingsPage'));
 const OrdersPage = lazy(() => import('../pages/dashboard/OrdersPage'));
+const CustomersPage = lazy(() => import('../pages/dashboard/CustomersPage'));
 const PagesPage = lazy(() => import('../pages/dashboard/PagesPage'));
 const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
 const WaitlistPage = lazy(() => import('../pages/dashboard/WaitlistPage'));
@@ -125,6 +126,9 @@ export const router = createBrowserRouter([
       { index: true,        element: <OverviewPage /> },
       { path: 'products',   element: <ProductsPage /> },
       { path: 'orders',     element: <OrdersPage /> },
+      // MOD-10. Sin SoloAdmin: staff ya ve los datos de contacto del cliente en
+      // cada pedido que atiende, así que la lista no le enseña nada nuevo.
+      { path: 'customers',  element: <CustomersPage /> },
       { path: 'reviews',    element: <ReviewsPage /> },
       { path: 'waitlist',   element: <WaitlistPage /> },
 

@@ -123,9 +123,17 @@
   min-width: 0;
 }
 
+/* `auto-fit` y no un número fijo de columnas: los campos son cuatro o cinco
+   según si quien edita ve el costo (MOD-6), y con `repeat(4, …)` el quinto caía
+   solo a una segunda fila mientras los otros cuatro se estrechaban.
+
+   El mínimo son 118px porque el caso que manda no es la etiqueta sino el VALOR:
+   un producto de cuatro cifras con decimales ("4555.00") más las flechas del
+   `input[type=number]` no entran en menos, y el número se recortaba justo en los
+   productos caros. */
 .variant-numbers {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 0.4rem;
 }
 
@@ -187,4 +195,12 @@
   .variant-numbers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Margen de la variante, debajo de su costo (MOD-6). */
+.variant-margin {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }

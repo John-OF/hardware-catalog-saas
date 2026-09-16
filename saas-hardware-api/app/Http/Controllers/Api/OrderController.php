@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
 use App\Support\Bitacora;
+use App\Support\Costos;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,7 @@ class OrderController extends Controller
         // Paginación
         $orders = $query->paginate(Paginacion::porPagina($request, 15));
 
-        return response()->json($orders);
+        return response()->json(Costos::mostrar($orders));
     }
 
     /**
@@ -130,7 +131,7 @@ class OrderController extends Controller
             ['pedido_id' => $order->id, 'numero' => $order->number, 'total' => $order->total],
         );
 
-        return response()->json($order->load('items'), 201);
+        return response()->json(Costos::mostrar($order->load('items')), 201);
     }
 
     /**
@@ -138,7 +139,7 @@ class OrderController extends Controller
      */
     public function show(Order $order): JsonResponse
     {
-        return response()->json($order->load('items'));
+        return response()->json(Costos::mostrar($order->load('items')));
     }
 
     /**
@@ -182,7 +183,7 @@ class OrderController extends Controller
             );
         }
 
-        return response()->json($order->load('items'));
+        return response()->json(Costos::mostrar($order->load('items')));
     }
 
     /**

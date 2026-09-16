@@ -15,9 +15,11 @@ import {
   ShoppingBag,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
+import { exportarPedidos } from '../../api/exportaciones';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
@@ -35,6 +37,20 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const puedeAdministrar = useEsAdmin() !== false;
+  const [exportando, setExportando] = useState(false);
+
+  const handleExport = async () => {
+    setExportando(true);
+
+    try {
+      await exportarPedidos({ status: status || undefined });
+      toast.success('Pedidos exportados.');
+    } catch {
+      toast.error('No se pudieron exportar los pedidos.');
+    } finally {
+      setExportando(false);
+    }
+  };
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   // Fetch orders
@@ -149,9 +165,18 @@ export default function OrdersPage() {
         <p className="page-description">
           Administra las solicitudes de tu catálogo público y registra las ventas de mostrador.
         </p>
-        <button type="button" className="btn-primary" onClick={() => setIsNewOrderOpen(true)}>
-          <Plus size={16} /> Nueva venta
-        </button>
+        <div className="page-header-buttons">
+          {/* MOD-7: con el filtro de estado puesto, que es como se exporta para
+              cuadrar cuentas ("los atendidos de este mes"). */}
+          {puedeAdministrar && (
+            <button type="button" className="btn-secondary" onClick={handleExport} disabled={exportando}>
+              <Download size={16} /> {exportando ? 'Exportando…' : 'Exportar CSV'}
+            </button>
+          )}
+          <button type="button" className="btn-primary" onClick={() => setIsNewOrderOpen(true)}>
+            <Plus size={16} /> Nueva venta
+          </button>
+        </div>
       </div>
 
       {isNewOrderOpen && <NewOrderModal
@@ -444,6 +469,29 @@ export default function OrdersPage() {
                   <span>Total del Pedido</span>
                   <strong>{money(selectedOrder.total)}</strong>
                 </div>
+
+                {/* MOD-6: utilidad del pedido, solo para admin. `utilidad` a null
+                    es "ningún producto tenía costo", que NO es ganar cero: en ese
+                    caso se dice, en vez de pintar un 0. */}
+                {puedeAdministrar && selectedOrder.utilidad !== undefined && (
+                  <div className="detail-total-row detail-profit-row">
+                    <span>Utilidad</span>
+                    {selectedOrder.utilidad === null ? (
+                      <span className="muted-cell">Sin costos registrados</span>
+                    ) : (
+                      <span>
+                        <strong>{money(selectedOrder.utilidad)}</strong>
+                        <small>
+                          {' '}(costo {money(selectedOrder.costo_total)}
+                          {(selectedOrder.lineas_sin_costo ?? 0) > 0
+                            ? `, ${selectedOrder.lineas_sin_costo} producto(s) sin costo`
+                            : ''}
+                          )
+                        </small>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* State updates inside details */}

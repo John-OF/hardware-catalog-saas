@@ -22,6 +22,8 @@ export interface VarianteEnFormulario {
   sku: string;
   price: string;
   sale_price: string;
+  /** Costo de compra (MOD-6). Vacío para staff, que ni ve la columna. */
+  cost: string;
   stock: string;
   low_stock_threshold: string;
   /** Foto nueva elegida, que se sube al guardar. */
@@ -40,6 +42,7 @@ export const varianteVacia = (ejes: string[]): VarianteEnFormulario => ({
   sku: '',
   price: '',
   sale_price: '',
+  cost: '',
   stock: '',
   low_stock_threshold: '5',
   imagen: null,
@@ -65,6 +68,7 @@ export const variantesDesdeProducto = (variantes: ProductVariant[] = []) => {
     sku: v.sku ?? '',
     price: String(v.price),
     sale_price: v.sale_price !== null ? String(v.sale_price) : '',
+    cost: v.cost !== null && v.cost !== undefined ? String(v.cost) : '',
     stock: String(v.stock),
     low_stock_threshold: String(v.low_stock_threshold ?? 5),
     imagen: null,
@@ -101,14 +105,27 @@ export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[
   return null;
 };
 
-/** Lo que se manda al backend: la lista en JSON y las fotos por su posición. */
-export const agregarVariantesAlFormulario = (formData: FormData, ejes: string[], filas: VarianteEnFormulario[]) => {
+/**
+ * Lo que se manda al backend: la lista en JSON y las fotos por su posición.
+ *
+ * `incluirCosto` es false para staff, y entonces la clave `cost` **no viaja**.
+ * No es lo mismo que mandarla vacía: el backend entiende ausente como "no lo
+ * toques" y null como "bórralo" (MOD-6), así que mandarla vacía dejaría a cada
+ * vendedor borrando los costos al editar una variante.
+ */
+export const agregarVariantesAlFormulario = (
+  formData: FormData,
+  ejes: string[],
+  filas: VarianteEnFormulario[],
+  incluirCosto = false,
+) => {
   const lista = filas.map((fila) => ({
     ...(fila.id ? { id: fila.id } : {}),
     options: ejes.map((name, i): VariantOption => ({ name: name.trim(), value: fila.valores[i].trim() })),
     sku: fila.sku.trim() || null,
     price: fila.price,
     sale_price: fila.sale_price === '' ? null : fila.sale_price,
+    ...(incluirCosto ? { cost: fila.cost === '' ? null : fila.cost } : {}),
     stock: fila.stock,
     low_stock_threshold: fila.low_stock_threshold || '5',
     remove_image: fila.quitarImagen,

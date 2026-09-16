@@ -572,3 +572,21 @@
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
+
+/* Margen del producto, bajo su precio, y el del formulario (MOD-6). */
+:where(.page-products) .margin-tag {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+:where(.page-products) .margin-preview {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}

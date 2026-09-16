@@ -11,6 +11,8 @@ import {
   Store,
   User as UserIcon,
   Users as UsersIcon,
+  // Clientela (MOD-10). `Users` ya esta cogido por Equipo, y son cosas distintas.
+  UserRound,
   Menu,
   X,
   ChevronRight,
@@ -141,6 +143,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/categories')) return 'Categorías';
     if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
     if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
+    if (location.pathname.includes('/dashboard/customers')) return 'Clientes';
     if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
     if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
     if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
@@ -225,6 +228,18 @@ export default function DashboardPage() {
           >
             <ShoppingCart size={20} />
             <span>Pedidos</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          {/* MOD-10: va justo detrás de Pedidos porque se mira por lo mismo,
+              quién compró; aquí agrupado por persona en vez de por pedido. */}
+          <NavLink
+            to="/dashboard/customers"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <UserRound size={20} />
+            <span>Clientes</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

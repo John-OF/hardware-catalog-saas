@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\UserController;
@@ -206,6 +208,18 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // forma de esa respuesta; el porque esta en PlanController.
     Route::get('/plan',      [PlanController::class, 'show']);
 
+    // Exportar (MOD-7). Van AQUI y no en el grupo de admin de mas abajo por el
+    // orden de las rutas: `products/{product}` y `orders/{order}` los registra
+    // `apiResource` unas lineas mas abajo y se tragarian `/export` como si fuera
+    // un id. Es el mismo motivo por el que `products/reorder` esta antes.
+    //
+    // Solo admin: el catalogo lleva el costo de compra (MOD-6) y los pedidos,
+    // los datos de contacto de todos los clientes de la tienda.
+    Route::middleware('admin')->group(function () {
+        Route::get('products/export', [ExportController::class, 'products']);
+        Route::get('orders/export', [ExportController::class, 'orders']);
+    });
+
     // Productos: staff crea y edita, no borra (ver el subgrupo de abajo).
     Route::post('products/reorder', [ProductController::class, 'reorder']);
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate']);
@@ -217,6 +231,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
 
     // Pedidos
     Route::apiResource('orders', OrderController::class)->except(['destroy']);
+
+    // Clientes de la tienda (MOD-10). Lectura: no se crean ni se editan desde el
+    // panel -las cuentas las abre el propio cliente en el catalogo-. Staff los ve
+    // porque ya ve los mismos datos de contacto en cada pedido que atiende.
+    Route::get('customers', [CustomerController::class, 'index']);
+    Route::get('customers/{customer}', [CustomerController::class, 'show']);
 
     // Reseñas/Calificaciones
     Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)->only(['index', 'update', 'destroy']);
@@ -233,6 +253,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
         Route::post('/tenant/custom-domain/verify', [TenantController::class, 'verifyCustomDomain']);
 
         Route::post('products/import', [ProductController::class, 'import']);
+
         Route::post('products/bulk', [ProductController::class, 'bulkAction']);
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 

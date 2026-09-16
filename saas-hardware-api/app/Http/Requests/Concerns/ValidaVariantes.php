@@ -42,6 +42,8 @@ trait ValidaVariantes
             'variants.*.sku' => 'nullable|string|max:100',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.sale_price' => 'nullable|numeric|min:0',
+            // MOD-6: cada variante tiene su costo, como tiene su precio.
+            'variants.*.cost' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.low_stock_threshold' => 'nullable|integer|min:0',
             'variants.*.remove_image' => 'nullable|boolean',

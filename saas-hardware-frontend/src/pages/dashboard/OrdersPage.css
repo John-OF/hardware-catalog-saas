@@ -447,3 +447,22 @@
 :where(.page-orders) .process-btn:hover .spinner-hover {
   transform: rotate(360deg);
 }
+
+/* Utilidad del pedido en el detalle (MOD-6): se lee como un total mas, pero
+   apagado, porque no es dinero que el cliente pague sino lo que queda. */
+:where(.page-orders) .detail-profit-row {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+:where(.page-orders) .detail-profit-row small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* Los botones de la cabecera (exportar + nueva venta). */
+:where(.page-orders) .page-header-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

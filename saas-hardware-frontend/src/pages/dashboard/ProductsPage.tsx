@@ -23,7 +23,8 @@ import {
   Copy,
   CheckSquare,
   GripVertical,
-  Bell
+  Bell,
+  Download
 } from 'lucide-react';
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import { getCategories } from '../../api/categories';
@@ -37,6 +38,8 @@ import {
   type VarianteEnFormulario,
 } from '../../utils/variantesEnFormulario';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
+import { margenDe, precioQueSeCobra } from '../../utils/margen';
+import { exportarCatalogo } from '../../api/exportaciones';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
@@ -82,6 +85,12 @@ export default function ProductsPage() {
   // masivas (el backend le responde 403). Se esconde en vez de apagarse porque
   // no es algo que vaya a poder hacer esperando: no es de su rol.
   const puedeAdministrar = useEsAdmin() !== false;
+
+  // MOD-6: el costo de compra y el margen son solo del admin. Mismo criterio
+  // optimista que arriba: mientras no se sabe el rol se enseña, porque lo normal
+  // es ser admin y el backend es el que manda de todas formas.
+  const puedeVerCostos = puedeAdministrar;
+  const [exportando, setExportando] = useState(false);
   const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
   const [bulkPriceAdjustment, setBulkPriceAdjustment] = useState('');
 
@@ -91,6 +100,8 @@ export default function ProductsPage() {
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  // MOD-6: solo lo ve y lo manda un admin. Ver `puedeVerCostos`.
+  const [cost, setCost] = useState('');
   const [stock, setStock] = useState('');
   const [lowStockThreshold, setLowStockThreshold] = useState('5');
   const [categoryId, setCategoryId] = useState('');
@@ -114,6 +125,13 @@ export default function ProductsPage() {
   const [ejesVariantes, setEjesVariantes] = useState<string[]>([]);
   const [filasVariantes, setFilasVariantes] = useState<VarianteEnFormulario[]>([]);
   const conVariantesEnFormulario = filasVariantes.length > 0;
+
+  /** Lo que deja el producto que se está editando, con el precio que se cobra. */
+  const margenDelFormulario = margenDe(precioQueSeCobra(price, salePrice), cost);
+
+  /** El mismo cálculo para una fila del listado. */
+  const margenDeLaFila = (producto: Product) =>
+    margenDe(precioQueSeCobra(producto.price, producto.sale_price), producto.cost);
 
   // Fetch categories (for the filter and form dropdown)
   const { data: categories = [] } = useQuery<Category[]>({
@@ -278,6 +296,7 @@ export default function ProductsPage() {
     setStatus('published');
     setImageFile(null);
     setImagePreview(null);
+    setCost('');
     setGalleryFiles([]);
     setGalleryPreviews([]);
     setExistingGallery([]);
@@ -295,6 +314,8 @@ export default function ProductsPage() {
     setSku(product.sku || '');
     setPrice(product.price.toString());
     setSalePrice(product.sale_price ? product.sale_price.toString() : '');
+    // `cost` no llega si quien mira es staff; entonces se queda vacío y no se manda.
+    setCost(product.cost !== null && product.cost !== undefined ? String(product.cost) : '');
     setStock(product.stock.toString());
     setLowStockThreshold(product.low_stock_threshold ? product.low_stock_threshold.toString() : '5');
     setCategoryId(product.category_id || '');
@@ -391,6 +412,12 @@ export default function ProductsPage() {
       formData.append('sale_price', salePrice || '');
       formData.append('stock', stock);
       formData.append('low_stock_threshold', lowStockThreshold || '5');
+
+      // MOD-6: si no se ve el campo, la clave NO viaja. Mandarla vacía borraría
+      // el costo cada vez que un vendedor edita el producto.
+      if (puedeVerCostos) {
+        formData.append('cost', cost);
+      }
     }
     formData.append('category_id', categoryId);
     formData.append('description', description);
@@ -423,7 +450,7 @@ export default function ProductsPage() {
 
     // Siempre, también vacía: una lista vacía es lo que le dice al backend que
     // quite las variantes de un producto que las tenía.
-    agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes);
+    agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes, puedeVerCostos);
 
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, formData });
@@ -462,6 +489,24 @@ export default function ProductsPage() {
       toast.error(msg);
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExportando(true);
+
+    try {
+      await exportarCatalogo({
+        search: search || undefined,
+        category_id: selectedCategory || undefined,
+      });
+      toast.success('Catálogo exportado.');
+    } catch {
+      // El error de red ya lo cuenta el interceptor; aquí solo hace falta que el
+      // dueño sepa que no tiene archivo.
+      toast.error('No se pudo exportar el catálogo.');
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -600,6 +645,14 @@ export default function ProductsPage() {
             <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
               <Upload size={18} />
               <span>Importar CSV</span>
+            </button>
+          )}
+
+          {/* MOD-7: se lleva lo que hay en pantalla, con sus filtros puestos. */}
+          {puedeAdministrar && (
+            <button onClick={handleExport} className="btn-secondary" disabled={exportando}>
+              {exportando ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+              <span>Exportar CSV</span>
             </button>
           )}
 
@@ -778,6 +831,13 @@ export default function ProductsPage() {
                         ) : (
                           money(product.price)
                         )}
+                        {/* MOD-6: el margen debajo del precio, solo para admin. Sin
+                            costo no se escribe nada: un 0% sería mentira. */}
+                        {puedeVerCostos && margenDeLaFila(product) && (
+                          <span className="margin-tag" title="Margen sobre el precio de venta">
+                            {margenDeLaFila(product)!.porcentaje}% margen
+                          </span>
+                        )}
                       </td>
                       <td>
                         <div className="stock-cell">
@@ -872,10 +932,15 @@ export default function ProductsPage() {
 
       {/* Modal Drawer */}
       {isModalOpen && (
+        /* `ancho` es mayor que en el resto de ventanas del panel porque la fila de
+           una variante lleva cinco campos en línea (precio, oferta, costo, stock y
+           SKU): a 580 se cortaban las etiquetas, y a 760 seguía sin caber un precio
+           de cuatro cifras con decimales. Va emparejado con el mínimo de columna de
+           `.variant-numbers`; tocar uno sin el otro devuelve el recorte. */
         <Dialogo
           titulo={editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
           onCerrar={closeModal}
-          ancho={580}
+          ancho={820}
           className="page-products"
         >
             <form onSubmit={handleSubmit} className="dialogo-cuerpo">
@@ -1024,6 +1089,7 @@ export default function ProductsPage() {
                 ejes={ejesVariantes}
                 filas={filasVariantes}
                 moneda={currencyCode}
+                conCostos={puedeVerCostos}
                 onChange={(ejes, filas) => {
                   setEjesVariantes(ejes);
                   setFilasVariantes(filas);
@@ -1069,6 +1135,35 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+
+              {puedeVerCostos && (
+                <div className="form-row">
+                  <div className="form-group half">
+                    <label htmlFor="prod-cost">Costo de compra ({currencyCode} - Opcional)</label>
+                    <input
+                      id="prod-cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={cost}
+                      onChange={(e) => setCost(e.target.value)}
+                      className="premium-input"
+                    />
+                    <small className="form-hint">
+                      Lo que te cuesta a ti. No se enseña nunca en la tienda.
+                    </small>
+                  </div>
+                  <div className="form-group half">
+                    <label>Margen</label>
+                    <p className="margin-preview">
+                      {margenDelFormulario
+                        ? `${money(margenDelFormulario.utilidad)} por unidad · ${margenDelFormulario.porcentaje}%`
+                        : 'Escribe precio y costo para verlo.'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="form-row">
                 <div className="form-group half">

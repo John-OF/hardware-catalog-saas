@@ -35,14 +35,20 @@ class ProductVariant extends Model
     }
 
     protected $fillable = [
-        'product_id', 'options', 'sku', 'price', 'sale_price', 'stock',
+        'product_id', 'options', 'sku', 'price', 'sale_price', 'cost', 'stock',
         'low_stock_threshold', 'image_url', 'thumbnail_url', 'sort_order',
     ];
+
+    // Oculto por el mismo motivo que en `Product`, y ademas porque la variante
+    // viaja SIEMPRE dentro de su producto: si la ficha publica esconde el costo
+    // y la variante no, el costo sale igual (MOD-6).
+    protected $hidden = ['cost'];
 
     protected $casts = [
         'options' => 'array',
         'price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'cost' => 'decimal:2',
         'stock' => 'integer',
         'low_stock_threshold' => 'integer',
         'sort_order' => 'integer',

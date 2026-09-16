@@ -21,16 +21,30 @@ class Product extends Model
     }
 
     protected $fillable = [
-        'category_id', 'sku', 'name', 'brand', 'price', 'sale_price',
+        'category_id', 'sku', 'name', 'brand', 'price', 'sale_price', 'cost',
         'stock', 'low_stock_threshold', 'description', 'specs',
         'image_url', 'thumbnail_url', 'is_active', 'sort_order', 'status',
     ];
+
+    /**
+     * El costo de compra NO sale en ninguna respuesta salvo que alguien lo pida
+     * (MOD-6).
+     *
+     * El catalogo publico devuelve el modelo entero en media docena de sitios
+     * -listado, ficha, relacionados, buscador, armador- y varios van por cache.
+     * Ocultarlo aqui y ensenarlo a mano (`App\Support\Costos`) falla en cerrado:
+     * una consulta publica nueva no filtra el costo por descuido, sino que no lo
+     * lleva de entrada. Al reves, cualquier ruta nueva que se olvidara de
+     * quitarlo se lo estaria ensenando a la competencia.
+     */
+    protected $hidden = ['cost'];
 
     protected $casts = [
         'description'          => \App\Casts\SanitizedHtml::class,
         'specs'                => 'array',
         'price'                => 'decimal:2',
         'sale_price'           => 'decimal:2',
+        'cost'                 => 'decimal:2',
         'low_stock_threshold'  => 'integer',
         'is_active'            => 'boolean',
         'sort_order'           => 'integer',
@@ -197,6 +211,10 @@ class Product extends Model
 
         $this->price = $masBarata->price;
         $this->sale_price = $masBarata->sale_price;
+        // MOD-6: el costo sigue al precio para que la ficha no mezcle el precio
+        // de una variante con el costo de otra. Emparejados describen siempre a
+        // la misma —la mas barata—, que es lo que ya significaba este resumen.
+        $this->cost = $masBarata->cost;
         $this->stock = $variantes->sum(fn (ProductVariant $v) => max(0, (int) $v->stock));
 
         $this->save();

@@ -99,6 +99,60 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    /**
+     * Lo que costo comprar lo que se vendio en este pedido (MOD-6).
+     *
+     * Sale de `unit_cost`, el costo copiado linea a linea el dia de la venta, y
+     * no del costo que tenga hoy el producto: asi la utilidad de un pedido de
+     * marzo no cambia porque en abril suba el proveedor.
+     *
+     * `null` cuando NINGUNA linea tiene costo -pedidos anteriores a este cambio,
+     * o productos a los que nadie se lo ha puesto-. No es cero: cero seria decir
+     * que la tienda gano el precio entero.
+     */
+    public function getCostoTotalAttribute(): ?float
+    {
+        $conCosto = $this->items->whereNotNull('unit_cost');
+
+        if ($conCosto->isEmpty()) {
+            return null;
+        }
+
+        return round($conCosto->sum(fn (OrderItem $i) => (float) $i->unit_cost * $i->quantity), 2);
+    }
+
+    /**
+     * Precio de venta menos costo, solo de las lineas que tienen costo.
+     *
+     * **El envio no cuenta.** `delivery_cost` es lo que se le cobra al cliente
+     * por llevarselo (MOD-1), no lo que la tienda gana con el producto, y lo que
+     * le cuesta a ella el reparto no lo sabe el sistema. Meterlo aqui inflaria
+     * la utilidad con dinero que se va en gasolina.
+     *
+     * Si solo algunas lineas tienen costo, esto es una utilidad PARCIAL, y
+     * `lineas_sin_costo` es lo que avisa de ello.
+     */
+    public function getUtilidadAttribute(): ?float
+    {
+        $conCosto = $this->items->whereNotNull('unit_cost');
+
+        if ($conCosto->isEmpty()) {
+            return null;
+        }
+
+        $venta = $conCosto->sum(fn (OrderItem $i) => (float) $i->subtotal);
+
+        return round($venta - (float) $this->costo_total, 2);
+    }
+
+    /**
+     * Cuantas lineas del pedido se vendieron sin saber cuanto costaban.
+     */
+    public function getLineasSinCostoAttribute(): int
+    {
+        return $this->items->whereNull('unit_cost')->count();
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

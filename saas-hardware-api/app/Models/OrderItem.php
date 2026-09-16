@@ -21,11 +21,17 @@ class OrderItem extends Model
 
     protected $fillable = [
         'order_id', 'product_id', 'variant_id', 'product_name', 'variant_name',
-        'unit_price', 'quantity', 'subtotal',
+        'unit_price', 'unit_cost', 'quantity', 'subtotal',
     ];
+
+    // MOD-6: el costo de la linea solo lo ve un admin del panel, y lo ensena
+    // `App\Support\Costos`. Un pedido tambien se devuelve al cliente que lo
+    // hizo (`PublicOrdersController`): ahi el costo no pinta nada.
+    protected $hidden = ['unit_cost'];
 
     protected $casts = [
         'unit_price' => 'decimal:2',
+        'unit_cost'  => 'decimal:2',
         'subtotal'   => 'decimal:2',
         'quantity'   => 'integer',
     ];

@@ -224,6 +224,14 @@ export interface Product {
   brand: string | null;
   price: number;
   sale_price: number | null;
+  /**
+   * Costo de compra (MOD-6). **Solo llega si quien mira es admin**: el backend
+   * lo esconde para staff y para el catálogo público, así que `undefined` no
+   * significa "no tiene costo" sino "no te toca verlo"; `null` sí es "no lo han
+   * puesto". Con variantes es el resumen de la más barata, emparejado con
+   * `price`.
+   */
+  cost?: number | string | null;
   stock: number;
   low_stock_threshold: number;
   sku: string | null;
@@ -265,6 +273,8 @@ export interface ProductVariant {
   sku: string | null;
   price: number | string;
   sale_price: number | string | null;
+  /** Costo de compra de ESTA variante (MOD-6). Solo para admin; ver `Product.cost`. */
+  cost?: number | string | null;
   stock: number;
   low_stock_threshold: number;
   image_url: string | null;
@@ -287,6 +297,11 @@ export interface OrderItem {
   /** Snapshot de la variante vendida ("16 GB"); null si el producto no tenía variantes. */
   variant_name?: string | null;
   unit_price: number;
+  /**
+   * Lo que costó esta línea el día de la venta (MOD-6). Solo llega para admin;
+   * `null` cuando el producto no tenía costo puesto, que no es cero.
+   */
+  unit_cost?: number | string | null;
   quantity: number;
   subtotal: number;
 }
@@ -315,9 +330,47 @@ export interface Order {
   delivery_method?: 'pickup' | 'delivery' | null;
   delivery_cost?: number | string;
   total: number;
+  /**
+   * Utilidad del pedido (MOD-6). Los tres solo llegan para admin.
+   *
+   * `null` en `utilidad` y `costo_total` significa que NINGUNA línea tenía
+   * costo: no es que se ganara cero. Si `lineas_sin_costo` es mayor que cero
+   * con una utilidad no nula, lo que hay es una utilidad parcial y hay que
+   * decirlo en pantalla. El envío cobrado no cuenta aquí.
+   */
+  utilidad?: number | null;
+  costo_total?: number | null;
+  lineas_sin_costo?: number;
   items: OrderItem[];
   items_count?: number;
   created_at: string;
+}
+
+/**
+ * Un cliente de la tienda, con lo que lleva comprado (MOD-10).
+ *
+ * Es un `User` con rol `customer`: lo crea el propio cliente al registrarse en
+ * el catálogo, nunca el panel. Los totales los calcula el backend sin contar los
+ * pedidos cancelados, y `ultima_compra`/`total_gastado` valen `null`/`0` para
+ * quien se registró pero todavía no ha comprado.
+ */
+export interface Cliente {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  is_active: boolean;
+  created_at: string;
+  pedidos_count: number;
+  total_gastado: number;
+  ultima_compra: string | null;
+  favoritos_count: number;
+}
+
+/** La ficha de un cliente: él y sus últimas compras. */
+export interface FichaDeCliente {
+  customer: Cliente;
+  orders: Array<Pick<Order, 'id' | 'number' | 'status' | 'total' | 'created_at'> & { items_count: number }>;
 }
 
 /**

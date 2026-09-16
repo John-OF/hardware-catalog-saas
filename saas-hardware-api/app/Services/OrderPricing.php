@@ -99,6 +99,12 @@ class OrderPricing
             $subtotal = round($unitPrice * $item['quantity'], 2);
             $total += $subtotal;
 
+            // MOD-6: el costo se copia igual que el precio y por el mismo motivo.
+            // Si manana sube el proveedor, esta venta tiene que seguir contando la
+            // utilidad que dejo hoy. `null` cuando el producto no tiene costo
+            // puesto, y null no es cero: es "no se sabe" (ver la migracion).
+            $unitCost = $variante ? $variante->cost : $product->cost;
+
             $lines[] = [
                 'product_id'   => $product->id,
                 'variant_id'   => $variante?->id,
@@ -107,6 +113,7 @@ class OrderPricing
                 'product_name' => $product->name,
                 'variant_name' => $variante?->nombre,
                 'unit_price'   => $unitPrice,
+                'unit_cost'    => $unitCost !== null ? (float) $unitCost : null,
                 'quantity'     => $item['quantity'],
                 'subtotal'     => $subtotal,
             ];

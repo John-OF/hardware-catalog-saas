@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\Category;
 use App\Services\ImageService;
 use App\Support\Bitacora;
+use App\Support\Costos;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class ProductController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return response()->json($products);
+        return response()->json(Costos::mostrar($products));
     }
 
     public function store(StoreProductRequest $request): JsonResponse
@@ -102,12 +103,12 @@ class ProductController extends Controller
             ['producto_id' => $product->id],
         );
 
-        return response()->json($product->fresh()->load(['category', 'images', 'variants']), 201);
+        return response()->json(Costos::mostrar($product->fresh()->load(['category', 'images', 'variants'])), 201);
     }
 
     public function show(Product $product): JsonResponse
     {
-        return response()->json($product->load(['category', 'images', 'variants']));
+        return response()->json(Costos::mostrar($product->load(['category', 'images', 'variants'])));
     }
 
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
@@ -191,7 +192,7 @@ class ProductController extends Controller
 
         $this->anotarEdicion($antes, $product->fresh());
 
-        return response()->json($product->fresh()->load(['category', 'images', 'variants']));
+        return response()->json(Costos::mostrar($product->fresh()->load(['category', 'images', 'variants'])));
     }
 
     public function destroy(Product $product): JsonResponse
@@ -279,8 +280,12 @@ class ProductController extends Controller
         $map = [
             'nombre'           => array_search('nombre', $header),
             'marca'            => array_search('marca', $header),
+            'sku'              => array_search('sku', $header),
             'precio'           => array_search('precio', $header),
             'precio_oferta'    => array_search('precio_oferta', $header),
+            // MOD-6 / MOD-7: el costo de compra, para que lo exportado se pueda
+            // volver a importar sin perderlo. Solo lo lee un admin; ver mas abajo.
+            'costo'            => array_search('costo', $header),
             'stock'            => array_search('stock', $header),
             'categoria'        => array_search('categoria', $header),
             'descripcion'      => array_search('descripcion', $header),
@@ -292,6 +297,7 @@ class ProductController extends Controller
         if ($map['marca'] === false) $map['marca'] = array_search('brand', $header);
         if ($map['precio'] === false) $map['precio'] = array_search('price', $header);
         if ($map['precio_oferta'] === false) $map['precio_oferta'] = array_search('sale_price', $header);
+        if ($map['costo'] === false) $map['costo'] = array_search('cost', $header);
         if ($map['stock'] === false) $map['stock'] = array_search('stock', $header);
         if ($map['categoria'] === false) $map['categoria'] = array_search('category', $header);
         if ($map['descripcion'] === false) $map['descripcion'] = array_search('description', $header);
@@ -356,6 +362,16 @@ class ProductController extends Controller
                     $errors[] = "Fila {$rowCount}: El precio de oferta ($salePrice) debe ser menor que el precio regular ($price).";
                     continue;
                 }
+
+                $sku = $map['sku'] !== false && isset($row[$map['sku']]) ? trim($row[$map['sku']]) : null;
+
+                // El costo solo entra si quien importa es un admin: si no, la
+                // columna se ignora en silencio, como el formulario ignora el
+                // campo (MOD-6).
+                $costoStr = $map['costo'] !== false && isset($row[$map['costo']]) ? trim($row[$map['costo']]) : '';
+                $costo = Costos::usuarioPuedeVerlos() && is_numeric($costoStr) && (float) $costoStr >= 0
+                    ? (float) $costoStr
+                    : null;
 
                 $stockStr = $map['stock'] !== false && isset($row[$map['stock']]) ? trim($row[$map['stock']]) : '';
                 $stock = is_numeric($stockStr) ? (int) $stockStr : null;
@@ -426,8 +442,10 @@ class ProductController extends Controller
                 $lote[] = $this->filaAAtributos([
                     'name'        => $name,
                     'brand'       => $brand,
+                    'sku'         => $sku ?: null,
                     'price'       => $price,
                     'sale_price'  => $salePrice,
+                    'cost'        => $costo,
                     'stock'       => $stock,
                     'category_id' => $categoryId,
                     'description' => $description,
@@ -670,7 +688,7 @@ class ProductController extends Controller
             ['producto_id' => $product->id, 'copia_id' => $newProduct->id],
         );
 
-        return response()->json($newProduct->load(['category', 'images', 'variants']), 201);
+        return response()->json(Costos::mostrar($newProduct->load(['category', 'images', 'variants'])), 201);
     }
 
     /**
@@ -746,7 +764,17 @@ class ProductController extends Controller
         unset($validado['variants'], $validado['variant_images']);
 
         if ($variantes) {
-            unset($validado['price'], $validado['sale_price'], $validado['stock']);
+            // MOD-6: el costo de la ficha es, como el precio, el resumen de la
+            // variante mas barata, y lo escribe `sincronizarResumenDeVariantes()`.
+            unset($validado['price'], $validado['sale_price'], $validado['stock'], $validado['cost']);
+        }
+
+        // MOD-6: staff no ve el costo, asi que su formulario no lo manda. Que no
+        // llegue tiene que significar "no lo toques" y no "borralo": si esto no
+        // estuviera, el vendedor que corrige una falta de ortografia en el nombre
+        // dejaria el producto sin costo y sin que nadie se enterara.
+        if (! Costos::usuarioPuedeVerlos()) {
+            unset($validado['cost']);
         }
 
         return [$validado, $variantes];
@@ -781,6 +809,10 @@ class ProductController extends Controller
             'sku'         => $product->sku,
             'price'       => $product->price,
             'sale_price'  => $product->sale_price,
+            // MOD-6: el costo cambia el margen de todo lo que se venda despues,
+            // asi que quien lo toca queda escrito como con el precio. La bitacora
+            // solo la lee un admin, que es quien puede verlo.
+            'cost'        => $product->cost,
             'stock'       => $product->stock,
             'is_active'   => (bool) $product->is_active,
             'status'      => $product->status === 'draft' ? 'borrador' : 'publicado',
@@ -794,6 +826,7 @@ class ProductController extends Controller
                 'nombre'     => $v->nombre,
                 'price'      => $v->price,
                 'sale_price' => $v->sale_price,
+                'cost'       => $v->cost,
                 'stock'      => $v->stock,
             ]])->all(),
         ];
@@ -819,7 +852,7 @@ class ProductController extends Controller
         ];
 
         if (! $conVariantes) {
-            $campos += ['price' => 'precio', 'sale_price' => 'oferta', 'stock' => 'stock'];
+            $campos += ['price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo', 'stock' => 'stock'];
         }
 
         $cambios = Bitacora::cambios($antes, $despues, $campos);
@@ -834,7 +867,7 @@ class ProductController extends Controller
             }
 
             $deVariante = Bitacora::cambios($antes['variantes'][$id], $variante, [
-                'price' => 'precio', 'sale_price' => 'oferta', 'stock' => 'stock',
+                'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo', 'stock' => 'stock',
             ]);
 
             foreach ($deVariante as $etiqueta => $par) {
@@ -909,6 +942,12 @@ class ProductController extends Controller
                 'low_stock_threshold' => $datos['low_stock_threshold'] ?? 5,
                 'sort_order'          => $posicion,
             ]);
+
+            // MOD-6: mismo criterio que en la ficha. Ausente es "no lo toques"
+            // -el formulario de staff no lo manda- y null explicito es "borralo".
+            if (Costos::usuarioPuedeVerlos() && array_key_exists('cost', $datos)) {
+                $variante->cost = $datos['cost'];
+            }
 
             $foto = $request->file("variant_images.{$posicion}");
 

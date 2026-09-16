@@ -39,8 +39,10 @@ cobro todavía, así que hoy es "enséñalo", no "véndelo" (`SAAS-3`).
 
 **Para la tienda**: alta self-service con verificación de correo, catálogo con especificaciones
 técnicas y variantes (capacidad, color…, cada una con su precio, stock y foto), imágenes
-optimizadas, importación por CSV, pedidos con estados y descuento automático de
-stock, venta de mostrador, moderación de reseñas, lista de espera de productos agotados, páginas
+optimizadas, importación **y exportación** por CSV, pedidos con estados y descuento automático de
+stock, envío a domicilio o recojo en tienda y métodos de pago informativos, costo de compra con su
+margen y la utilidad de cada pedido, ficha de cada cliente registrado con lo que lleva comprado,
+venta de mostrador, moderación de reseñas, lista de espera de productos agotados, páginas
 informativas, métricas y personalización visual completa (colores, tipografías, portada, pie,
 favicon).
 
@@ -52,8 +54,9 @@ carrito; cuenta con favoritos e historial; reseñas con moderación y anti-bot.
 cambiar su plan y rescatar la contraseña de un dueño. Los planes limitan cuánto puede crear cada
 tienda (`config/plans.php`).
 
-**Lo que todavía no existe** y conviene saber antes de nada: no hay pasarela de pago ni facturación
-del SaaS, ni envíos, ni impuestos/comprobante. El detalle completo —qué
+**Lo que todavía no existe** y conviene saber antes de nada: no hay pasarela de pago —ni para cobrar
+en la tienda ni para cobrarle a la tienda— ni impuestos/comprobante, ni cupones, ni papelera. El
+envío existe pero es un precio fijo, sin zonas ni transportista. El detalle completo —qué
 hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionalidades.md`.
 
 ---
@@ -276,10 +279,12 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
 | GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3) y `delivery_enabled`/`delivery_cost` (MOD-1) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
-| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]` | Todo menos `DELETE` |
+| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6) | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
-| CRUD | `/api/orders` | Pedidos y venta de mostrador | Todo menos `DELETE` |
+| CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
+| GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
+| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta` | No |
 | GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
 | CRUD | `/api/pages` | Páginas informativas | No |
@@ -331,7 +336,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 507 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 547 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -364,7 +369,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/login` · `/register` | Acceso y alta de tienda |
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
 | `/dashboard` | Resumen con métricas |
-| `/dashboard/products` · `/categories` · `/orders` · `/pages` · `/reviews` · `/waitlist` | Gestión |
+| `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10) |
 | `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 | `/platform/login` | Acceso del operador del SaaS |
@@ -447,7 +452,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 97 tests (Vitest + Testing Library, jsdom)
+npm test          # 117 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -459,7 +464,10 @@ formularios sin sesión (`erroresDeFormulario`), los interceptores de Axios (qu�
 ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
 plataforma (`utils/plataforma`), el envío y los métodos de pago en el checkout (`utils/paymentMethods`,
 la selección de entrega y su costo en `CartDrawer`), que el `FormData` de Configuración mande
-booleanos de verdad (`api/tenant`), y `money`/`phone`. La red se sustituye en cada test; ninguno
+booleanos de verdad (`api/tenant`), el margen y qué precio se compara con el costo (`utils/margen`),
+la descarga de las exportaciones (`api/exportaciones`: blob, filtros y nombre del archivo), la
+pantalla de clientes (`CustomersPage`: totales, cliente sin compras y la ficha que solo se pide al
+abrirla), y `money`/`phone`. La red se sustituye en cada test; ninguno
 necesita la API levantada. Las páginas grandes (ficha, armador, formulario de producto) todavía no
 tienen tests.
 
@@ -477,6 +485,14 @@ tienen tests.
 - **Al añadir un sitio que cree algo limitado**, acordarse del gate; al añadir una consulta que mire
   por encima de las tiendas, `withoutTenant()` explícito.
 - **Los topes son de la creación, no del estado existente**: bajar de plan nunca borra nada.
+- **El costo de compra (`products.cost`, `product_variants.cost`) está oculto por defecto**: va en el
+  `$hidden` de los modelos y solo lo enseña `App\Support\Costos::mostrar()`, que comprueba que quien
+  mira sea admin. Una consulta pública nueva no lo filtra por descuido: no lo lleva de entrada. Y en
+  el formulario, **una clave `cost` ausente significa "no lo toques"**, no "bórralo": es lo que
+  impide que un colaborador —que no ve el campo— vacíe los costos al editar un producto.
+- **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
+  igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
+  reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.
 - **Cambiar precio o stock de una variante fuera del formulario** (una venta, una devolución, un
   ajuste en lote) obliga a llamar después a `Product::sincronizarResumenDeVariantes()`, o el
   catálogo enseñará un precio y un stock que ya no son.

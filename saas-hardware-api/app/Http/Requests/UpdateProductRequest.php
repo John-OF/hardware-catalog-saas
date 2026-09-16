@@ -39,6 +39,10 @@ class UpdateProductRequest extends FormRequest
             'price'       => 'sometimes|nullable|required_without:variants|numeric|min:0',
             'sale_price'  => 'nullable|numeric|min:0',
             'stock'       => 'sometimes|nullable|required_without:variants|integer|min:0',
+            // MOD-6: el costo de compra. Lo valida todo el panel pero solo lo
+            // guarda un admin: el controlador lo descarta para staff, para que
+            // editar un producto sin ver el campo no lo borre.
+            'cost'                => 'nullable|numeric|min:0',
             'sku'                 => 'nullable|string|max:100',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'category_id'         => 'nullable|uuid|exists:categories,id',

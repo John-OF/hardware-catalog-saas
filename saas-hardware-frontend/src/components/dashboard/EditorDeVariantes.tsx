@@ -1,6 +1,7 @@
 import './EditorDeVariantes.css';
 
 import { ImagePlus, Plus, Trash2, X } from 'lucide-react';
+import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import {
   MAXIMO_DE_EJES,
   MAXIMO_DE_VARIANTES,
@@ -12,8 +13,14 @@ interface EditorDeVariantesProps {
   ejes: string[];
   filas: VarianteEnFormulario[];
   moneda: string;
+  /** Si se enseña la columna de costo (MOD-6). Solo para admin. */
+  conCostos?: boolean;
   onChange: (ejes: string[], filas: VarianteEnFormulario[]) => void;
 }
+
+/** El margen de una fila, con el precio que de verdad se cobra (el de oferta si lo hay). */
+const margenDeLaFila = (fila: VarianteEnFormulario) =>
+  margenDe(precioQueSeCobra(fila.price, fila.sale_price), fila.cost);
 
 /**
  * Las variantes de un producto en el formulario del panel (MOD-5).
@@ -22,8 +29,11 @@ interface EditorDeVariantesProps {
  * ("Capacidad", "Color") y cada variante solo rellena sus valores: así no puede
  * haber una que diga "Capacidad" y otra "capacidad " para lo mismo, que en la
  * tienda saldrían como dos cosas distintas.
+ *
+ * El costo de cada variante (MOD-6) solo aparece si `conCostos`: es dato de
+ * admin, y su ausencia significa "no lo toques" al guardar.
  */
-export default function EditorDeVariantes({ ejes, filas, moneda, onChange }: EditorDeVariantesProps) {
+export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = false, onChange }: EditorDeVariantesProps) {
   const cambiarEje = (i: number, nombre: string) => {
     onChange(ejes.map((e, j) => (j === i ? nombre : e)), filas);
   };
@@ -149,6 +159,24 @@ export default function EditorDeVariantes({ ejes, filas, moneda, onChange }: Edi
                       <span>Oferta</span>
                       <input type="number" step="0.01" min="0" className="premium-input" value={fila.sale_price} onChange={(e) => cambiarFila(fila.clave, { sale_price: e.target.value })} />
                     </label>
+                    {conCostos && (
+                      <label>
+                        <span>Costo</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="premium-input"
+                          value={fila.cost}
+                          onChange={(e) => cambiarFila(fila.clave, { cost: e.target.value })}
+                        />
+                        {margenDeLaFila(fila) && (
+                          <small className="variant-margin">
+                            {margenDeLaFila(fila)!.porcentaje}% de margen
+                          </small>
+                        )}
+                      </label>
+                    )}
                     <label>
                       <span>Stock</span>
                       <input type="number" min="0" className="premium-input" value={fila.stock} onChange={(e) => cambiarFila(fila.clave, { stock: e.target.value })} />

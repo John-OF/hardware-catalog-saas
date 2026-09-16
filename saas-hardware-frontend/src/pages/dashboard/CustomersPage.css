@@ -1,0 +1,258 @@
+/* Estilos de <CustomersPage> (MOD-10).
+
+   Acotados a `.page-customers`, que se anade en la raiz del componente y se le
+   pasa tambien al <Dialogo> de la ficha (que va por portal y ya no cuelga del
+   arbol de la pagina). Sin acotar, nombres como .page-header, .state-card o
+   .dashboard-table -definidos en media docena de hojas de este panel- se
+   pisarian entre pantallas.
+
+   Es `:where()` y no `.page-customers` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas compiten con index.css igual que las demas.
+
+   UI-5: ninguna de estas reglas apunta a una clase de un componente con CSS
+   propio. `.glass-card`, `.premium-input`, `.btn-secondary` y `.dialogo-*` son
+   del sistema de diseno o del dialogo, y por eso aqui no se redefinen. */
+
+:where(.page-customers).customers-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-customers) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-customers) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+/* Filtros */
+
+:where(.page-customers) .filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-customers) .search-box {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+
+:where(.page-customers) .search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+:where(.page-customers) .search-input {
+  padding-left: 2.4rem;
+  width: 100%;
+}
+
+/* Solo medidas: el fondo y el color los pone `.premium-input`, igual que en las
+   pantallas hermanas. */
+:where(.page-customers) .filter-select {
+  width: 230px;
+  cursor: pointer;
+}
+
+:where(.page-customers) .filter-select option {
+  background-color: var(--bg-select-option);
+  color: var(--text-primary);
+}
+
+/* Estados vacio y de carga */
+
+:where(.page-customers) .state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+:where(.page-customers) .state-card h3 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-customers) .state-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 52ch;
+}
+
+:where(.page-customers) .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+/* Tabla */
+
+:where(.page-customers) .table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+:where(.page-customers) .table-wrapper {
+  overflow-x: auto;
+}
+
+:where(.page-customers) .dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+:where(.page-customers) .dashboard-table th,
+:where(.page-customers) .dashboard-table td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+:where(.page-customers) .dashboard-table th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:where(.page-customers) .dashboard-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* A diferencia de Pedidos o Lista de espera, esta columna NO va a la derecha: alli
+   hay una fila de iconos de accion y pegarla al borde la separa de los datos; aqui
+   es un solo boton, y alineado a la derecha se leia como si perteneciera a otra
+   tabla. Se queda como las demas columnas.
+
+   Lleva `th` en el selector por el empate que documenta Lista de espera:
+   `.dashboard-table th` vale 0,1,1 y le ganaria a una clase suelta. */
+:where(.page-customers) .dashboard-table th.actions-header {
+  text-align: left;
+}
+
+:where(.page-customers) .actions-cell {
+  text-align: left;
+}
+
+:where(.page-customers) .btn-small {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+:where(.page-customers) .customer-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+:where(.page-customers) .customer-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+:where(.page-customers) .customer-since {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+:where(.page-customers) .customer-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-customers) .customer-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+:where(.page-customers) .customer-spent {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+:where(.page-customers) .muted-cell {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* Paginacion */
+
+:where(.page-customers) .pagination-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-customers) .page-indicator {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Ficha del cliente (dentro del <Dialogo>) */
+
+:where(.page-customers) .customer-stats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+:where(.page-customers) .customer-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+:where(.page-customers) .customer-stat strong,
+:where(.page-customers) .customer-stat-money {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+:where(.page-customers) .customer-orders {
+  font-size: 0.85rem;
+}
+
+:where(.page-customers) .customer-empty {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin: 0;
+}
