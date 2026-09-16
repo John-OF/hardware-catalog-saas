@@ -20,6 +20,8 @@ import {
   ShoppingCart,
   FileText,
   BarChart3,
+  // Reportes (MOD-9). `BarChart3` ya es Resumen, y son dos pantallas distintas.
+  LineChart,
   MessageSquare,
   Bell,
   History,
@@ -144,6 +146,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/settings')) return 'Configuración';
     if (location.pathname.includes('/dashboard/orders')) return 'Pedidos';
     if (location.pathname.includes('/dashboard/customers')) return 'Clientes';
+    if (location.pathname.includes('/dashboard/reports')) return 'Reportes';
     if (location.pathname.includes('/dashboard/pages')) return 'Páginas';
     if (location.pathname.includes('/dashboard/reviews')) return 'Reseñas';
     if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
@@ -240,6 +243,19 @@ export default function DashboardPage() {
           >
             <UserRound size={20} />
             <span>Clientes</span>
+            <ChevronRight className="nav-arrow" size={16} />
+          </NavLink>
+
+          {/* MOD-9: detrás de Clientes porque cierra el bloque de "cómo va la
+              tienda" -pedidos, quién compra, cuánto se vendió- antes de pasar a
+              lo que se configura. */}
+          <NavLink
+            to="/dashboard/reports"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <LineChart size={20} />
+            <span>Reportes</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 

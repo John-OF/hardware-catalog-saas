@@ -1,0 +1,530 @@
+/* Estilos de <ReportsPage> (MOD-9).
+
+   Acotados a `.page-reports`, que va en la raiz del componente y tambien en los
+   `return` tempranos de carga y de error. Sin acotar, nombres como .page-header,
+   .kpi-grid o .list-item-row -definidos en media docena de hojas de este panel-
+   se pisarian entre pantallas: .kpi-card existe tambien en OverviewPage.css con
+   otra pinta.
+
+   Es `:where()` y no `.page-reports` a secas porque :where() vale 0 de
+   especificidad: asi estas reglas compiten con index.css igual que las demas.
+
+   UI-5: ninguna de estas reglas apunta a una clase de un componente con CSS
+   propio. `.glass-card`, `.premium-input`, `.btn-primary` y `.btn-secondary` son
+   del sistema de diseno y por eso aqui no se redefinen. */
+
+:where(.page-reports).reports-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+:where(.page-reports).reports-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-reports).reports-error {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+:where(.page-reports) .spinner {
+  animation: spin 1s linear infinite;
+}
+
+:where(.page-reports) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-reports) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 75ch;
+  line-height: 1.5;
+}
+
+/* --- Filtros: una sola fila, encima de todo lo que filtran --------------- */
+
+:where(.page-reports) .reports-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+:where(.page-reports) .filtro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+:where(.page-reports) .filtro > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+:where(.page-reports) .filtro .premium-input {
+  min-width: 150px;
+}
+
+:where(.page-reports) .atajos {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-reports) .atajos .btn-secondary {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* Empuja el boton de exportar al extremo, lejos de los atajos: no es un filtro
+   mas, es la accion de la pantalla. */
+:where(.page-reports) .exportar {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --- Las cifras del rango ------------------------------------------------ */
+
+:where(.page-reports) .kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+:where(.page-reports) .kpi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+:where(.page-reports) .kpi-icon-wrapper {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+
+:where(.page-reports) .kpi-data {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+:where(.page-reports) .kpi-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+:where(.page-reports) .kpi-value {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+:where(.page-reports) .kpi-pie {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* Lo que avisa de que la cifra esta incompleta -lineas vendidas sin costo- no
+   es un error, pero tampoco puede leerse como un dato mas. */
+:where(.page-reports) .kpi-pie.aviso {
+  color: var(--warning);
+}
+
+/* --- La grafica ---------------------------------------------------------- */
+
+:where(.page-reports) .grafica-card {
+  padding: 1.25rem;
+}
+
+:where(.page-reports) .column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+:where(.page-reports) .column-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-reports) .column-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+:where(.page-reports) .ver-tabla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+/* Los dos colores de la grafica.
+
+   No salen de --primary/--success por dos motivos. El primero es que el verde
+   del sistema (#10b981 en claro, #22c55e en oscuro) queda fuera de la banda de
+   luminosidad que hace legible una serie sobre el lienzo. El segundo es que
+   estos dos se validaron como PAREJA: separacion suficiente en deuteranopia y
+   protanopia, contraste sobre los dos fondos del panel. Cambiar uno solo
+   rompe el par, asi que se cambian los dos o ninguno.
+
+   Aun asi el color no es lo unico que distingue las series: la venta es una
+   barra y la utilidad una linea con marcadores, mas la leyenda. */
+:where(.page-reports) .grafica {
+  --rep-ventas: #2563eb;
+  --rep-utilidad: #059669;
+}
+
+:where(.dashboard-layout.theme-dark) :where(.page-reports) .grafica {
+  --rep-ventas: #3b82f6;
+}
+
+:where(.page-reports) .leyenda {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+:where(.page-reports) .clave {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  /* El texto lleva tinta de texto, nunca el color de la serie: el color lo
+     carga la muestra de al lado. */
+  color: var(--text-secondary);
+}
+
+:where(.page-reports) .muestra {
+  display: inline-block;
+  border-radius: 2px;
+}
+
+:where(.page-reports) .muestra.barra {
+  width: 12px;
+  height: 12px;
+  background: var(--rep-ventas);
+}
+
+:where(.page-reports) .muestra.linea {
+  width: 14px;
+  height: 3px;
+  background: var(--rep-utilidad);
+}
+
+:where(.page-reports) .lienzo {
+  position: relative;
+}
+
+/* El SVG se pinta al ancho medido, no estirado: `width`/`height` los pone el
+   componente en píxeles reales para que el texto no escale con el contenedor
+   (ver el comentario de <GraficaDeVentas>). Aquí solo se le quita el hueco de
+   línea base y se le deja asomar la etiqueta directa de la barra más alta. */
+:where(.page-reports) .lienzo svg {
+  display: block;
+  overflow: visible;
+  max-width: 100%;
+}
+
+:where(.page-reports) .rejilla {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+:where(.page-reports) .etiqueta-eje {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+:where(.page-reports) .etiqueta-directa {
+  fill: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:where(.page-reports) .barra {
+  fill: var(--rep-ventas);
+  transition: opacity 0.15s ease;
+}
+
+/* Al pasar por encima se apaga el resto, no se enciende la de debajo: asi el
+   contraste de la que se mira no depende de un color nuevo. */
+:where(.page-reports) .lienzo:hover .barra {
+  opacity: 0.45;
+}
+
+:where(.page-reports) .lienzo:hover .barra.activa {
+  opacity: 1;
+}
+
+:where(.page-reports) .linea-utilidad {
+  fill: none;
+  stroke: var(--rep-utilidad);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* El aro del color del lienzo separa el marcador de la barra que tiene detras
+   sin inventarse un tercer color. */
+:where(.page-reports) .marcador {
+  fill: var(--rep-utilidad);
+  stroke: var(--bg-card);
+  stroke-width: 2;
+}
+
+:where(.page-reports) .zona {
+  fill: transparent;
+  cursor: pointer;
+}
+
+:where(.page-reports) .cruz {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+:where(.page-reports) .globo {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+:where(.page-reports) .globo strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+/* --- La serie como tabla ------------------------------------------------- */
+
+:where(.page-reports) .tabla-serie {
+  max-height: 320px;
+  overflow: auto;
+}
+
+:where(.page-reports) .tabla-serie table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+:where(.page-reports) .tabla-serie th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-reports) .tabla-serie td {
+  padding: 0.5rem 0.75rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-reports) .tabla-serie td:first-child {
+  color: var(--text-primary);
+}
+
+/* --- Las dos listas ------------------------------------------------------ */
+
+:where(.page-reports) .reports-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+:where(.page-reports) .split-column {
+  padding: 1.25rem;
+}
+
+:where(.page-reports) .list-container {
+  display: flex;
+  flex-direction: column;
+}
+
+:where(.page-reports) .empty-text {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+:where(.page-reports) .list-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.page-reports) .list-item-row:last-child {
+  border-bottom: none;
+}
+
+:where(.page-reports) .item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+:where(.page-reports) .puesto {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary-glow);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+:where(.page-reports) .icono-stock {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--warning-glow);
+  color: var(--warning);
+}
+
+:where(.page-reports) .info-texto {
+  min-width: 0;
+}
+
+:where(.page-reports) .info-texto h5 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+:where(.page-reports) .info-texto span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+:where(.page-reports) .item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+:where(.page-reports) .item-right strong {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+:where(.page-reports) .utilidad-pill,
+:where(.page-reports) .umbral {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+:where(.page-reports) .stock-pill {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* Agotado y bajo van con palabra, no solo con color: "Agotado" se lee igual en
+   blanco y negro. */
+:where(.page-reports) .stock-pill.agotado {
+  background: var(--danger-glow);
+  color: var(--danger);
+}
+
+:where(.page-reports) .stock-pill.bajo {
+  background: var(--warning-glow);
+  color: var(--warning);
+}
+
+/* --- Movil --------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  :where(.page-reports) .reports-filters {
+    align-items: stretch;
+  }
+
+  :where(.page-reports) .filtro,
+  :where(.page-reports) .filtro .premium-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  :where(.page-reports) .exportar {
+    margin-left: 0;
+    justify-content: center;
+  }
+}

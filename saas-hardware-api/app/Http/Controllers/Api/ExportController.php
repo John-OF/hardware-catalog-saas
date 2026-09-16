@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Support\Costos;
+use App\Support\Reportes;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -26,8 +28,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * importador acepta los dos delimitadores y se come el BOM (OWN-5), asi que lo
  * exportado se puede volver a importar.
  *
- * **Solo admin**: el CSV del catalogo lleva el costo de compra (MOD-6) y el de
- * pedidos, los datos de contacto de todos los clientes de la tienda.
+ * **Solo admin**: el CSV del catalogo lleva el costo de compra (MOD-6), el de
+ * pedidos los datos de contacto de todos los clientes de la tienda, y el del
+ * reporte (MOD-9) la utilidad.
  */
 class ExportController extends Controller
 {
@@ -141,6 +144,69 @@ class ExportController extends Controller
                     $pedido->utilidad,
                     $pedido->customer_note,
                 ], ';');
+            }
+        });
+    }
+
+    /**
+     * El reporte del rango (MOD-9), en **dos bloques dentro del mismo archivo**:
+     * la serie periodo a periodo y, debajo, los productos mas vendidos.
+     *
+     * Dos bloques y no dos descargas porque la pregunta es una sola -"como me
+     * fue en agosto"- y quien la lleva a su hoja de calculo quiere las dos
+     * tablas al lado. A diferencia del catalogo y de los pedidos, este CSV NO
+     * esta pensado para volver a importarse: no hay nada que reimportar, son
+     * cuentas.
+     *
+     * Sale **entero**, sin el tope de diez filas de la pantalla: en pantalla se
+     * miran los diez primeros, en la hoja se suman todos.
+     *
+     * Los numeros salen de `App\Support\Reportes`, el mismo sitio del que los
+     * saca la pantalla, para que el archivo no pueda decir otra cosa.
+     */
+    public function reports(Request $request): StreamedResponse
+    {
+        $tenant = app('currentTenant');
+
+        [$desde, $hasta, $agrupacion] = Reportes::rango($request);
+
+        $reportes = new Reportes($tenant->id, $desde, $hasta, $agrupacion);
+
+        // Aqui siempre true: la ruta es de admin, que es justo quien puede ver
+        // el costo (MOD-6). Se pregunta igual en vez de escribir `true` para
+        // que el dia que la ruta se abra a staff el archivo se ajuste solo.
+        $conCostos = Costos::usuarioPuedeVerlos();
+
+        // Se calculan AHORA y no dentro del callback: `streamDownload` lo
+        // ejecuta al enviar la respuesta, y un `abort(422)` de un rango
+        // imposible a esas alturas ya no puede convertirse en un error para el
+        // navegador -las cabeceras ya salieron-.
+        $serie = $reportes->serie($conCostos);
+        $masVendidos = $reportes->masVendidos($conCostos, tope: null);
+
+        $nombre = "reporte-{$tenant->slug}-{$desde->toDateString()}-a-{$hasta->toDateString()}.csv";
+
+        return $this->csv($nombre, function ($salida) use ($serie, $masVendidos, $agrupacion, $conCostos) {
+            $cabeceraSerie = [$agrupacion === 'mes' ? 'mes' : 'fecha', 'ventas', 'pedidos', 'unidades'];
+            fputcsv($salida, $conCostos ? [...$cabeceraSerie, 'utilidad'] : $cabeceraSerie, ';');
+
+            foreach ($serie as $fila) {
+                fputcsv($salida, array_values($fila), ';');
+            }
+
+            // Una fila en blanco separa las dos tablas: pegadas, Excel las lee
+            // como una sola con las columnas descuadradas.
+            fputcsv($salida, [], ';');
+
+            $cabeceraTop = ['producto', 'unidades', 'ventas'];
+            fputcsv($salida, $conCostos ? [...$cabeceraTop, 'utilidad'] : $cabeceraTop, ';');
+
+            foreach ($masVendidos as $fila) {
+                // Sin `product_id`: en la hoja no sirve de nada y el nombre es
+                // el snapshot de la venta, que es lo que se quiere leer.
+                unset($fila['product_id']);
+
+                fputcsv($salida, array_values($fila), ';');
             }
         });
     }

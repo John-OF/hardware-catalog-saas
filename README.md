@@ -220,6 +220,7 @@ app/
     ├── PlanGate.php        # Aplica los límites del plan
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
+    ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
     ├── Money.php           # Formato de moneda por tienda
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
@@ -275,7 +276,8 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 |---|---|---|---|
 | POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión | Sí |
 | POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | Sí |
-| GET | `/api/dashboard/stats` | Métricas | Sí |
+| GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | Sí |
+| GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). Devuelve resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **no salen para staff** (MOD-6) | Sí, sin costos |
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
 | GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3) y `delivery_enabled`/`delivery_cost` (MOD-1) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
@@ -285,6 +287,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
 | GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
 | GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta` | No |
+| GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques | No |
 | GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
 | CRUD | `/api/pages` | Páginas informativas | No |
@@ -336,7 +339,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 547 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 565 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -369,7 +372,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/login` · `/register` | Acceso y alta de tienda |
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
 | `/dashboard` | Resumen con métricas |
-| `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10) |
+| `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
 | `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 | `/platform/login` | Acceso del operador del SaaS |
@@ -452,7 +455,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 117 tests (Vitest + Testing Library, jsdom)
+npm test          # 128 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -467,7 +470,9 @@ la selección de entrega y su costo en `CartDrawer`), que el `FormData` de Confi
 booleanos de verdad (`api/tenant`), el margen y qué precio se compara con el costo (`utils/margen`),
 la descarga de las exportaciones (`api/exportaciones`: blob, filtros y nombre del archivo), la
 pantalla de clientes (`CustomersPage`: totales, cliente sin compras y la ficha que solo se pide al
-abrirla), y `money`/`phone`. La red se sustituye en cada test; ninguno
+abrirla), la de reportes (`ReportsPage`: que el rango y la agrupación se le pidan al servidor, que
+sin permiso no se pinte utilidad ni margen, la serie como tabla y el motivo de un rango rechazado),
+y `money`/`phone`. La red se sustituye en cada test; ninguno
 necesita la API levantada. Las páginas grandes (ficha, armador, formulario de producto) todavía no
 tienen tests.
 
@@ -509,6 +514,14 @@ tienen tests.
   conviértelo con `filter_var($valor, FILTER_VALIDATE_BOOLEAN)` antes de guardar.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
+- **Lo que se difiere al envío de la respuesta (`streamDownload`, `defer()`) corre fuera del alcance
+  de la tienda**: para entonces el middleware ya la olvidó, y el fallo en cerrado devuelve cero filas
+  **sin ningún error**. Esas consultas van con `withoutTenant()` y el `tenant_id` fijado antes de
+  empezar (`ExportController`, `App\Support\Reportes`).
+- **Una función de fecha en SQL se escribe para los dos motores.** MySQL (producción) no tiene
+  `strftime` y SQLite (la suite) no tiene `DATE_FORMAT`: escribir solo una deja los tests en verde y
+  un 500 en el servidor. Se elige por `DB::connection()->getDriverName()`, como en
+  `Reportes::expresionDePeriodo()`.
 - **Toda ruta nueva del panel que escribe decide si anota en la actividad.** Se anota con
   `App\Support\Bitacora::anotar()` después de guardar (nunca tumba la acción si falla). Si la ruta no
   debe anotar, va en `SIN_ANOTAR` de `BitacoraDeTiendaTest` con su motivo; si no está en ninguna de

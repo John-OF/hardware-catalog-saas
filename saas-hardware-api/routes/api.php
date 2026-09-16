@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
@@ -200,6 +201,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // Estadísticas
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
+    // Reportes: ventas por periodo, más vendidos y stock bajo (MOD-9). Staff
+    // entra: son los mismos pedidos y el mismo stock que ya ve en sus dos
+    // pantallas. Lo que NO ve es el costo ni la utilidad, y eso no lo decide
+    // esta ruta sino `Costos::usuarioPuedeVerlos()` dentro: las claves no
+    // llegan a la respuesta.
+    Route::get('/reports', [ReportController::class, 'index']);
+
     // Configuración del tenant. Staff la LEE -el panel necesita la moneda, el
     // slug y si la tienda esta publicada- pero no la cambia.
     Route::get('/tenant',    [TenantController::class, 'show']);
@@ -218,6 +226,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     Route::middleware('admin')->group(function () {
         Route::get('products/export', [ExportController::class, 'products']);
         Route::get('orders/export', [ExportController::class, 'orders']);
+        // El del reporte lleva la utilidad, así que vive con los otros dos
+        // aunque la pantalla que lo ofrece sí la vea staff (MOD-9).
+        Route::get('reports/export', [ExportController::class, 'reports']);
     });
 
     // Productos: staff crea y edita, no borra (ver el subgrupo de abajo).

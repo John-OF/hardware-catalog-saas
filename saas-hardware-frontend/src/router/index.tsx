@@ -55,6 +55,7 @@ const CategoriesPage = lazy(() => import('../pages/dashboard/CategoriesPage'));
 const SettingsPage = lazy(() => import('../pages/dashboard/SettingsPage'));
 const OrdersPage = lazy(() => import('../pages/dashboard/OrdersPage'));
 const CustomersPage = lazy(() => import('../pages/dashboard/CustomersPage'));
+const ReportsPage = lazy(() => import('../pages/dashboard/ReportsPage'));
 const PagesPage = lazy(() => import('../pages/dashboard/PagesPage'));
 const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
 const WaitlistPage = lazy(() => import('../pages/dashboard/WaitlistPage'));
@@ -129,6 +130,11 @@ export const router = createBrowserRouter([
       // MOD-10. Sin SoloAdmin: staff ya ve los datos de contacto del cliente en
       // cada pedido que atiende, así que la lista no le enseña nada nuevo.
       { path: 'customers',  element: <CustomersPage /> },
+      // MOD-9. Sin SoloAdmin: staff ve las ventas y el stock bajo, que son los
+      // mismos datos que ya tiene en Pedidos y en Productos. El costo y el
+      // margen no se los manda el backend, así que no hay nada que esconder
+      // aquí.
+      { path: 'reports',    element: <ReportsPage /> },
       { path: 'reviews',    element: <ReviewsPage /> },
       { path: 'waitlist',   element: <WaitlistPage /> },
 
