@@ -8,6 +8,8 @@ export interface UpdateTenantPayload {
   logo_url?: string | null;
   custom_domain?: string | null;
   currency?: string;
+  /** MOD-13. Identificador IANA de `utils/timezones.ts`; el backend valida contra la misma lista. */
+  timezone?: string;
   theme?: TenantTheme;
   /** MOD-3. Se manda el objeto completo: el backend hace merge por método, no por campo. */
   payment_methods?: PaymentMethods;
@@ -37,6 +39,7 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
   if (payload.logo_url !== undefined && payload.logo_url !== null) fd.append('logo_url', payload.logo_url);
   if (payload.custom_domain !== undefined) fd.append('custom_domain', payload.custom_domain ?? '');
   if (payload.currency !== undefined) fd.append('currency', payload.currency);
+  if (payload.timezone !== undefined) fd.append('timezone', payload.timezone);
 
   // Campos del theme como arreglo anidado: theme[clave]=valor
   if (payload.theme) {

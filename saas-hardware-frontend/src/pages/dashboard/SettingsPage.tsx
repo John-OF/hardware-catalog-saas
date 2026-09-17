@@ -34,6 +34,8 @@ import {
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
 import { CURRENCIES, DEFAULT_CURRENCY, formatMoney } from '../../utils/money';
+import { TIMEZONES, DEFAULT_TIMEZONE, etiquetaDeZona } from '../../utils/timezones';
+import { formatearFechaHora } from '../../utils/fechas';
 import { DEFAULT_NEUTRAL, NEUTRALS, neutralClass } from '../../utils/neutrals';
 import {
   DEFAULT_HERO_STYLE,
@@ -132,6 +134,7 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#2563eb');
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
   
   // Estados para el tema (colores, portada, etc.)
   const [accentColor, setAccentColor] = useState('#06b6d4');
@@ -209,6 +212,7 @@ export default function SettingsPage() {
     setPrimaryColor(tenant.primary_color ?? '#2563eb');
     setCustomDomain(tenant.custom_domain ?? '');
     setCurrency(tenant.currency ?? DEFAULT_CURRENCY);
+    setTimezone(tenant.timezone ?? DEFAULT_TIMEZONE);
 
     // MOD-3: se completa cada método por separado y no de un tirón, porque
     // `GET /tenant` sólo trae las claves que alguna vez se guardaron —una
@@ -360,6 +364,7 @@ export default function SettingsPage() {
       logo_url: logoUrl || null,
       custom_domain: customDomain || null,
       currency,
+      timezone,
       payment_methods: paymentMethods,
       delivery_enabled: deliveryEnabled,
       delivery_cost: deliveryCost || '0',
@@ -480,6 +485,30 @@ export default function SettingsPage() {
             <span className="helper-text">
               Ejemplo: {formatMoney(1234.5, currency)}. Se aplica a todos los precios del catálogo,
               el carrito y los pedidos.
+            </span>
+          </div>
+          {/* MOD-13. Va pegado a la moneda porque las dos responden a lo mismo:
+              dónde está la tienda. El ejemplo de abajo enseña la hora de AHORA
+              en la zona elegida, que es la única forma de que alguien note que
+              se equivocó antes de guardar. */}
+          <div className="form-group">
+            <label htmlFor="tenant-timezone">Zona horaria</label>
+            <select
+              id="tenant-timezone"
+              className="premium-input"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+            >
+              {/* La etiqueta lleva el desplazamiento calculado ("— UTC-5"): saber
+                  geografía no puede ser requisito para configurar una tienda, y
+                  así se ve de un vistazo cuándo dos países son equivalentes. */}
+              {Object.keys(TIMEZONES).map((zona) => (
+                <option key={zona} value={zona}>{etiquetaDeZona(zona)}</option>
+              ))}
+            </select>
+            <span className="helper-text">
+              Ahora mismo ahí son las {formatearFechaHora(new Date().toISOString(), timezone)}. Decide
+              en qué día cae cada venta en los reportes y con qué hora se ven las fechas del panel.
             </span>
           </div>
           <div className="form-group full">

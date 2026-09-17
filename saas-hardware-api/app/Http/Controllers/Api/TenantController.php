@@ -86,6 +86,13 @@ class TenantController extends Controller
             // que es la misma lista que ofrece el selector de Configuración.
             'currency' => ['sometimes', 'string', Rule::in(array_keys(config('currencies')))],
 
+            // Zona horaria de la tienda (MOD-13). Whitelist corta, como la
+            // moneda, y por el mismo motivo: el selector ofrece esas y solo
+            // esas. No se acepta cualquier identificador IANA valido porque
+            // entonces la lista del frontend y lo que admite el backend
+            // podrian separarse sin que nada fallara.
+            'timezone' => ['sometimes', 'string', Rule::in(array_keys(config('timezones')))],
+
             // Métodos de pago visibles para el comprador (MOD-3). Cuatro fijos,
             // por eso van con nombre y no como un array libre: un método
             // inventado no tendría ni formulario ni traducción en el catálogo.
@@ -253,7 +260,7 @@ class TenantController extends Controller
         unset($data['logo'], $data['banner'], $data['favicon']);
 
         $antes = $tenant->only([
-            'name', 'whatsapp_number', 'currency', 'custom_domain', 'primary_color', 'logo_url', 'theme',
+            'name', 'whatsapp_number', 'currency', 'timezone', 'custom_domain', 'primary_color', 'logo_url', 'theme',
             'payment_methods', 'delivery_enabled', 'delivery_cost',
         ]);
 
@@ -300,6 +307,7 @@ class TenantController extends Controller
             'name' => 'nombre',
             'whatsapp_number' => 'WhatsApp',
             'currency' => 'moneda',
+            'timezone' => 'zona horaria',
             'custom_domain' => 'dominio propio',
             'delivery_enabled' => 'envío a domicilio',
             'delivery_cost' => 'costo de envío',

@@ -13,11 +13,14 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { getReviews, updateReviewApproval, deleteReview } from '../../api/reviews';
+import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFecha } from '../../utils/fechas';
 import type { Review, PaginatedResponse } from '../../types';
 import './ReviewsPage.css';
 
 export default function ReviewsPage() {
   const queryClient = useQueryClient();
+  const tenant = useTenantStore((s) => s.tenant);
   const [search, setSearch] = useState('');
   const [isApproved, setIsApproved] = useState('');
   const [rating, setRating] = useState('');
@@ -195,7 +198,7 @@ export default function ReviewsPage() {
                       </p>
                     </td>
                     <td className="date-cell">
-                      {new Date(review.created_at).toLocaleDateString()}
+                      {formatearFecha(review.created_at, tenant?.timezone)}
                     </td>
                     <td>
                       <button

@@ -27,6 +27,12 @@ use Illuminate\Support\Facades\DB;
  * atendio: es la que ve el dueño en el listado y la que exporta MOD-7, y la
  * unica que no se mueve sola.
  *
+ * **Y esa fecha se lee en la zona horaria de la tienda** (MOD-13). Todo se
+ * guarda en UTC y se sigue guardando en UTC; lo que cambia es donde se corta el
+ * dia. Sin esto, una venta de las 8 de la noche en Peru (UTC-5) contaba como
+ * del dia siguiente, que en el total del mes da igual y en una grafica por dia
+ * no.
+ *
  * **Todas las consultas van con `withoutTenant()` y el `tenant_id` a mano.** No
  * es un descuido del aislamiento sino lo contrario: la exportacion escribe su
  * CSV en un callback que corre al ENVIAR la respuesta, cuando el middleware ya
@@ -55,6 +61,13 @@ class Reportes
 
     private const TOPE_STOCK_BAJO = 20;
 
+    /**
+     * @param  CarbonImmutable  $desde  Primer dia del rango, **en la zona de la
+     *                                  tienda** y a las 00:00. Lo construye
+     *                                  `rango()`; pasarlo en otra zona hace que
+     *                                  el rango empiece a otra hora.
+     * @param  CarbonImmutable  $hasta  Ultimo dia del rango, igual.
+     */
     public function __construct(
         private string $tenantId,
         private CarbonImmutable $desde,
@@ -70,9 +83,16 @@ class Reportes
      * controlador para que la pantalla y su exportacion no puedan entender
      * "desde" de dos maneras distintas.
      *
+     * **Las dos fechas se interpretan en la zona de la tienda** (MOD-13). "Del
+     * 1 al 31" es del 1 al 31 alli, no en UTC: el dueño escribe los dias de su
+     * calendario, no los del servidor. Y "hoy" sin fechas es el hoy de la
+     * tienda, que puede no ser el del servidor -a las 21:00 en Lima, en UTC ya
+     * es maniana-.
+     *
+     * @param  string  $zona  Identificador IANA de `Tenant::zonaHoraria()`.
      * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
      */
-    public static function rango(Request $request): array
+    public static function rango(Request $request, string $zona = 'UTC'): array
     {
         $request->validate([
             'desde'      => 'nullable|date',
@@ -88,11 +108,11 @@ class Reportes
             : 'dia';
 
         $hasta = $request->filled('hasta')
-            ? CarbonImmutable::parse($request->hasta)->startOfDay()
-            : CarbonImmutable::now()->startOfDay();
+            ? CarbonImmutable::parse($request->hasta, $zona)->startOfDay()
+            : CarbonImmutable::now($zona)->startOfDay();
 
         $desde = $request->filled('desde')
-            ? CarbonImmutable::parse($request->desde)->startOfDay()
+            ? CarbonImmutable::parse($request->desde, $zona)->startOfDay()
             : $hasta->subDays(29);
 
         self::comprobarLargo($desde, $hasta, $agrupacion);
@@ -265,20 +285,52 @@ class Reportes
     }
 
     /**
-     * La etiqueta del periodo, **en el dialecto de cada motor**.
+     * La etiqueta del periodo, **en el dialecto de cada motor y en la hora de la
+     * tienda**.
      *
      * MySQL no tiene `strftime` y SQLite no tiene `DATE_FORMAT`. La suite corre
      * sobre SQLite y produccion sobre MySQL, asi que escribir solo una de las
      * dos deja un test en verde y un 500 en el servidor, que es justo el fallo
      * que nadie ve venir.
+     *
+     * El `created_at` esta en UTC, asi que antes de recortarlo a "dia" o "mes"
+     * se le suma el desplazamiento de la tienda (MOD-13). Se hace sumando
+     * minutos y no con `CONVERT_TZ`: esa funcion devuelve NULL si el servidor
+     * MySQL no tiene cargadas las tablas de zonas horarias -que es lo normal en
+     * una instalacion recien hecha-, y un NULL aqui agruparia todas las ventas
+     * en una sola fila vacia sin dar ningun error.
+     *
+     * `$minutos` sale de Carbon y se fuerza a entero antes de entrar en el SQL:
+     * es el unico valor de esta cadena que no es literal.
      */
     private function expresionDePeriodo(): string
     {
         $formato = $this->agrupacion === 'mes' ? '%Y-%m' : '%Y-%m-%d';
+        $minutos = $this->desplazamientoEnMinutos();
 
         return DB::connection()->getDriverName() === 'sqlite'
-            ? "strftime('{$formato}', orders.created_at)"
-            : "DATE_FORMAT(orders.created_at, '{$formato}')";
+            ? "strftime('{$formato}', orders.created_at, '{$minutos} minutes')"
+            : "DATE_FORMAT(DATE_ADD(orders.created_at, INTERVAL {$minutos} MINUTE), '{$formato}')";
+    }
+
+    /**
+     * Cuantos minutos separan la hora de la tienda de UTC.
+     *
+     * Se toma **al final del rango** y se usa uno solo para todo el. Donde hay
+     * horario de verano -Chile, Paraguay, Espania- un rango que cruce el cambio
+     * reparte mal las ventas de esa hora concreta; el resto del mercado al que
+     * apunta esto (Peru, Colombia, Mexico, Bolivia, Brasil...) no lo tiene. La
+     * alternativa correcta al cien por cien seria convertir fila a fila con las
+     * tablas de zonas de MySQL, que no siempre estan, o traerse un anio de
+     * ventas a PHP para agruparlas ahi. Queda escrito como limite en
+     * `funcionalidades.md`, que es donde tiene que estar.
+     *
+     * Los limites del rango NO usan esto: se calculan con Carbon, que si sabe de
+     * horario de verano, asi que el rango es exacto siempre.
+     */
+    private function desplazamientoEnMinutos(): int
+    {
+        return (int) $this->hasta->utcOffset();
     }
 
     // -------------------------------------------------------- mas vendidos
@@ -390,16 +442,25 @@ class Reportes
     /**
      * Los pedidos de la tienda dentro del rango, sin filtrar por estado.
      *
-     * `whereDate` y no un `whereBetween` con horas: las dos fechas del filtro
-     * son dias completos, el ultimo incluido, que es lo que espera quien escribe
-     * "del 1 al 31".
+     * **Instantes exactos, no `whereDate`.** El dia de la tienda empieza y
+     * acaba en un momento concreto de UTC -las 00:00 del 1 de septiembre en Lima
+     * son las 05:00 UTC- y `whereDate` comparaba la fecha UTC, o sea que se
+     * comia las cinco primeras horas del dia y se traia cinco de mas del
+     * anterior (MOD-13).
+     *
+     * El corte de arriba es `<` sobre el comienzo del dia SIGUIENTE, y no `<=`
+     * sobre el final de este: asi no hay que discutir si el ultimo segundo lleva
+     * milisegundos ni si la columna los guarda.
+     *
+     * Las dos fronteras las calcula Carbon a partir de la zona de la tienda, asi
+     * que son correctas tambien donde hay horario de verano.
      */
     private function pedidosDelRango()
     {
         return Order::withoutTenant()
             ->where('tenant_id', $this->tenantId)
-            ->whereDate('created_at', '>=', $this->desde->toDateString())
-            ->whereDate('created_at', '<=', $this->hasta->toDateString());
+            ->where('created_at', '>=', $this->desde->utc())
+            ->where('created_at', '<', $this->hasta->addDay()->utc());
     }
 
     /**
@@ -418,8 +479,9 @@ class Reportes
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->where('orders.tenant_id', $this->tenantId)
             ->where('orders.status', 'attended')
-            ->whereDate('orders.created_at', '>=', $this->desde->toDateString())
-            ->whereDate('orders.created_at', '<=', $this->hasta->toDateString());
+            // Los mismos instantes exactos que `pedidosDelRango()`; ver alli.
+            ->where('orders.created_at', '>=', $this->desde->utc())
+            ->where('orders.created_at', '<', $this->hasta->addDay()->utc());
     }
 
     /**

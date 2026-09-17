@@ -107,6 +107,14 @@ export interface Tenant {
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
   /**
+   * Zona horaria de la tienda (MOD-13). Identificador IANA, 'UTC' por defecto.
+   *
+   * No cambia nada de lo guardado —la base sigue en UTC— sino cómo se lee: en
+   * qué día cae una venta al agrupar los reportes y con qué hora se pinta una
+   * fecha en el panel. Ver src/utils/timezones.ts y src/utils/fechas.ts.
+   */
+  timezone: string;
+  /**
    * Métodos de pago que la tienda le enseña al comprador (MOD-3). No es una
    * pasarela: el checkout sigue cerrándose por WhatsApp, esto es solo dónde
    * pagarle. Desde el catálogo público solo llegan los que están `enabled`;

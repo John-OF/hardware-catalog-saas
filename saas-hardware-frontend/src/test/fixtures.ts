@@ -18,6 +18,7 @@ export const unaTienda = (datos: Partial<Tenant> = {}): Tenant => ({
   custom_domain_verified_at: null,
   trial_ends_at: null,
   currency: 'USD',
+  timezone: 'UTC',
   payment_methods: null,
   delivery_enabled: false,
   delivery_cost: 0,

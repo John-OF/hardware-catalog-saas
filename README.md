@@ -226,6 +226,10 @@ app/
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/plans.php       # La matriz de planes y límites
+config/timezones.php   # Zonas horarias que puede elegir una tienda (MOD-13).
+                       # El criterio es DONDE HAY TIENDAS, no que moneda usan: sacarla
+                       # de las monedas dejo fuera a los paises dolarizados. Copia en
+                       # utils/timezones.ts, y un test comprueba que no se separen.
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
@@ -277,9 +281,9 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión | Sí |
 | POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | Sí |
 | GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | Sí |
-| GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). Devuelve resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **no salen para staff** (MOD-6) | Sí, sin costos |
+| GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **no salen para staff** (MOD-6) | Sí, sin costos |
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
-| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3) y `delivery_enabled`/`delivery_cost` (MOD-1) | Solo `GET` |
+| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1) y `timezone` (MOD-13, whitelist de `config/timezones.php`) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6) | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
@@ -339,7 +343,7 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 565 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 582 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
@@ -455,7 +459,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 128 tests (Vitest + Testing Library, jsdom)
+npm test          # 141 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -521,7 +525,15 @@ tienen tests.
 - **Una función de fecha en SQL se escribe para los dos motores.** MySQL (producción) no tiene
   `strftime` y SQLite (la suite) no tiene `DATE_FORMAT`: escribir solo una deja los tests en verde y
   un 500 en el servidor. Se elige por `DB::connection()->getDriverName()`, como en
-  `Reportes::expresionDePeriodo()`.
+  `Reportes::expresionDePeriodo()`. **Y nunca `CONVERT_TZ`**: devuelve `NULL` si el MySQL no tiene
+  cargadas las tablas de zonas horarias —lo normal en una instalación nueva— y eso agrupa todo en
+  una fila vacía sin dar ningún error; el desplazamiento va en minutos.
+- **Todo se guarda en UTC; la zona de la tienda (`tenants.timezone`, MOD-13) solo decide cómo se
+  lee.** Un rango de fechas del panel son días del calendario de la tienda: sus límites se calculan
+  con Carbon y se comparan como instantes (`created_at >= X AND < Y`), nunca con `whereDate`, que
+  compara la fecha UTC y se come las primeras horas del día. En el frontend, una fecha del panel se
+  pinta con `utils/fechas.ts` y la zona de la tienda, nunca con `toLocaleDateString()` a secas, que
+  usa el reloj de quien mira.
 - **Toda ruta nueva del panel que escribe decide si anota en la actividad.** Se anota con
   `App\Support\Bitacora::anotar()` después de guardar (nunca tumba la acción si falla). Si la ruta no
   debe anotar, va en `SIN_ANOTAR` de `BitacoraDeTiendaTest` con su motivo; si no está en ninguna de

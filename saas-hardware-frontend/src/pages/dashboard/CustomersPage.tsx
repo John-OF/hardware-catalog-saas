@@ -17,6 +17,7 @@ import { getCustomer, getCustomers, type OrdenDeClientes } from '../../api/custo
 import Dialogo from '../../components/ui/Dialogo';
 import type { Cliente, FichaDeCliente, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFecha } from '../../utils/fechas';
 import { formatMoney } from '../../utils/money';
 
 /**
@@ -35,6 +36,7 @@ import { formatMoney } from '../../utils/money';
 export default function CustomersPage() {
   const tenant = useTenantStore((s) => s.tenant);
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency ?? 'USD');
+  const fecha = (iso: string | null | undefined) => formatearFecha(iso, tenant?.timezone);
 
   const [busqueda, setBusqueda] = useState('');
   const [orden, setOrden] = useState<OrdenDeClientes>('recientes');
@@ -125,7 +127,7 @@ export default function CustomersPage() {
                       <div className="customer-name-cell">
                         <span className="customer-name">{cliente.name}</span>
                         <span className="customer-since">
-                          Cliente desde {new Date(cliente.created_at).toLocaleDateString()}
+                          Cliente desde {fecha(cliente.created_at)}
                         </span>
                       </div>
                     </td>
@@ -145,7 +147,7 @@ export default function CustomersPage() {
                     <td className="customer-spent">{money(cliente.total_gastado)}</td>
                     <td>
                       {cliente.ultima_compra ? (
-                        new Date(cliente.ultima_compra).toLocaleDateString()
+                        fecha(cliente.ultima_compra)
                       ) : (
                         <span className="muted-cell">Sin compras todavía</span>
                       )}
@@ -195,6 +197,7 @@ export default function CustomersPage() {
         <FichaDelCliente
           cliente={fichaAbierta}
           money={money}
+          fecha={fecha}
           onCerrar={() => setFichaAbierta(null)}
         />
       )}
@@ -212,10 +215,13 @@ export default function CustomersPage() {
 function FichaDelCliente({
   cliente,
   money,
+  fecha,
   onCerrar,
 }: {
   cliente: Cliente;
   money: (n: number | string | null | undefined) => string;
+  /** Formatea en la zona de la tienda (MOD-13). Llega hecho, como `money`. */
+  fecha: (iso: string | null | undefined) => string;
   onCerrar: () => void;
 }) {
   const { data, isLoading } = useQuery<FichaDeCliente>({
@@ -268,7 +274,7 @@ function FichaDelCliente({
               {pedidos.map((pedido) => (
                 <tr key={pedido.id}>
                   <td>#{pedido.number}</td>
-                  <td>{new Date(pedido.created_at).toLocaleDateString()}</td>
+                  <td>{fecha(pedido.created_at)}</td>
                   <td>{etiquetaDeEstado(pedido.status)}</td>
                   <td>{money(pedido.total)}</td>
                 </tr>

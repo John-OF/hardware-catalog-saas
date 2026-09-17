@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, History, Loader2 } from 'lucide-react';
 import { getActividad } from '../../api/activity';
 import { getTeamUsers } from '../../api/users';
+import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFechaHora } from '../../utils/fechas';
 import type { AreaDeActividad } from '../../types';
 
 /** En el orden del menú del panel. */
@@ -22,7 +24,6 @@ const AREAS: { valor: AreaDeActividad; etiqueta: string }[] = [
 const etiquetaDeArea = (action: string) =>
   AREAS.find((a) => action.startsWith(`${a.valor}.`))?.etiqueta ?? 'Otro';
 
-const fecha = new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 'short' });
 
 /**
  * Quién cambió qué en el panel (INF-3). Solo admin.
@@ -36,6 +37,7 @@ const fecha = new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 's
  */
 export default function ActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const tenant = useTenantStore((s) => s.tenant);
 
   const area = (searchParams.get('area') as AreaDeActividad | null) || undefined;
   const actor = searchParams.get('persona') || undefined;
@@ -140,7 +142,7 @@ export default function ActivityPage() {
                   )}
                   <span className="activity-area">{etiquetaDeArea(linea.action)}</span>
                   <time className="activity-time" dateTime={linea.created_at}>
-                    {fecha.format(new Date(linea.created_at))}
+                    {formatearFechaHora(linea.created_at, tenant?.timezone)}
                   </time>
                 </div>
                 <p className="activity-description">{linea.description}</p>

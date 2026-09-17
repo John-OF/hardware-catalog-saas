@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { getDashboardStats } from '../../api/dashboard';
 import type { DashboardStats } from '../../api/dashboard';
 import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFecha } from '../../utils/fechas';
 import { formatMoney } from '../../utils/money';
 
 export default function OverviewPage() {
@@ -181,7 +182,7 @@ export default function OverviewPage() {
                     </div>
                     <div className="order-info-text">
                       <h5>{order.customer_name}</h5>
-                      <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                      <span>{formatearFecha(order.created_at, tenant?.timezone)}</span>
                     </div>
                   </div>
                   <div className="item-right">

@@ -24,7 +24,7 @@ class Tenant extends Model implements IsTenant
     protected $fillable = [
         'slug', 'name', 'logo_url', 'primary_color', 'theme',
         'whatsapp_number', 'plan', 'is_active', 'is_published', 'custom_domain', 'currency',
-        'payment_methods', 'delivery_enabled', 'delivery_cost',
+        'timezone', 'payment_methods', 'delivery_enabled', 'delivery_cost',
     ];
 
     protected $casts = [
@@ -48,6 +48,24 @@ class Tenant extends Model implements IsTenant
      * en `TenantController::update()` (la validación) y en `PaymentMethodsForm`
      * del frontend.
      */
+    /**
+     * La zona horaria de la tienda, siempre utilizable (MOD-13).
+     *
+     * Nunca devuelve null ni vacio: una tienda de antes de esta columna, o una
+     * fila a la que alguien le metio `''` a mano, cae en UTC, que es como se
+     * comportaba el sistema entero antes de MOD-13. Lo que NO se hace aqui es
+     * adivinar la zona por la moneda: una tienda peruana puede cobrar en
+     * dolares, y dos tiendas con la misma moneda pueden estar en husos
+     * distintos.
+     *
+     * Todo se sigue guardando en UTC. Esto solo decide como se LEE: en que dia
+     * cae una venta al agrupar los reportes y con que hora se pinta una fecha.
+     */
+    public function zonaHoraria(): string
+    {
+        return $this->timezone ?: 'UTC';
+    }
+
     public const METODOS_DE_PAGO = ['yape', 'plin', 'transferencia', 'efectivo'];
 
     /**

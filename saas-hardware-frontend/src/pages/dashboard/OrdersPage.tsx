@@ -23,6 +23,7 @@ import { exportarPedidos } from '../../api/exportaciones';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFecha, formatearFechaHora } from '../../utils/fechas';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import Dialogo from '../../components/ui/Dialogo';
@@ -259,7 +260,7 @@ export default function OrdersPage() {
                   <td className="date-cell">
                     <div className="date-info">
                       <Calendar size={14} />
-                      <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                      <span>{formatearFecha(order.created_at, tenant?.timezone)}</span>
                     </div>
                   </td>
                   <td>{order.items_count} u.</td>
@@ -420,7 +421,7 @@ export default function OrdersPage() {
                   </div>
                   <div>
                     <label>Fecha de Pedido:</label>
-                    <p>{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                    <p>{formatearFechaHora(selectedOrder.created_at, tenant?.timezone)}</p>
                   </div>
                   {selectedOrder.customer_note && (
                     <div className="full-width">

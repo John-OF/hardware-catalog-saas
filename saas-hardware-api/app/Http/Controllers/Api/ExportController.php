@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Support\Costos;
 use App\Support\Reportes;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -61,7 +62,7 @@ class ExportController extends Controller
             ->orderBy('sort_order')
             ->orderBy('created_at');
 
-        return $this->csv("catalogo-{$tenant->slug}-".now()->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
+        return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
             fputcsv($salida, [
                 'nombre', 'marca', 'sku', 'precio', 'precio_oferta', 'costo',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
@@ -109,17 +110,27 @@ class ExportController extends Controller
             'hasta.after_or_equal' => 'La fecha final no puede ser anterior a la inicial.',
         ]);
 
+        $zona = $tenant->zonaHoraria();
+
         $consulta = $this->sinScopeDeTienda(Order::query(), $tenant->id)
             ->with('items')
             ->when(
                 in_array($request->status, ['pending', 'processing', 'attended', 'cancelled'], true),
                 fn ($q) => $q->where('status', $request->status),
             )
-            ->when($request->desde, fn ($q) => $q->whereDate('created_at', '>=', $request->desde))
-            ->when($request->hasta, fn ($q) => $q->whereDate('created_at', '<=', $request->hasta))
+            // MOD-13: el dia de la tienda empieza y acaba en un instante
+            // concreto de UTC. Con `whereDate` sobre la fecha UTC, una tienda en
+            // Lima se dejaba fuera las cinco primeras horas de su "desde" y se
+            // traia cinco de mas del dia anterior a su "hasta".
+            ->when($request->desde, fn ($q) => $q->where(
+                'created_at', '>=', CarbonImmutable::parse($request->desde, $zona)->startOfDay()->utc(),
+            ))
+            ->when($request->hasta, fn ($q) => $q->where(
+                'created_at', '<', CarbonImmutable::parse($request->hasta, $zona)->startOfDay()->addDay()->utc(),
+            ))
             ->orderBy('created_at');
 
-        return $this->csv("pedidos-{$tenant->slug}-".now()->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
+        return $this->csv("pedidos-{$tenant->slug}-".now($zona)->format('Y-m-d').'.csv', function ($salida) use ($consulta, $zona) {
             fputcsv($salida, [
                 'numero', 'fecha', 'estado', 'cliente', 'telefono', 'correo',
                 'entrega', 'costo_envio', 'productos', 'total', 'costo_total',
@@ -129,7 +140,9 @@ class ExportController extends Controller
             foreach ($consulta->lazy(self::POR_LOTE) as $pedido) {
                 fputcsv($salida, [
                     $pedido->number,
-                    $pedido->created_at?->format('Y-m-d H:i'),
+                    // En la hora de la tienda, no en UTC (MOD-13): quien abre
+                    // esto en Excel cuadra cajas con las horas de su mostrador.
+                    $pedido->created_at?->timezone($zona)->format('Y-m-d H:i'),
                     $this->estadoEnTexto($pedido->status),
                     $pedido->customer_name,
                     $pedido->customer_phone,
@@ -168,7 +181,7 @@ class ExportController extends Controller
     {
         $tenant = app('currentTenant');
 
-        [$desde, $hasta, $agrupacion] = Reportes::rango($request);
+        [$desde, $hasta, $agrupacion] = Reportes::rango($request, $tenant->zonaHoraria());
 
         $reportes = new Reportes($tenant->id, $desde, $hasta, $agrupacion);
 

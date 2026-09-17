@@ -20,6 +20,8 @@ import {
   deleteStockNotification,
 } from '../../api/stockNotifications';
 import type { StockNotification, PaginatedResponse } from '../../types';
+import { useTenantStore } from '../../stores/tenantStore';
+import { formatearFecha } from '../../utils/fechas';
 import { nombreConVariante } from '../../utils/variants';
 import './WaitlistPage.css';
 
@@ -36,6 +38,7 @@ import './WaitlistPage.css';
  */
 export default function WaitlistPage() {
   const queryClient = useQueryClient();
+  const tenant = useTenantStore((s) => s.tenant);
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
 
@@ -219,7 +222,7 @@ export default function WaitlistPage() {
                         </span>
                       </td>
                       <td className="date-cell">
-                        {new Date(espera.created_at).toLocaleDateString()}
+                        {formatearFecha(espera.created_at, tenant?.timezone)}
                       </td>
                       <td>
                         {pendiente ? (

@@ -33,9 +33,13 @@ class ReportController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        [$desde, $hasta, $agrupacion] = Reportes::rango($request);
+        $tienda = app('currentTenant');
 
-        $reportes = new Reportes(app('currentTenant')->id, $desde, $hasta, $agrupacion);
+        // El rango se lee en la zona de la tienda (MOD-13): "del 1 al 31" son
+        // los dias de su calendario, no los del servidor.
+        [$desde, $hasta, $agrupacion] = Reportes::rango($request, $tienda->zonaHoraria());
+
+        $reportes = new Reportes($tienda->id, $desde, $hasta, $agrupacion);
         $conCostos = Costos::usuarioPuedeVerlos();
 
         return response()->json([
@@ -43,6 +47,11 @@ class ReportController extends Controller
                 'desde'      => $desde->toDateString(),
                 'hasta'      => $hasta->toDateString(),
                 'agrupacion' => $agrupacion,
+                // Se devuelve para que la pantalla pueda decir en que hora esta
+                // contando, y para que un rango sin fechas -que el servidor
+                // resuelve como "los ultimos 30 dias de la tienda"- llegue ya
+                // resuelto en vez de que el navegador lo adivine con SU reloj.
+                'zona'       => $tienda->zonaHoraria(),
             ],
             'resumen'      => $reportes->resumen($conCostos),
             'serie'        => $reportes->serie($conCostos),
