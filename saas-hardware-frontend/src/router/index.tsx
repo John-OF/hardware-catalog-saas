@@ -61,6 +61,8 @@ const ReviewsPage = lazy(() => import('../pages/dashboard/ReviewsPage'));
 const WaitlistPage = lazy(() => import('../pages/dashboard/WaitlistPage'));
 const UsersPage = lazy(() => import('../pages/dashboard/UsersPage'));
 const ActivityPage = lazy(() => import('../pages/dashboard/ActivityPage'));
+const TrashPage = lazy(() => import('../pages/dashboard/TrashPage'));
+const CouponsPage = lazy(() => import('../pages/dashboard/CouponsPage'));
 
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
@@ -145,6 +147,12 @@ export const router = createBrowserRouter([
       { path: 'pages',      element: <SoloAdmin><PagesPage /></SoloAdmin> },
       { path: 'users',      element: <SoloAdmin><UsersPage /></SoloAdmin> },
       { path: 'activity',   element: <SoloAdmin><ActivityPage /></SoloAdmin> },
+      // MOD-8. Solo admin por lo mismo que borrar (FUN-4): restaurar y volver
+      // a borrar sería reordenar el catálogo de otro.
+      { path: 'trash',      element: <SoloAdmin><TrashPage /></SoloAdmin> },
+      // MOD-4. Solo admin: un cupón es dinero que se deja de cobrar, así que lo
+      // decide quien decide los precios (FUN-4).
+      { path: 'coupons',    element: <SoloAdmin><CouponsPage /></SoloAdmin> },
     ],
   },
 

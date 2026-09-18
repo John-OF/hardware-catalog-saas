@@ -119,6 +119,15 @@ class TenantController extends Controller
             'delivery_enabled' => 'sometimes|boolean',
             'delivery_cost' => 'sometimes|numeric|min:0|max:99999.99',
 
+            // Impuesto (MOD-2). El nombre lo pone el dueño porque la plataforma
+            // no sabe en qué país está: "IGV" en Perú, "IVA" en media región,
+            // "ITBMS" en Panamá. `tax_included` decide si el porcentaje se saca
+            // del precio o se suma al final, y eso cambia lo que paga el cliente.
+            'tax_enabled' => 'sometimes|boolean',
+            'tax_name' => 'sometimes|string|max:20',
+            'tax_rate' => 'sometimes|numeric|min:0|max:99.99',
+            'tax_included' => 'sometimes|boolean',
+
             // Archivos subidos opcionales (alternativa a pegar la URL)
             'banner' => 'nullable|image|mimes:jpeg,png,webp|max:5120',
             // Sin SVG (TEC-7): un .svg puede llevar <script> dentro y se sirve
@@ -262,6 +271,7 @@ class TenantController extends Controller
         $antes = $tenant->only([
             'name', 'whatsapp_number', 'currency', 'timezone', 'custom_domain', 'primary_color', 'logo_url', 'theme',
             'payment_methods', 'delivery_enabled', 'delivery_cost',
+            'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
         ]);
 
         try {
@@ -311,6 +321,13 @@ class TenantController extends Controller
             'custom_domain' => 'dominio propio',
             'delivery_enabled' => 'envío a domicilio',
             'delivery_cost' => 'costo de envío',
+            // MOD-2: los cuatro con su "de X a Y". Cambiar el impuesto cambia lo
+            // que paga el cliente en la venta siguiente, así que es de lo que más
+            // importa que quede escrito quién lo tocó.
+            'tax_enabled' => 'cobro de impuesto',
+            'tax_name' => 'nombre del impuesto',
+            'tax_rate' => 'tasa del impuesto',
+            'tax_included' => 'impuesto incluido en los precios',
         ]);
 
         $otros = [];

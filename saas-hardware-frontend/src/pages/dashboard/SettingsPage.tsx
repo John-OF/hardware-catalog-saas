@@ -30,6 +30,8 @@ import {
   Landmark,
   Banknote,
   Truck,
+  // Impuesto (MOD-2).
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ImageSourceField from '../../components/ui/ImageSourceField';
@@ -160,6 +162,12 @@ export default function SettingsPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethods>(PAYMENT_METHODS_VACIOS);
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
   const [deliveryCost, setDeliveryCost] = useState('0');
+  // MOD-2. Apagado por defecto: encenderlo cambia lo que se cobra o cómo se
+  // desglosa, y eso lo decide el dueño, no nosotros por él.
+  const [taxEnabled, setTaxEnabled] = useState(false);
+  const [taxName, setTaxName] = useState('IGV');
+  const [taxRate, setTaxRate] = useState('18');
+  const [taxIncluded, setTaxIncluded] = useState(true);
 
   /** Cambia un campo de un método sin tocar los otros tres. */
   const setMetodo = <M extends keyof PaymentMethods>(
@@ -226,6 +234,10 @@ export default function SettingsPage() {
     });
     setDeliveryEnabled(tenant.delivery_enabled ?? false);
     setDeliveryCost(tenant.delivery_cost != null ? String(tenant.delivery_cost) : '0');
+    setTaxEnabled(tenant.tax_enabled ?? false);
+    setTaxName(tenant.tax_name || 'IGV');
+    setTaxRate(tenant.tax_rate != null ? String(tenant.tax_rate) : '18');
+    setTaxIncluded(tenant.tax_included ?? true);
 
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
@@ -368,6 +380,10 @@ export default function SettingsPage() {
       payment_methods: paymentMethods,
       delivery_enabled: deliveryEnabled,
       delivery_cost: deliveryCost || '0',
+      tax_enabled: taxEnabled,
+      tax_name: taxName || 'IGV',
+      tax_rate: taxRate || '0',
+      tax_included: taxIncluded,
       theme: {
         hero_style: heroStyle,
         hero_title: heroTitle || null,
@@ -791,6 +807,104 @@ export default function SettingsPage() {
                 Se cobra en cada pedido con delivery: {formatMoney(deliveryCost || 0, currency)}.
               </span>
             </div>
+          )}
+        </div>
+
+        <hr className="settings-divider" />
+
+        {/* Impuesto (MOD-2) */}
+        <div className="settings-grid">
+          <div className="form-group full">
+            <label className="payment-method-toggle">
+              <input
+                type="checkbox"
+                checked={taxEnabled}
+                onChange={(e) => setTaxEnabled(e.target.checked)}
+              />
+              <Receipt size={16} />
+              <span>Cobrar impuesto</span>
+            </label>
+            <span className="helper-text">
+              Aparece desglosado en cada pedido y en la cotización en PDF. Solo afecta a las
+              ventas nuevas: lo ya vendido conserva el impuesto con el que se vendió.
+            </span>
+          </div>
+
+          {taxEnabled && (
+            <>
+              <div className="form-group">
+                <label>Nombre</label>
+                <input
+                  className="premium-input"
+                  type="text"
+                  maxLength={20}
+                  value={taxName}
+                  onChange={(e) => setTaxName(e.target.value)}
+                />
+                <span className="helper-text">Como se llame en tu país: IGV, IVA, ITBMS…</span>
+              </div>
+
+              <div className="form-group">
+                <label>Tasa (%)</label>
+                <input
+                  className="premium-input"
+                  type="number"
+                  min="0"
+                  max="99.99"
+                  step="0.01"
+                  value={taxRate}
+                  onChange={(e) => setTaxRate(e.target.value)}
+                />
+              </div>
+
+              {/* La decisión que de verdad importa, y por eso va con el ejemplo
+                  calculado delante: elegir mal aquí cambia lo que paga el
+                  cliente, no solo cómo se ve. */}
+              <div className="form-group full">
+                <label>Tus precios…</label>
+                <label className="payment-method-toggle">
+                  <input
+                    type="radio"
+                    name="tax_included"
+                    checked={taxIncluded}
+                    onChange={() => setTaxIncluded(true)}
+                  />
+                  <span>
+                    <strong>ya incluyen el {taxName || 'impuesto'}</strong> — el cliente paga el
+                    precio del catálogo y el impuesto se desglosa hacia atrás
+                  </span>
+                </label>
+                <label className="payment-method-toggle">
+                  <input
+                    type="radio"
+                    name="tax_included"
+                    checked={!taxIncluded}
+                    onChange={() => setTaxIncluded(false)}
+                  />
+                  <span>
+                    <strong>son sin {taxName || 'impuesto'}</strong> — se suma al final, así que el
+                    total será mayor que la suma del carrito
+                  </span>
+                </label>
+                <span className="helper-text">
+                  Con un producto de {formatMoney(100, currency)}, el cliente paga{' '}
+                  <strong>
+                    {formatMoney(
+                      taxIncluded ? 100 : 100 * (1 + (Number(taxRate) || 0) / 100),
+                      currency,
+                    )}
+                  </strong>{' '}
+                  y el {taxName || 'impuesto'} sería{' '}
+                  {formatMoney(
+                    taxIncluded
+                      ? (100 * (Number(taxRate) || 0)) / (100 + (Number(taxRate) || 0))
+                      : (100 * (Number(taxRate) || 0)) / 100,
+                    currency,
+                  )}
+                  .
+                </span>
+              </div>
+            </>
           )}
         </div>
       </section>

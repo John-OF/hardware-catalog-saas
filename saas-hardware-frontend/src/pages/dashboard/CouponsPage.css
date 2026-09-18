@@ -1,0 +1,218 @@
+/* Estilos de <CouponsPage> (MOD-4).
+
+   Acotados con :where(.page-coupons), como las demas paginas del panel (TEC-6):
+   .page-header, .state-card, .pagination-bar... se llaman igual en media docena
+   de hojas. `.glass-card`, `.premium-input` y `.btn-primary` son del sistema de
+   diseno y no se redefinen aqui (UI-5). */
+
+:where(.page-coupons).coupons-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-coupons) .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-coupons) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-coupons) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+/* Lista */
+
+:where(.page-coupons) .coupon-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+:where(.page-coupons) .coupon-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(var(--overlay-mix), 0.07);
+}
+
+:where(.page-coupons) .coupon-item:last-child {
+  border-bottom: none;
+}
+
+/* Un cupon apagado sigue en la lista pero se lee como lo que es: algo que
+   ahora mismo no descuenta nada. */
+:where(.page-coupons) .coupon-item.apagado .coupon-code,
+:where(.page-coupons) .coupon-item.apagado .coupon-value {
+  opacity: 0.55;
+}
+
+:where(.page-coupons) .coupon-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 14rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* Monoespaciada a proposito: es un codigo que alguien va a teclear, y asi se
+   distingue un 0 de una O. */
+:where(.page-coupons) .coupon-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+:where(.page-coupons) .coupon-value {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+:where(.page-coupons) .coupon-badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(var(--overlay-mix), 0.08);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+:where(.page-coupons) .coupon-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+:where(.page-coupons) .coupon-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-coupons) .btn-danger-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid rgba(var(--overlay-mix), 0.14);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+:where(.page-coupons) .btn-danger-ghost:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: rgba(var(--overlay-mix), 0.04);
+}
+
+:where(.page-coupons) .btn-danger-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Paginacion. La de Actividad, que usa el mismo marcado. */
+
+:where(.page-coupons) .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:where(.page-coupons) .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-coupons) .pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-coupons) .page-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-coupons) .page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-coupons) .page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Formulario */
+
+:where(.page-coupons) .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+:where(.page-coupons) .coupon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  :where(.page-coupons) .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  :where(.page-coupons) .coupon-meta {
+    text-align: left;
+  }
+
+  :where(.page-coupons) .coupon-actions {
+    width: 100%;
+  }
+
+  :where(.page-coupons) .coupon-actions button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

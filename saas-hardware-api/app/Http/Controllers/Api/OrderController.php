@@ -11,6 +11,8 @@ use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
 use App\Support\Bitacora;
 use App\Support\Costos;
+use App\Support\Cupones;
+use App\Support\Impuesto;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -92,6 +94,9 @@ class OrderController extends Controller
             'items.*.product_id' => 'required|uuid',
             'items.*.variant_id' => 'nullable|uuid',
             'items.*.quantity' => 'required|integer|min:1|max:999',
+            // MOD-4: el dueño puede aplicar un cupón en el mostrador, que es
+            // donde llega el cliente con el código en el móvil.
+            'coupon_code' => 'nullable|string|max:40',
         ], [
             'customer_name.required' => 'Escribe a nombre de quién va la venta.',
             'items.required' => 'Agrega al menos un producto.',
@@ -100,9 +105,23 @@ class OrderController extends Controller
 
         // `soloVisibles: false`: el dueño vende lo que tiene físicamente, aunque
         // el producto esté despublicado o desactivado en el catálogo.
-        ['lines' => $lineItems, 'total' => $total] = $pricing->build($tenant, $data['items'], soloVisibles: false);
+        ['lines' => $lineItems, 'total' => $subtotalProductos] = $pricing->build($tenant, $data['items'], soloVisibles: false);
 
-        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total) {
+        // MOD-4: el descuento va antes del impuesto y solo sobre los productos.
+        // Una venta de mostrador no tiene envío, así que la base es lo que queda.
+        $cupon = Cupones::resolver($tenant, $data['coupon_code'] ?? null, $subtotalProductos);
+
+        // MOD-2: el impuesto lo decide el servidor con la configuración de la
+        // tienda, igual que el costo del envío (MOD-1).
+        $impuesto = Impuesto::paraVenta($tenant, round($subtotalProductos - $cupon['discount'], 2));
+
+        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $impuesto, $cupon, $subtotalProductos) {
+            // Dentro de la transacción y con la fila bloqueada: entre comprobar
+            // el tope y usarlo cabe otro comprador.
+            if ($cupon['coupon']) {
+                Cupones::consumir($cupon['coupon']);
+            }
+
             $order = Order::create([
                 'tenant_id' => $tenant->id,
                 'customer_name' => $data['customer_name'],
@@ -110,7 +129,15 @@ class OrderController extends Controller
                 'customer_email' => $data['customer_email'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
                 'status' => $data['status'],
-                'total' => $total,
+                'total' => $impuesto['total'],
+                'items_subtotal' => $subtotalProductos,
+                'coupon_id' => $cupon['coupon']?->id,
+                'coupon_code' => $cupon['coupon']?->code,
+                'discount_amount' => $cupon['coupon'] ? $cupon['discount'] : null,
+                'tax_name' => $impuesto['tax_name'],
+                'tax_rate' => $impuesto['tax_rate'],
+                'tax_included' => $impuesto['tax_included'],
+                'tax_amount' => $impuesto['tax_amount'],
             ]);
 
             $order->items()->createMany($lineItems);
@@ -119,7 +146,7 @@ class OrderController extends Controller
             // como atendida el stock se descuenta aquí mismo. Es el mismo
             // criterio que aplica `update` al pasar un pedido a 'attended'.
             if ($data['status'] === 'attended') {
-                $this->applyStockDelta($order, decrement: true);
+                $order->moverStock(decrement: true);
             }
 
             return $order;
@@ -163,12 +190,12 @@ class OrderController extends Controller
 
                 // Si pasa a "attended" (atendido) desde cualquier otro estado -> descontar stock
                 if ($newStatus === 'attended' && $oldStatus !== 'attended') {
-                    $this->applyStockDelta($order, decrement: true);
+                    $order->moverStock(decrement: true);
                 }
 
                 // Si sale de "attended" hacia cualquier otro estado (ej: cancelado o revertido) -> devolver stock
                 if ($oldStatus === 'attended' && $newStatus !== 'attended') {
-                    $this->applyStockDelta($order, decrement: false);
+                    $order->moverStock(decrement: false);
                 }
             });
 
@@ -193,7 +220,7 @@ class OrderController extends Controller
     {
         DB::transaction(function () use ($order) {
             if ($order->status === 'attended') {
-                $this->applyStockDelta($order, decrement: false);
+                $order->moverStock(decrement: false);
             }
             $order->delete();
         });
@@ -263,60 +290,4 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Descuenta o devuelve el stock de las líneas de un pedido.
-     *
-     * Las líneas guardan un snapshot del producto, así que `product_id` puede
-     * ser null si el artículo se borró del catálogo después de venderse: en ese
-     * caso no hay stock que mover y la línea se salta.
-     *
-     * MOD-5: una línea de una variante mueve el stock de ESA variante y después
-     * recalcula el resumen del producto. Se salta —sin mover nada— en dos casos
-     * en los que no hay dónde devolverlo con sentido: la variante se borró
-     * (queda su nombre pero no su id), o la línea es de antes de que el producto
-     * tuviera variantes (el stock del producto ya es solo un resumen, y el
-     * próximo cálculo pisaría lo que se le sumara a mano).
-     *
-     * Con el modelo (`increment()` de una instancia) y no con una consulta suelta,
-     * para que salten los eventos: el aviso de "ya llegó" al devolver stock de un
-     * pedido cancelado.
-     */
-    private function applyStockDelta(Order $order, bool $decrement): void
-    {
-        foreach ($order->items as $item) {
-            if (! $item->product_id) {
-                continue;
-            }
-
-            if ($item->variant_id) {
-                $variante = ProductVariant::find($item->variant_id);
-
-                if (! $variante) {
-                    continue;
-                }
-
-                $decrement
-                    ? $variante->decrement('stock', $item->quantity)
-                    : $variante->increment('stock', $item->quantity);
-
-                $variante->product?->sincronizarResumenDeVariantes();
-
-                continue;
-            }
-
-            if ($item->variant_name !== null) {
-                continue;
-            }
-
-            $producto = Product::withCount('variants')->find($item->product_id);
-
-            if (! $producto || $producto->variants_count > 0) {
-                continue;
-            }
-
-            $decrement
-                ? $producto->decrement('stock', $item->quantity)
-                : $producto->increment('stock', $item->quantity);
-        }
-    }
 }

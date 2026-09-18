@@ -25,6 +25,10 @@ import {
   MessageSquare,
   Bell,
   History,
+  // Papelera (MOD-8).
+  Trash2,
+  // Cupones (MOD-4).
+  Ticket,
   Sun,
   Moon
 } from 'lucide-react';
@@ -152,6 +156,8 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/waitlist')) return 'Lista de espera';
     if (location.pathname.includes('/dashboard/users')) return 'Equipo';
     if (location.pathname.includes('/dashboard/activity')) return 'Actividad';
+    if (location.pathname.includes('/dashboard/trash')) return 'Papelera';
+    if (location.pathname.includes('/dashboard/coupons')) return 'Cupones';
     return 'Dashboard';
   };
 
@@ -311,6 +317,35 @@ export default function DashboardPage() {
             >
               <History size={20} />
               <span>Actividad</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
+
+          {/* MOD-4: junto a Productos y Pedidos, que es donde se trabaja con
+              precios; no al final con lo de administrar. */}
+          {esAdmin !== false && (
+            <NavLink
+              to="/dashboard/coupons"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <Ticket size={20} />
+              <span>Cupones</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
+
+          {/* MOD-8: la papelera va junto a Actividad y no entre Productos y
+              Pedidos, porque no es un sitio al que se entre a trabajar: se
+              entra cuando algo se borró por error. */}
+          {esAdmin !== false && (
+            <NavLink
+              to="/dashboard/trash"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <Trash2 size={20} />
+              <span>Papelera</span>
               <ChevronRight className="nav-arrow" size={16} />
             </NavLink>
           )}

@@ -36,6 +36,33 @@
 .cart-item-remove { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; }
 .cart-item-remove:hover { color: var(--danger); }
 .cart-checkout { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.65rem; }
+/* Cupon (MOD-4). El campo va pegado a su boton y el error justo debajo, donde
+   se lee sin buscarlo. */
+.cart-coupon { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.6rem; }
+.cart-coupon-input { display: flex; gap: 0.4rem; }
+.cart-coupon-input .premium-input { flex: 1 1 auto; min-width: 0; }
+.cart-coupon-input button,
+.cart-coupon-applied button {
+  padding: 0.5rem 0.8rem; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text-secondary); font-size: 0.82rem;
+  font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.cart-coupon-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cart-coupon-applied {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.45rem 0.6rem; border-radius: 6px;
+  background: rgba(var(--overlay-mix), 0.05); font-size: 0.85rem; color: var(--text-primary);
+}
+.cart-coupon-error { color: var(--danger); font-size: 0.78rem; }
+
+/* El descuento en verde: es lo unico del desglose que resta. */
+.cart-discount-row span:last-child { color: var(--success); font-weight: 600; }
+
+/* Desglose del impuesto (MOD-2). Mas pequenio y en gris que el total: es una
+   explicacion de como se llega a la cifra, no la cifra. */
+.cart-tax { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.4rem; }
+.cart-tax-row { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 0.82rem; }
+
 .cart-total { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
 .cart-total span { color: var(--text-secondary); font-size: 0.9rem; }
 .cart-total strong { color: var(--text-primary); font-size: 1.35rem; font-weight: 800; }

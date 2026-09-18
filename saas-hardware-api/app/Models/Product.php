@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Concerns\BelongsToTenant;
 use App\Notifications\BackInStockNotification;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,17 @@ use Illuminate\Support\Facades\Notification;
 
 class Product extends Model
 {
-    use HasUuids, BelongsToTenant;
+    /**
+     * `SoftDeletes` es la papelera de MOD-8, y lo que importa de ponerlo aqui es
+     * lo que arregla **sin tocar ninguna consulta**: el catalogo publico, el
+     * buscador, el armador, los reportes, el resumen y los topes del plan pasan
+     * todos por Eloquent, asi que un producto en la papelera desaparece de los
+     * seis a la vez. La unica consulta de productos que NO va por aqui es
+     * `ImageService::borrarSiNadieLasUsa()`, que usa `DB::table` a proposito:
+     * para ella un producto en la papelera **si** cuenta como que usa su foto,
+     * que es justo lo que impide que borrar otro producto le deje sin imagenes.
+     */
+    use HasUuids, BelongsToTenant, SoftDeletes;
 
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
@@ -207,17 +218,41 @@ class Product extends Model
             return;
         }
 
-        $masBarata = $variantes->sortBy(fn (ProductVariant $v) => $v->precioVisible())->first();
-
-        $this->price = $masBarata->price;
-        $this->sale_price = $masBarata->sale_price;
-        // MOD-6: el costo sigue al precio para que la ficha no mezcle el precio
-        // de una variante con el costo de otra. Emparejados describen siempre a
-        // la misma —la mas barata—, que es lo que ya significaba este resumen.
-        $this->cost = $masBarata->cost;
-        $this->stock = $variantes->sum(fn (ProductVariant $v) => max(0, (int) $v->stock));
+        $this->forceFill(self::resumenDeVariantes(
+            $variantes->map(fn (ProductVariant $v) => $v->only(['price', 'sale_price', 'cost', 'stock']))->all()
+        ));
 
         $this->save();
+    }
+
+    /**
+     * El resumen que va en `products` para una lista de variantes.
+     *
+     * Vive aparte de `sincronizarResumenDeVariantes()` porque el import CSV
+     * (MOD-12) crea la ficha y sus variantes en el mismo INSERT en lote y ya
+     * tiene los numeros en memoria: releerlos de la base para calcular lo mismo
+     * serian dos consultas por producto importado. Calcularlo en el importador
+     * por su cuenta era la otra opcion, y es justo la que deja que los dos
+     * resumenes se separen el dia que cambie la regla.
+     *
+     * @param  array<int, array<string, mixed>>  $variantes  filas con price, sale_price, cost y stock
+     * @return array{price: mixed, sale_price: mixed, cost: mixed, stock: int}
+     */
+    public static function resumenDeVariantes(array $variantes): array
+    {
+        $masBarata = collect($variantes)
+            ->sortBy(fn (array $v) => (float) ($v['sale_price'] ?? $v['price']))
+            ->first();
+
+        return [
+            'price'      => $masBarata['price'],
+            'sale_price' => $masBarata['sale_price'] ?? null,
+            // MOD-6: el costo sigue al precio para que la ficha no mezcle el precio
+            // de una variante con el costo de otra. Emparejados describen siempre a
+            // la misma —la mas barata—, que es lo que ya significaba este resumen.
+            'cost'       => $masBarata['cost'] ?? null,
+            'stock'      => collect($variantes)->sum(fn (array $v) => max(0, (int) $v['stock'])),
+        ];
     }
 
     // Accessor útil para el frontend

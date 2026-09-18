@@ -1,10 +1,11 @@
 import api from './axios';
 
 /**
- * Descargar el catálogo, los pedidos y el reporte en CSV (MOD-7, MOD-9).
+ * Descargar el catálogo, los pedidos y el reporte en CSV (MOD-7, MOD-9), y la
+ * cotización de un pedido en PDF (MOD-2).
  *
- * **Por qué no es un enlace normal.** Las tres rutas van detrás de `auth:sanctum`
- * y del header `X-Tenant`, y un `<a href>` no manda ni el token ni el tenant: el
+ * **Por qué no es un enlace normal.** Todas van detrás de `auth:sanctum` y del
+ * header `X-Tenant`, y un `<a href>` no manda ni el token ni el tenant: el
  * navegador abriría una pestaña con un 401 en JSON. Así que se piden por axios
  * —que ya inyecta los dos— y el archivo se guarda desde el navegador.
  */
@@ -38,6 +39,10 @@ export const exportarPedidos = (filtros: FiltrosDePedidos = {}): Promise<void> =
 
 export const exportarReporte = (filtros: FiltrosDeReporte = {}): Promise<void> =>
   descargar('/reports/export', filtros);
+
+/** La cotización de un pedido en PDF (MOD-2). Mismo camino que los CSV. */
+export const descargarCotizacion = (pedidoId: string): Promise<void> =>
+  descargar(`/orders/${pedidoId}/pdf`, {});
 
 /**
  * Pide el CSV y lo guarda con el nombre que manda el servidor.
@@ -80,6 +85,7 @@ export function nombreDeArchivo(cabecera: unknown, ruta: string): string {
     return encontrado[1].trim().replace(/^"|"$/g, '');
   }
 
+  if (ruta.endsWith('/pdf')) return 'cotizacion.pdf';
   if (ruta.includes('reports')) return 'reporte.csv';
 
   return ruta.includes('orders') ? 'pedidos.csv' : 'catalogo.csv';

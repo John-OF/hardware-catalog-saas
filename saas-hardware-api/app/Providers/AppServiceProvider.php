@@ -110,6 +110,14 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($ruta($request).'|'.$request->ip());
         });
 
+        // MOD-4: probar codigos de cupon. Mas estrecho que el resto de la
+        // escritura publica porque es lo unico del catalogo donde acertar a
+        // ciegas tiene premio: un codigo corto ("VERANO25") se adivina probando,
+        // y a 10/min una campaña se filtra sola. Va por IP y por tienda.
+        RateLimiter::for('cupon', function (Request $request) use ($ruta) {
+            return Limit::perMinute(5)->by($ruta($request).'|'.$request->ip());
+        });
+
         // El enlace de verificacion del correo (FUN-5).
         RateLimiter::for('verificacion_correo', function (Request $request) use ($ruta) {
             return Limit::perMinute(6)->by($ruta($request).'|'.$request->ip());

@@ -302,6 +302,17 @@ class QueuedMailWithRealQueueTest extends TestCase
             '--stop-when-empty' => true,
             '--tries'           => 1,
             '--sleep'           => 0,
+            // `queue:work` para solo en cuanto el proceso pasa de su tope de
+            // memoria (128 MB por defecto), y aqui el proceso NO es un worker
+            // limpio: es el de PHPUnit, con la suite entera cargada detras. Al
+            // entrar dompdf (MOD-2) la suite completa ya arrancaba este test por
+            // encima de los 128 MB, asi que el worker procesaba el primer correo
+            // y se paraba —dejando el segundo en la tabla, sin error y sin
+            // `failed_jobs`, que es lo que lo hizo dificil de leer—. El tope va
+            // alto a proposito: aqui no mide nada util, y dejarlo al azar de lo
+            // que haya consumido el resto de la suite es un test que falla segun
+            // con quien corra.
+            '--memory'          => 4096,
         ]);
     }
 

@@ -75,6 +75,16 @@ class BitacoraDeTiendaTest extends TestCase
         'POST api/users/{user}/resend-invitation'      => ActivityLog::EQUIPO_REINVITADO,
         'PUT api/tenant'                               => ActivityLog::CONFIGURACION_EDITADA,
         'POST api/tenant/custom-domain/verify'         => ActivityLog::CONFIGURACION_DOMINIO,
+        // MOD-8: las tres escriben. Restaurar y purgar son tan reversibles o tan
+        // definitivas como borrar, y vaciar la papelera lo es más que nada.
+        // MOD-4: un cupon es dinero que se deja de cobrar; quien lo crea o lo
+        // cambia queda escrito como quien cambia un precio.
+        'POST api/coupons'                             => ActivityLog::CUPON_CREADO,
+        'PUT api/coupons/{coupon}'                     => ActivityLog::CUPON_EDITADO,
+        'DELETE api/coupons/{coupon}'                  => ActivityLog::CUPON_BORRADO,
+        'POST api/trash/{tipo}/{id}/restore'           => ActivityLog::PAPELERA_RESTAURADO,
+        'DELETE api/trash/{tipo}/{id}'                 => ActivityLog::PAPELERA_PURGADO,
+        'DELETE api/trash'                             => ActivityLog::PAPELERA_VACIADA,
     ];
 
     private Tenant $tienda;
@@ -140,6 +150,18 @@ class BitacoraDeTiendaTest extends TestCase
         $espera = $this->crearEspera();
         $companiero = $this->crearUsuario($this->tienda, 'otro@bitacora.test', 'staff', 'Otro');
 
+        // MOD-8: dos productos ya en la papelera, puestos ahí por el modelo y no
+        // por la API, para que no dejen su propia línea y descuadren el conteo.
+        // MOD-4: uno ya creado, para los pasos de editar y borrar.
+        $cupon = new \App\Models\Coupon(['code' => 'EXISTENTE', 'type' => 'percent', 'value' => 10, 'is_active' => true]);
+        $cupon->tenant_id = $this->tienda->id;
+        $cupon->save();
+
+        $paraRestaurar = $this->crearProducto($this->tienda, 'En la papelera 1', 100, 1);
+        $paraPurgar = $this->crearProducto($this->tienda, 'En la papelera 2', 100, 1);
+        $paraRestaurar->delete();
+        $paraPurgar->delete();
+
         $pasos = [
             'POST api/products' => fn () => $this->como($this->admin)->postJson('/api/products', ['name' => 'RTX 4070', 'price' => 2800, 'stock' => 3]),
             'PUT api/products/{product}' => fn () => $this->como($this->admin)->putJson("/api/products/{$this->producto->id}", ['name' => 'Ryzen 7 7800X3D', 'price' => 1400, 'stock' => 10]),
@@ -169,7 +191,15 @@ class BitacoraDeTiendaTest extends TestCase
             'DELETE api/users/{user}' => fn () => $this->como($this->admin)->deleteJson("/api/users/{$companiero->id}"),
             'PUT api/tenant' => fn () => $this->como($this->admin)->putJson('/api/tenant', ['name' => 'Tienda Renombrada', 'custom_domain' => 'tienda.example.com']),
             'POST api/tenant/custom-domain/verify' => fn () => $this->como($this->admin)->postJson('/api/tenant/custom-domain/verify'),
+            'POST api/coupons' => fn () => $this->como($this->admin)->postJson('/api/coupons', ['code' => 'NUEVO', 'type' => 'percent', 'value' => 15]),
+            'PUT api/coupons/{coupon}' => fn () => $this->como($this->admin)->putJson("/api/coupons/{$cupon->id}", ['value' => 20]),
+            'DELETE api/coupons/{coupon}' => fn () => $this->como($this->admin)->deleteJson("/api/coupons/{$cupon->id}"),
             'DELETE api/products/{product}' => fn () => $this->como($this->admin)->deleteJson("/api/products/{$this->producto->id}"),
+            // Van al final a propósito: el paso de arriba deja un producto en la
+            // papelera, que es lo que encuentra el vaciado.
+            'POST api/trash/{tipo}/{id}/restore' => fn () => $this->como($this->admin)->postJson("/api/trash/productos/{$paraRestaurar->id}/restore"),
+            'DELETE api/trash/{tipo}/{id}' => fn () => $this->como($this->admin)->deleteJson("/api/trash/productos/{$paraPurgar->id}"),
+            'DELETE api/trash' => fn () => $this->como($this->admin)->deleteJson('/api/trash'),
         ];
 
         $this->assertEqualsCanonicalizing(array_keys(self::ANOTAN), array_keys($pasos), 'Cada ruta de ANOTAN necesita su paso aquí.');

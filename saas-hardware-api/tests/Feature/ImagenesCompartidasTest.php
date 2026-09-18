@@ -124,7 +124,13 @@ class ImagenesCompartidasTest extends TestCase
         }
     }
 
-    public function test_borrar_el_ultimo_que_las_usa_si_borra_los_archivos(): void
+    /**
+     * MOD-8: borrar ya no borra, manda a la papelera, y **los archivos se
+     * quedan**. Antes este caso comprobaba lo contrario. Restaurar un producto
+     * sin sus fotos sería media restauración, así que el momento de borrarlas se
+     * movió al vaciado de la papelera, donde TEC-14 sigue mandando igual.
+     */
+    public function test_mandar_a_la_papelera_no_borra_ningun_archivo(): void
     {
         [$original, $copia] = $this->productoConCopia();
         $urls = $this->urlsDe($copia);
@@ -132,13 +138,53 @@ class ImagenesCompartidasTest extends TestCase
         $this->comoDuenio()->deleteJson("/api/products/{$original->id}")->assertNoContent();
         $this->comoDuenio()->deleteJson("/api/products/{$copia->id}")->assertNoContent();
 
+        foreach ($urls as $url) {
+            $this->assertExiste($url);
+        }
+    }
+
+    public function test_vaciar_la_papelera_con_el_original_y_la_copia_borra_los_archivos(): void
+    {
+        [$original, $copia] = $this->productoConCopia();
+        $urls = $this->urlsDe($copia);
+
+        $this->comoDuenio()->deleteJson("/api/products/{$original->id}")->assertNoContent();
+        $this->comoDuenio()->deleteJson("/api/products/{$copia->id}")->assertNoContent();
+
+        $this->comoDuenio()->deleteJson('/api/trash')->assertOk();
+
         // Sin nadie que las use, no quedan archivos huérfanos.
         foreach ($urls as $url) {
             $this->assertNoExiste($url);
         }
     }
 
-    public function test_borrar_en_lote_el_original_y_la_copia_borra_los_archivos(): void
+    /**
+     * El caso de TEC-14 dentro de la papelera: borrar del todo el original
+     * mientras la copia sigue ahí NO puede llevarse las fotos que la copia
+     * seguirá mostrando si alguien la restaura.
+     */
+    public function test_purgar_solo_el_original_conserva_las_fotos_de_la_copia_en_la_papelera(): void
+    {
+        [$original, $copia] = $this->productoConCopia();
+        $urls = $this->urlsDe($copia);
+
+        $this->comoDuenio()->deleteJson("/api/products/{$original->id}")->assertNoContent();
+        $this->comoDuenio()->deleteJson("/api/products/{$copia->id}")->assertNoContent();
+
+        $this->comoDuenio()->deleteJson("/api/trash/productos/{$original->id}")->assertNoContent();
+
+        foreach ($urls as $url) {
+            $this->assertExiste($url);
+        }
+
+        // Y al restaurarla, la copia sigue teniendo sus fotos.
+        $this->comoDuenio()->postJson("/api/trash/productos/{$copia->id}/restore")->assertOk();
+
+        $this->assertSame($urls, $this->urlsDe(Product::withoutTenant()->findOrFail($copia->id)));
+    }
+
+    public function test_borrar_en_lote_el_original_y_la_copia_no_borra_los_archivos(): void
     {
         [$original, $copia] = $this->productoConCopia();
         $urls = $this->urlsDe($copia);
@@ -147,6 +193,13 @@ class ImagenesCompartidasTest extends TestCase
             'product_ids' => [$original->id, $copia->id],
             'bulk_action' => 'delete',
         ])->assertOk();
+
+        // A la papelera, con sus fotos intactas (MOD-8).
+        foreach ($urls as $url) {
+            $this->assertExiste($url);
+        }
+
+        $this->comoDuenio()->deleteJson('/api/trash')->assertOk();
 
         foreach ($urls as $url) {
             $this->assertNoExiste($url);

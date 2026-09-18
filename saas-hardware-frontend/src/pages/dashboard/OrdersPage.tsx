@@ -16,10 +16,12 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Download
+  Download,
+  // Cotizacion en PDF (MOD-2). `Download` ya es el CSV del listado.
+  FileDown
 } from 'lucide-react';
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
-import { exportarPedidos } from '../../api/exportaciones';
+import { descargarCotizacion, exportarPedidos } from '../../api/exportaciones';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
@@ -52,6 +54,24 @@ export default function OrdersPage() {
       setExportando(false);
     }
   };
+
+  // MOD-2: la cotización en PDF de un pedido suelto. Mismo camino que el CSV
+  // —por axios y no por <a href>— porque la ruta va detrás del token y del
+  // header de tienda.
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+
+  const cotizar = async (pedidoId: string) => {
+    setDescargandoPdf(true);
+
+    try {
+      await descargarCotizacion(pedidoId);
+    } catch {
+      toast.error('No se pudo generar la cotización.');
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
+
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   // Fetch orders
@@ -453,6 +473,16 @@ export default function OrdersPage() {
                   ))}
                 </div>
 
+                {/* MOD-4: solo si ESE pedido llevó cupón. El código va escrito
+                    porque es lo que el dueño necesita para saber qué campaña se
+                    lo llevó. */}
+                {selectedOrder.discount_amount != null && (
+                  <div className="detail-total-row detail-discount-row">
+                    <span>Descuento{selectedOrder.coupon_code ? ` (${selectedOrder.coupon_code})` : ''}</span>
+                    <span>-{money(selectedOrder.discount_amount)}</span>
+                  </div>
+                )}
+
                 {/* MOD-1: null en venta de mostrador y en pedidos de antes de
                     este cambio, así que no se enseña nada en esos casos. */}
                 {selectedOrder.delivery_method && (
@@ -464,6 +494,25 @@ export default function OrdersPage() {
                         : 'Recojo en tienda'}
                     </span>
                   </div>
+                )}
+
+                {/* MOD-2: el desglose solo aparece si ESTA venta llevó impuesto.
+                    Un pedido de antes, o de cuando la tienda no lo cobraba, se
+                    pinta como siempre: inventar una línea "IGV 0,00" diría que se
+                    cobró un impuesto del cero por ciento. */}
+                {selectedOrder.tax_amount != null && (
+                  <>
+                    <div className="detail-total-row detail-tax-row">
+                      <span>Op. gravada</span>
+                      <span>{money(selectedOrder.base_imponible ?? 0)}</span>
+                    </div>
+                    <div className="detail-total-row detail-tax-row">
+                      <span>
+                        {selectedOrder.tax_name} ({Number(selectedOrder.tax_rate)}%)
+                      </span>
+                      <span>{money(selectedOrder.tax_amount)}</span>
+                    </div>
+                  </>
                 )}
 
                 <div className="detail-total-row">
@@ -493,6 +542,20 @@ export default function OrdersPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* MOD-2: siempre, en cualquier estado. Un pedido pendiente es
+                  justo el que se cotiza, y uno atendido, el comprobante que el
+                  cliente pide después. */}
+              <div className="dialogo-acciones">
+                <button
+                  type="button"
+                  onClick={() => cotizar(selectedOrder.id)}
+                  className="btn-secondary"
+                  disabled={descargandoPdf}
+                >
+                  <FileDown size={16} /> {descargandoPdf ? 'Generando…' : 'Descargar cotización (PDF)'}
+                </button>
               </div>
 
               {/* State updates inside details */}

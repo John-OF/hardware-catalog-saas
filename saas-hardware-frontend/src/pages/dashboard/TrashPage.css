@@ -1,0 +1,250 @@
+/* Estilos de <TrashPage> (MOD-8).
+
+   Acotados con :where(.page-trash), como las demas paginas del panel (TEC-6):
+   .page-header, .state-card, .pagination-bar... se llaman igual en media docena
+   de hojas. `.glass-card` y `.btn-secondary` son del sistema de diseno y no se
+   redefinen aqui (UI-5). */
+
+:where(.page-trash).trash-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-trash) .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-trash) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-trash) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+/* Pestañas de tipo */
+
+:where(.page-trash) .trash-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-trash) .trash-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+:where(.page-trash) .trash-tab:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.04);
+}
+
+:where(.page-trash) .trash-tab.active {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.07);
+  border-color: rgba(var(--overlay-mix), 0.12);
+}
+
+:where(.page-trash) .trash-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(var(--overlay-mix), 0.08);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lista */
+
+:where(.page-trash) .trash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+:where(.page-trash) .trash-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(var(--overlay-mix), 0.07);
+}
+
+:where(.page-trash) .trash-item:last-child {
+  border-bottom: none;
+}
+
+:where(.page-trash) .trash-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  /* Se queda con el espacio sobrante y se encoge antes que los botones: el
+     nombre de un producto es lo unico que puede ser largo de verdad. */
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+:where(.page-trash) .trash-item-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.page-trash) .trash-item-detail,
+:where(.page-trash) .trash-item-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+:where(.page-trash) .trash-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: right;
+}
+
+:where(.page-trash) .trash-item-dias {
+  font-weight: 600;
+}
+
+/* Los ultimos dias en color de aviso: es el unico momento en que mirar la
+   papelera es urgente. */
+:where(.page-trash) .trash-item-dias.urgente {
+  color: var(--warning);
+}
+
+:where(.page-trash) .trash-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-trash) .btn-danger,
+:where(.page-trash) .btn-danger-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+:where(.page-trash) .btn-danger {
+  border: 1px solid var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+:where(.page-trash) .btn-danger-ghost {
+  border: 1px solid rgba(var(--overlay-mix), 0.14);
+  background: transparent;
+  color: var(--danger);
+}
+
+:where(.page-trash) .btn-danger-ghost:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: rgba(var(--overlay-mix), 0.04);
+}
+
+:where(.page-trash) .btn-danger:disabled,
+:where(.page-trash) .btn-danger-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Paginacion. La de Actividad, que usa el mismo marcado. */
+
+:where(.page-trash) .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:where(.page-trash) .pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-trash) .pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+:where(.page-trash) .page-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(var(--overlay-mix), 0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-trash) .page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-trash) .page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* En movil la fila se apila y las fechas dejan de ir a la derecha: alineadas
+   contra un ancho de telefono quedaban pegadas al nombre. */
+@media (max-width: 640px) {
+  :where(.page-trash) .trash-item-meta {
+    text-align: left;
+  }
+
+  :where(.page-trash) .trash-item-actions {
+    width: 100%;
+  }
+
+  :where(.page-trash) .trash-item-actions button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

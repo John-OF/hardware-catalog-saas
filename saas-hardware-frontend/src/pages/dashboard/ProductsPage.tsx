@@ -19,7 +19,6 @@ import {
   ChevronLeft, 
   ChevronRight,
   Upload,
-  AlertCircle,
   Copy,
   CheckSquare,
   GripVertical,
@@ -27,10 +26,12 @@ import {
   Download
 } from 'lucide-react';
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
+import type { ImportReport, ModoDeImport } from '../../api/products';
 import { getCategories } from '../../api/categories';
 import { getPlan } from '../../api/plan';
 import Dialogo from '../../components/ui/Dialogo';
 import EditorDeVariantes from '../../components/dashboard/EditorDeVariantes';
+import InformeDeImport from '../../components/dashboard/InformeDeImport';
 import {
   agregarVariantesAlFormulario,
   problemaDeVariantes,
@@ -44,6 +45,29 @@ import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
+
+/** Un valor como celda de un CSV separado por ';': entre comillas si lo necesita. */
+const comoCeldaCsv = (valor: string) =>
+  /[;"\n]/.test(valor) ? `"${valor.replace(/"/g, '""')}"` : valor;
+
+/** Las tres respuestas a "¿y si el producto ya existe?" del import (FUN-17). */
+const MODOS_DE_IMPORT: { valor: ModoDeImport; titulo: string; detalle: string }[] = [
+  {
+    valor: 'omitir',
+    titulo: 'Dejarlo como está',
+    detalle: 'Solo se crean los que faltan. Subir dos veces el mismo archivo no cambia nada.',
+  },
+  {
+    valor: 'actualizar',
+    titulo: 'Actualizarlo con el archivo',
+    detalle: 'Toma el precio, el stock y lo demás del archivo. Una celda vacía no borra nada.',
+  },
+  {
+    valor: 'duplicar',
+    titulo: 'Crear otro igual',
+    detalle: 'Se crea un producto nuevo aunque ya exista uno con ese nombre.',
+  },
+];
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
@@ -75,7 +99,11 @@ export default function ProductsPage() {
   // Import states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importReport, setImportReport] = useState<{ message: string; success_count: number; errors: string[] } | null>(null);
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
+  const [importMode, setImportMode] = useState<ModoDeImport>('omitir');
+  // Cambiarlo vuelve a montar el <input type="file">: es la única forma de
+  // vaciarlo, porque su valor no se puede fijar desde React.
+  const [inputDeArchivo, setInputDeArchivo] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
 
   // Bulk selection states
@@ -470,18 +498,24 @@ export default function ProductsPage() {
     setImportReport(null);
 
     try {
-      const report = await importProductsCsv(importFile);
+      const report = await importProductsCsv(importFile, importMode);
       setImportReport(report);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['plan'] });
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      
+
+      // FUN-19: el diálogo se queda abierto con el informe —qué se creó, qué
+      // cambió en cada producto y qué fila falló—, también cuando todo fue
+      // bien: antes se cerraba y de lo que entró solo quedaba una cifra.
+      //
+      // El archivo se suelta: con el informe en pantalla, un segundo clic en
+      // "Iniciar" lo volvería a subir, y en modo "crear otro igual" duplicaría.
+      setImportFile(null);
+      setInputDeArchivo((n) => n + 1);
+
       if (report.errors.length === 0) {
         toast.success(report.message);
-        setIsImportModalOpen(false);
-        setImportFile(null);
       } else {
-        toast.error(`Importación parcial: ${report.success_count} productos cargados con éxito.`);
+        toast.error('La importación terminó con avisos: revísalos abajo.');
       }
     } catch (err: any) {
       console.error(err);
@@ -518,8 +552,21 @@ export default function ProductsPage() {
     //
     // El delimitador de columnas sigue siendo ';' a propósito: Excel en español
     // usa ';' como separador de lista, y con ',' abriría todo en una sola columna.
-    const headers = "nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
-    const row = 'Intel Core i7-14700K;Intel;409.99;389.99;15;Procesadores;"Procesador de alto rendimiento para socket LGA1700";"Frecuencia:3.4 GHz|Núcleos:20"\n';
+    //
+    // MOD-12: la columna `variante` va en la plantilla aunque sea opcional. Si
+    // solo se documentara, nadie la usaria: quien importa parte de este archivo.
+    //
+    // FUN-18: el import ya no crea categorías, así que el ejemplo usa las de la
+    // tienda —la de procesadores y la de almacenamiento, por su tipo— y deja la
+    // columna vacía si no tiene. Con nombres fijos, la plantilla fallaría en
+    // cualquier tienda que llame a las suyas de otra forma.
+    const categoriaDe = (tipo: Category['component_type']) =>
+      comoCeldaCsv(categories.find((c) => c.component_type === tipo)?.name ?? '');
+
+    const headers = "nombre;marca;variante;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
+    const row = `Intel Core i7-14700K;Intel;;409.99;389.99;15;${categoriaDe('cpu')};"Procesador de alto rendimiento para socket LGA1700";"Frecuencia:3.4 GHz|Núcleos:20"\n`
+      + `Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;${categoriaDe('ssd')};"SSD NVMe Gen4";"Interfaz:PCIe 4.0"\n`
+      + 'Kingston NV3;;Capacidad: 2 TB;499.99;;3;;;\n';
 
     // BOM para que Excel lo abra como UTF-8; sin él "Núcleos" se ve como
     // "NÃºcleos" y el dueño acaba reimportando esa basura.
@@ -1344,7 +1391,7 @@ export default function ProductsPage() {
       {isImportModalOpen && (
         <Dialogo
           titulo="Importación Masiva de Productos (CSV)"
-          subtitulo="Sube una plantilla CSV para crear o actualizar componentes rápidamente."
+          subtitulo="Sube una plantilla CSV para dar de alta componentes rápidamente."
           onCerrar={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}
           ancho={650}
           className="page-products"
@@ -1354,12 +1401,22 @@ export default function ProductsPage() {
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>Formato y Columnas Permitidas</h4>
                 <p>El archivo debe estar codificado en UTF-8 y tener como cabecera (primera fila):</p>
                 <code style={{ background: 'rgba(var(--overlay-mix),0.03)', padding: '0.4rem 0.6rem', borderRadius: '4px', fontFamily: 'monospace', color: 'var(--primary)', display: 'block', wordBreak: 'break-all' }}>
-                  nombre;marca;precio;precio_oferta;stock;categoria;descripcion;especificaciones
+                  nombre;marca;variante;sku;precio;precio_oferta;costo;stock;categoria;descripcion;especificaciones
                 </code>
                 <ul style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
-                  <li><strong>nombre</strong>, <strong>precio</strong> y <strong>stock</strong> son obligatorios.</li>
-                  <li><strong>categoria</strong>: si no existe en la tienda, se creará automáticamente.</li>
+                  <li><strong>nombre</strong>, <strong>precio</strong> y <strong>stock</strong> son obligatorios. El resto son opcionales y puedes quitar sus columnas.</li>
+                  <li>
+                    <strong>categoria</strong>: tiene que ser una de las que ya tienes (da igual mayúsculas o tildes). Si no existe, esa fila no se importa: créala antes en Categorías.
+                    {' '}
+                    {categories.length > 0 ? (
+                      <>Las tuyas: {categories.map((c) => c.name).join(', ')}.</>
+                    ) : (
+                      <>Todavía no tienes ninguna: los productos entrarán sin categoría.</>
+                    )}
+                  </li>
                   <li><strong>especificaciones</strong>: formato de clave:valor separados por punto y coma (ej: <code>Frecuencia:3.2 GHz;Núcleos:16</code>).</li>
+                  <li><strong>variante</strong>: déjala vacía si el producto no tiene variantes. Si la rellenas (ej: <code>Capacidad: 1 TB</code>, hasta tres opciones separadas por <code>|</code>), esa fila es una variante y el <strong>precio</strong>, el <strong>stock</strong> y el <strong>sku</strong> son suyos: pon una fila por variante repitiendo el mismo <strong>nombre</strong>.</li>
+                  <li>Un producto <strong>ya existe</strong> si en tu tienda hay otro con el mismo <strong>nombre</strong> (sin mirar mayúsculas ni tildes). Qué hacer con él lo eliges abajo.</li>
                 </ul>
                 
                 <button 
@@ -1374,10 +1431,11 @@ export default function ProductsPage() {
 
               <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Selecciona el archivo (.csv)</label>
-                <input 
-                  type="file" 
-                  accept=".csv,text/csv" 
-                  className="premium-input" 
+                <input
+                  key={inputDeArchivo}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="premium-input"
                   onChange={(e) => {
                     const files = e.target.files;
                     if (files && files.length > 0) {
@@ -1389,27 +1447,26 @@ export default function ProductsPage() {
                 />
               </div>
 
-              {/* Import Results Report */}
-              {importReport && (
-                <div className="customer-summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '200px', overflowY: 'auto' }}>
-                  <h4 style={{ color: importReport.errors.length > 0 ? 'var(--warning)' : 'var(--success)', margin: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <AlertCircle size={16} />
-                    {importReport.errors.length > 0 ? 'Importación Parcial / Errores Detectados' : 'Importación Exitosa'}
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>{importReport.message}</p>
-                  
-                  {importReport.errors.length > 0 && (
-                    <div style={{ marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>Errores por fila:</span>
-                      <ul style={{ paddingLeft: '1.2rem', color: 'var(--danger)', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        {importReport.errors.map((err, idx) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
+              <fieldset className="import-modes">
+                <legend>Si un producto del archivo ya existe en tu tienda</legend>
+                {MODOS_DE_IMPORT.map((modo) => (
+                  <label key={modo.valor} className={`import-mode ${importMode === modo.valor ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="modo-import"
+                      value={modo.valor}
+                      checked={importMode === modo.valor}
+                      onChange={() => setImportMode(modo.valor)}
+                    />
+                    <span>
+                      <strong>{modo.titulo}</strong>
+                      <small>{modo.detalle}</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+
+              {importReport && <InformeDeImport informe={importReport} />}
 
               <div className="dialogo-acciones">
                 <button
@@ -1417,7 +1474,7 @@ export default function ProductsPage() {
                   onClick={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}
                   className="btn-secondary"
                 >
-                  Cancelar
+                  {importReport ? 'Cerrar' : 'Cancelar'}
                 </button>
                 <button
                   type="submit"

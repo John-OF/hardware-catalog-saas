@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'react-hot-toast';
 import CartDrawer from './CartDrawer';
 import { createPublicOrder } from '../../api/public';
+import { comprobarCupon } from '../../api/coupons';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { unaRamConVariantes, unaTienda, unProducto } from '../../test/fixtures';
 import type { Order } from '../../types';
 
 vi.mock('../../api/public', () => ({ createPublicOrder: vi.fn() }));
+vi.mock('../../api/coupons', () => ({ comprobarCupon: vi.fn() }));
 vi.mock('react-hot-toast', () => {
   const toast = { success: vi.fn(), error: vi.fn() };
   return { toast, default: toast };
@@ -259,6 +261,176 @@ describe('CartDrawer (checkout)', () => {
     expect(mensaje).toContain('Entrega: Delivery ($15.00)');
     // El total del mensaje es el del pedido creado, no un recálculo local.
     expect(mensaje).toContain('*Total: $474.80*');
+  });
+
+  // ----------------------------------------------------------- MOD-4: cupones
+
+  it('aplicar un cupón baja el total y manda solo el código al crear el pedido', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(comprobarCupon).mockResolvedValue({
+      code: 'VERANO25', type: 'percent', value: 25, discount: 114.95,
+    });
+    // El total que de verdad cobra el servidor: 459.80 - 114.95.
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(9, 344.85));
+    llenarCarrito();
+    abrirCarrito();
+
+    await user.type(screen.getByPlaceholderText('¿Tienes un cupón?'), 'verano25');
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    expect(await screen.findByText('Descuento')).toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$344.85');
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    const payload = vi.mocked(createPublicOrder).mock.calls[0][1];
+
+    // Solo el código: el descuento lo calcula el servidor.
+    expect(payload.coupon_code).toBe('VERANO25');
+    expect(payload).not.toHaveProperty('discount_amount');
+  });
+
+  it('un código rechazado enseña su motivo y no toca el total', async () => {
+    const user = userEvent.setup();
+    vi.mocked(comprobarCupon).mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 422, data: { errors: { coupon_code: ['Ese código ya venció.'] } } },
+    });
+    llenarCarrito();
+    abrirCarrito();
+
+    await user.type(screen.getByPlaceholderText('¿Tienes un cupón?'), 'VIEJO');
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    // El motivo concreto, no un "código inválido" genérico (UI-11).
+    expect(await screen.findByText('Ese código ya venció.')).toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
+  });
+
+  it('el descuento se aplica antes del impuesto que se suma al final', async () => {
+    const user = userEvent.setup();
+    vi.mocked(comprobarCupon).mockResolvedValue({
+      code: 'MITAD', type: 'percent', value: 50, discount: 229.9,
+    });
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({ tax_enabled: true, tax_name: 'IGV', tax_rate: 10, tax_included: false })} />,
+    );
+
+    await user.type(screen.getByPlaceholderText('¿Tienes un cupón?'), 'MITAD');
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    // 459.80 - 229.90 = 229.90, +10% = 252.89. Con el impuesto antes del
+    // descuento saldría otro número, y uno que parece razonable.
+    expect(await screen.findByText('Descuento')).toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$252.89');
+    expect(screen.getByText('IGV (10%)').nextElementSibling).toHaveTextContent('$22.99');
+  });
+
+  it('el descuento no toca el envío', async () => {
+    const user = userEvent.setup();
+    vi.mocked(comprobarCupon).mockResolvedValue({
+      code: 'MITAD', type: 'percent', value: 50, discount: 229.9,
+    });
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({ delivery_enabled: true, delivery_cost: 15 })} />,
+    );
+
+    await user.click(screen.getByRole('radio', { name: /Delivery/ }));
+    await user.type(screen.getByPlaceholderText('¿Tienes un cupón?'), 'MITAD');
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+
+    // 459.80 - 229.90 + 15 = 244.90. Con el envío dentro del descuento serían
+    // 237.40.
+    expect(await screen.findByText('Descuento')).toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$244.90');
+  });
+
+  it('se puede quitar un cupón ya aplicado', async () => {
+    const user = userEvent.setup();
+    vi.mocked(comprobarCupon).mockResolvedValue({
+      code: 'VERANO25', type: 'percent', value: 25, discount: 114.95,
+    });
+    llenarCarrito();
+    abrirCarrito();
+
+    await user.type(screen.getByPlaceholderText('¿Tienes un cupón?'), 'VERANO25');
+    await user.click(screen.getByRole('button', { name: 'Aplicar' }));
+    await screen.findByText('aplicado', { exact: false });
+
+    await user.click(screen.getByRole('button', { name: 'Quitar cupón' }));
+
+    expect(screen.queryByText('Descuento')).not.toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
+  });
+
+  // --------------------------------------------------------- MOD-2: impuesto
+
+  it('sin impuesto configurado no enseña ningún desglose', () => {
+    llenarCarrito();
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda()} />);
+
+    expect(screen.queryByText('Op. gravada')).not.toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
+  });
+
+  it('con el impuesto incluido el total no cambia y se desglosa hacia atrás', () => {
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({ tax_enabled: true, tax_name: 'IGV', tax_rate: 18, tax_included: true })} />,
+    );
+
+    // Lo que importa: el comprador paga lo que decía el catálogo.
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
+    // 459.80 * 18 / 118 = 70.14, sacado del precio y no sumado encima.
+    expect(screen.getByText('IGV (18%)').nextElementSibling).toHaveTextContent('$70.14');
+    expect(screen.getByText('Op. gravada').nextElementSibling).toHaveTextContent('$389.66');
+  });
+
+  it('con el impuesto sumándose al final el total sube sobre la suma del carrito', () => {
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({ tax_enabled: true, tax_name: 'IVA', tax_rate: 10, tax_included: false })} />,
+    );
+
+    // 459.80 + 45.98. El comprador TIENE que ver de dónde sale, y por eso el
+    // desglose va antes del total.
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$505.78');
+    expect(screen.getByText('IVA (10%)').nextElementSibling).toHaveTextContent('$45.98');
+    expect(screen.getByText('Op. gravada').nextElementSibling).toHaveTextContent('$459.80');
+  });
+
+  it('el impuesto entra también sobre el envío', () => {
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({
+          delivery_enabled: true, delivery_cost: 15,
+          tax_enabled: true, tax_name: 'IGV', tax_rate: 18, tax_included: false,
+        })} />,
+    );
+
+    // Con "recojo" (la opción de entrada) la base son solo los productos.
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$542.56');
+  });
+
+  it('una tasa de cero se comporta como no cobrarlo', () => {
+    llenarCarrito();
+    render(
+      <CartDrawer open onClose={vi.fn()} slug="tienda-demo"
+        tenant={unaTienda({ tax_enabled: true, tax_rate: 0, tax_included: true })} />,
+    );
+
+    expect(screen.queryByText('Op. gravada')).not.toBeInTheDocument();
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$459.80');
   });
 
   // ---------------------------------------------------- MOD-3: métodos de pago

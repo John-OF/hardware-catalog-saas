@@ -1,10 +1,17 @@
 <!doctype html>
-<html lang="en">
+<!-- INF-4: `es` y no `en`. Es lo primero que lee un buscador para decidir a
+     quién le enseña esta página, y todo lo que hay dentro está en español. -->
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>saas-hardware-frontend</title>
+    <!-- Título y descripción de arranque: los pisa `useTenantBranding` en cuanto
+         se sabe qué tienda se está mirando, pero hasta entonces esto es lo que se
+         ve en la pestaña y lo que se comparte si algo falla al cargar.
+         "saas-hardware-frontend" era el nombre de la carpeta. -->
+    <title>Catálogo de componentes de PC</title>
+    <meta name="description" content="Tiendas de componentes de PC con catálogo, armador de PC compatible y pedidos por WhatsApp." />
   </head>
   <body>
     <div id="root"></div>

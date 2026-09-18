@@ -41,15 +41,42 @@ export const deleteProduct = async (id: string): Promise<void> => {
   await api.delete(`/products/${id}`);
 };
 
+/** Qué pasó con un producto del archivo (FUN-19). */
+export type AccionDeImport = 'creado' | 'actualizado' | 'sin_cambios' | 'omitido';
+
+export interface CambioDeImport {
+  /** Fila del archivo, contando la cabecera como la 1: la misma que usan los errores. */
+  fila: number;
+  accion: AccionDeImport;
+  producto: string;
+  /** "precio 900 → 950, stock 1 → 12" al actualizar; "con 2 variantes" al crear. */
+  detalle: string | null;
+}
+
 export interface ImportReport {
   message: string;
+  /** Lo que se escribió: creados más actualizados. */
   success_count: number;
+  created_count: number;
+  updated_count: number;
+  unchanged_count: number;
+  skipped_count: number;
+  /** Una entrada por producto del archivo, en el orden del archivo. */
+  changes: CambioDeImport[];
   errors: string[];
 }
 
-export const importProductsCsv = async (file: File): Promise<ImportReport> => {
+/**
+ * Qué hacer con un producto del archivo que ya existe en la tienda —mismo
+ * nombre, sin mirar mayúsculas ni tildes— (FUN-17). Por defecto `omitir`: es el
+ * único con el que subir dos veces el mismo archivo no cambia nada.
+ */
+export type ModoDeImport = 'omitir' | 'actualizar' | 'duplicar';
+
+export const importProductsCsv = async (file: File, modo: ModoDeImport = 'omitir'): Promise<ImportReport> => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('modo', modo);
   const response = await api.post<ImportReport>('/products/import', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Support\Busqueda;
 use App\Support\Costos;
 use App\Support\Reportes;
 use Carbon\CarbonImmutable;
@@ -52,31 +54,39 @@ class ExportController extends Controller
         $tenant = app('currentTenant');
 
         $consulta = $this->sinScopeDeTienda(Product::query(), $tenant->id)
-            ->with(['category' => fn ($q) => $q->withoutTenant()])
+            ->with([
+                'category' => fn ($q) => $q->withoutTenant(),
+                // MOD-12: sin esto la exportacion de una tienda con variantes
+                // sacaba el resumen de la ficha —el precio de la mas barata y el
+                // stock sumado— y reimportarlo creaba un producto suelto con los
+                // numeros mezclados.
+                'variants' => fn ($q) => $q->withoutTenant()->orderBy('sort_order'),
+            ])
             ->when($request->category_id, fn ($q) => $q->where('category_id', $request->category_id))
-            ->when($request->search, fn ($q) => $q->where(function ($sub) use ($request) {
-                $sub->where('name', 'like', "%{$request->search}%")
-                    ->orWhere('sku', 'like', "%{$request->search}%");
-            }))
+            // INF-6: la misma busqueda del listado, o lo que se descarga no es lo
+            // que el dueño esta viendo -que es justo lo que promete el boton-.
+            ->tap(fn ($q) => Busqueda::aplicar($q, $request->search))
             ->when($request->boolean('active_only'), fn ($q) => $q->where('is_active', true))
             ->orderBy('sort_order')
             ->orderBy('created_at');
 
         return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
             fputcsv($salida, [
-                'nombre', 'marca', 'sku', 'precio', 'precio_oferta', 'costo',
+                'nombre', 'marca', 'variante', 'sku', 'precio', 'precio_oferta', 'costo',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
             ], ';');
 
             foreach ($consulta->lazy(self::POR_LOTE) as $producto) {
-                fputcsv($salida, [
+                // Lo que describe la ficha va solo en su primera fila, que es
+                // como lo vuelve a leer el importador (MOD-12): repetir la
+                // descripcion y las specs en cada variante multiplicaria el peso
+                // del archivo por el numero de variantes sin añadir un dato.
+                $ficha = [
                     $producto->name,
                     $producto->brand,
-                    $producto->sku,
-                    $producto->price,
-                    $producto->sale_price,
-                    $producto->cost,
-                    $producto->stock,
+                ];
+
+                $cola = [
                     $producto->category?->name,
                     // El HTML de la descripcion se queda como esta: es lo que hay
                     // guardado, y limpiarlo aqui haria que reimportar cambiara el
@@ -84,7 +94,39 @@ class ExportController extends Controller
                     $producto->description,
                     $this->specsEnTexto($producto->specs),
                     $producto->status === 'published' ? 'publicado' : 'borrador',
-                ], ';');
+                ];
+
+                if ($producto->variants->isEmpty()) {
+                    fputcsv($salida, [
+                        ...$ficha,
+                        '',
+                        $producto->sku,
+                        $producto->price,
+                        $producto->sale_price,
+                        $producto->cost,
+                        $producto->stock,
+                        ...$cola,
+                    ], ';');
+
+                    continue;
+                }
+
+                foreach ($producto->variants as $indice => $variante) {
+                    fputcsv($salida, [
+                        // El nombre SI se repite: es lo que agrupa las filas al
+                        // reimportar, asi que sin el la variante se quedaria
+                        // suelta.
+                        $producto->name,
+                        $indice === 0 ? $producto->brand : '',
+                        $this->varianteEnTexto($variante),
+                        $variante->sku,
+                        $variante->price,
+                        $variante->sale_price,
+                        $variante->cost,
+                        $variante->stock,
+                        ...($indice === 0 ? $cola : ['', '', '', '']),
+                    ], ';');
+                }
             }
         });
     }
@@ -274,6 +316,17 @@ class ExportController extends Controller
 
         return collect($specs)
             ->map(fn ($valor, $clave) => "{$clave}: ".(is_array($valor) ? implode(', ', $valor) : $valor))
+            ->implode(' | ');
+    }
+
+    /**
+     * Las opciones de una variante como las lee el importador (MOD-12):
+     * "Capacidad: 1 TB | Color: Negro".
+     */
+    private function varianteEnTexto(ProductVariant $variante): string
+    {
+        return collect($variante->options ?? [])
+            ->map(fn ($opcion) => trim((string) ($opcion['name'] ?? '')).': '.trim((string) ($opcion['value'] ?? '')))
             ->implode(' | ');
     }
 

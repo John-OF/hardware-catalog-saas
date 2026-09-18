@@ -94,6 +94,27 @@ class ImageService
      *
      * @param  array<int, string|null>  $urls
      */
+    /**
+     * Todas las URL de fotos de unos productos: principal, galería y variantes.
+     * Para pasárselas después a `borrarSiNadieLasUsa()` (TEC-14).
+     *
+     * Vive aquí y no en `ProductController` porque desde `MOD-8` quien borra las
+     * fotos de un producto ya no es el controlador —que ahora solo lo manda a la
+     * papelera— sino `TrashController`, al vaciarla, y el comando que la purga.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Product>  $productos  con `images` y `variants` cargadas
+     * @return array<int, string|null>
+     */
+    public function fotosDe(\Illuminate\Support\Collection $productos): array
+    {
+        return $productos->flatMap(fn ($p) => [
+            $p->image_url,
+            $p->thumbnail_url,
+            ...$p->images->flatMap(fn ($img) => [$img->image_url, $img->thumbnail_url]),
+            ...$p->variants->flatMap(fn ($v) => [$v->image_url, $v->thumbnail_url]),
+        ])->all();
+    }
+
     public function borrarSiNadieLasUsa(array $urls): void
     {
         $urls = array_values(array_unique(array_filter($urls)));

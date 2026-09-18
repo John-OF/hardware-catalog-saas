@@ -125,6 +125,19 @@ export interface Tenant {
   /** Envío a domicilio (MOD-1): un precio fijo, sin zonas. Si está apagado, la única opción es recojo en tienda. */
   delivery_enabled: boolean;
   delivery_cost: number | string;
+  /**
+   * Impuesto de la tienda (MOD-2). El nombre lo pone el dueño porque depende del
+   * país ("IGV", "IVA", "ITBMS").
+   *
+   * `tax_included` es lo que cambia la aritmética: con `true` el precio del
+   * catálogo ya lo lleva dentro y el total no sube; con `false` se suma al final
+   * y el comprador paga más que la suma de su carrito — que es justo por lo que
+   * el checkout tiene que enseñar el desglose.
+   */
+  tax_enabled: boolean;
+  tax_name: string;
+  tax_rate: number | string;
+  tax_included: boolean;
 }
 
 /** Los cuatro métodos fijos de `Tenant::METODOS_DE_PAGO`. Ninguno es obligatorio. */
@@ -337,6 +350,28 @@ export interface Order {
    */
   delivery_method?: 'pickup' | 'delivery' | null;
   delivery_cost?: number | string;
+  /**
+   * La foto del impuesto del día de la venta (MOD-2), no la configuración de
+   * hoy: cambiar el porcentaje no reescribe lo ya vendido. `tax_rate` en `null`
+   * es "se vendió sin impuesto", que no es lo mismo que "con el 0%".
+   *
+   * El invariante que hace que esto se pinte sin preguntar cómo se cobró:
+   * **`total` es siempre lo que paga el cliente** y `tax_amount` es cuánto de
+   * eso es impuesto. `base_imponible` lo manda ya restado el servidor.
+   */
+  tax_name?: string | null;
+  tax_rate?: number | string | null;
+  tax_included?: boolean | null;
+  tax_amount?: number | string | null;
+  base_imponible?: number | string;
+  /**
+   * El cupón usado (MOD-4), también como foto del día de la venta.
+   * `items_subtotal` es lo que sumaban los productos ANTES de descontar, y es lo
+   * que deja pintar el desglose sin recalcular nada.
+   */
+  items_subtotal?: number | string | null;
+  coupon_code?: string | null;
+  discount_amount?: number | string | null;
   total: number;
   /**
    * Utilidad del pedido (MOD-6). Los tres solo llegan para admin.
@@ -411,8 +446,48 @@ export type AreaDeActividad =
   | 'pagina'
   | 'resena'
   | 'espera'
+  | 'papelera'
   | 'equipo'
   | 'configuracion';
+
+/**
+ * Un cupón de descuento de la tienda (MOD-4).
+ *
+ * Descuenta sobre el subtotal de los **productos**, nunca sobre el envío, y
+ * antes del impuesto. `used_count` lo lleva el servidor y no se edita.
+ */
+export interface Coupon {
+  id: string;
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number | string;
+  /** Los tres límites, opcionales: `null` es "sin límite". */
+  min_purchase: number | string | null;
+  max_uses: number | null;
+  used_count: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+/** Los dos tipos que tienen papelera (MOD-8). */
+export type TipoDePapelera = 'productos' | 'pedidos';
+
+/**
+ * Lo que devuelve `GET /api/trash` (MOD-8).
+ *
+ * Los elementos llegan paginados y con su `deleted_at`; los totales de los dos
+ * tipos vienen siempre, aunque solo se haya pedido uno, para las pestañas.
+ */
+export interface PapeleraResponse<T> {
+  tipo: TipoDePapelera;
+  items: PaginatedResponse<T & { deleted_at: string }>;
+  totales: { productos: number; pedidos: number };
+  /** `corte` es la fecha a partir de la cual algo sigue vivo: lo anterior ya caducó. */
+  retencion: { dias: number; corte: string };
+  tenant_timezone: string;
+}
 
 /**
  * Una línea de la actividad del panel de tienda (INF-3). La descripción llega

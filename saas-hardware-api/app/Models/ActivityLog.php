@@ -87,11 +87,22 @@ class ActivityLog extends Model
     public const EQUIPO_EDITADO = 'equipo.editado';
     public const EQUIPO_BORRADO = 'equipo.borrado';
     public const EQUIPO_REINVITADO = 'equipo.reinvitado';
+    // MOD-8: la papelera es su propia área y no "producto"/"pedido", porque lo
+    // que el dueño busca en la bitácora es "quién restauró esto" o "quién vació
+    // la papelera", no el historial del producto.
+    // MOD-4: los cupones son su propia area. Lo que el dueño busca es "quien
+    // creo este descuento", no el historial de un producto.
+    public const CUPON_CREADO = 'cupon.creado';
+    public const CUPON_EDITADO = 'cupon.editado';
+    public const CUPON_BORRADO = 'cupon.borrado';
+    public const PAPELERA_RESTAURADO = 'papelera.restaurado';
+    public const PAPELERA_PURGADO = 'papelera.purgado';
+    public const PAPELERA_VACIADA = 'papelera.vaciada';
     public const CONFIGURACION_EDITADA = 'configuracion.editada';
     public const CONFIGURACION_DOMINIO = 'configuracion.dominio_verificado';
 
     /** Las áreas de la bitácora de tienda, en el orden en que las ofrece el filtro. */
-    public const AREAS_DE_TIENDA = ['producto', 'pedido', 'categoria', 'pagina', 'resena', 'espera', 'equipo', 'configuracion'];
+    public const AREAS_DE_TIENDA = ['producto', 'pedido', 'categoria', 'pagina', 'resena', 'espera', 'cupon', 'papelera', 'equipo', 'configuracion'];
 
     protected $fillable = [
         'origen', 'tenant_id', 'actor_id', 'actor_email', 'actor_role',

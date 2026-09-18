@@ -1,0 +1,18 @@
+# robots.txt del host del SPA (INF-4).
+#
+# Este es el host donde de verdad vive el catalogo de una tienda por slug
+# (FRONTEND_URL/{slug}), asi que aqui hay que permitir el rastreo: es lo que se
+# comparte y lo que Google acaba indexando.
+#
+# El panel y el checkout no: no tienen nada que indexar, cambian por sesion y
+# solo gastan presupuesto de rastreo.
+#
+# No hay ningun `Sitemap:` a proposito. Este host lo comparten TODAS las tiendas
+# por slug, y robots.txt es del host y no de un path, asi que no existe un
+# sitemap unico que anunciar aqui; el de cada tienda esta en
+# {API}/{slug}/sitemap.xml y se envia a mano en Search Console. Una tienda con
+# dominio propio si tiene el suyo en su raiz, anunciado en su propio robots.txt.
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /platform/

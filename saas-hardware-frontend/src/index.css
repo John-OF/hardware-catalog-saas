@@ -770,3 +770,38 @@ select.premium-input option {
   color: var(--text-secondary);
   border: 1px solid var(--border);
 }
+
+/* Tarjeta de estado —cargando, error, lista vacia— y el icono que gira (UI-13).
+   Cada pagina se copiaba las suyas, y la que nacia sin copia salia con el texto
+   pegado al borde: paso en Equipo (UI-8), en Productos (UI-12) y en Cupones y
+   Papelera. Aqui queda el valor por defecto; lo que defina una hoja de pagina
+   gana el empate por orden de carga (index.css va el primero en main.tsx), asi
+   que una pagina con la suya solo hereda de aqui lo que ella no fija.
+
+   `.spinner` solo gira: el color lo decide quien lo pone, porque el mismo icono
+   va en blanco dentro de un `.btn-primary` y en color de marca en una tarjeta. */
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.state-card h3 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.state-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 52ch;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}

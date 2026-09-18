@@ -1,0 +1,72 @@
+/* Estilos de <InformeDeImport> (FUN-19). Es un componente, asi que su hoja es
+   global (TEC-6); todo va con el prefijo `informe-import` para no chocar. */
+
+.informe-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  /* Un catalogo de cientos de filas no puede empujar los botones del dialogo
+     fuera de la pantalla: el informe se desplaza por dentro. */
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(var(--overlay-mix), 0.02);
+}
+
+.informe-import-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.informe-import-titulo.con-avisos {
+  color: var(--warning);
+}
+
+.informe-import-resumen {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.informe-import-grupo h5,
+.informe-import-grupo summary {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.informe-import-grupo summary {
+  cursor: pointer;
+}
+
+.informe-import-grupo ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.informe-import-errores ul {
+  color: var(--danger);
+}
+
+.informe-import-fila {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.informe-import-detalle {
+  color: var(--text-secondary);
+}

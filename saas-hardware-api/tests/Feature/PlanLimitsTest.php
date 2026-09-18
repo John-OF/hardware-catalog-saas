@@ -351,26 +351,34 @@ class PlanLimitsTest extends TestCase
         $this->assertStringContainsString('4 productos más', implode(' ', $respuesta->json('errors')));
     }
 
-    /** Las categorias nuevas del CSV tambien gastan tope, y sin tirar el producto. */
-    public function test_el_import_deja_sin_categoria_lo_que_no_cabe_en_el_tope_de_categorias(): void
+    /**
+     * FUN-17: actualizar un producto que ya existe no gasta hueco, y un producto
+     * nuevo que no cabe ya no corta el archivo: las filas que vienen detras y
+     * actualizan siguen entrando. Antes el tope hacia `break`, que era correcto
+     * cuando toda fila creaba algo.
+     */
+    public function test_con_el_plan_lleno_el_import_sigue_actualizando_lo_que_ya_existe(): void
     {
-        $this->enPlan('test_alto');
-        config()->set('plans.plans.test_alto.limits.categories', 1);
+        $this->enPlan('test_alto');    // 10 productos
+        $this->sembrarProductos(10);   // sin hueco
 
-        $filas = "Uno;100;5;Procesadores\nDos;100;5;Tarjetas graficas\n";
+        $csv = "nombre;precio;stock\n"
+            ."Nuevo que no cabe;100;5\n"
+            ."Sembrado 3;250;9\n";
 
-        $respuesta = $this->importar("nombre;precio;stock;categoria\n".$filas);
+        $respuesta = $this->comoAdmin()->post('/api/products/import', [
+            'file' => UploadedFile::fake()->createWithContent('productos.csv', $csv),
+            'modo' => 'actualizar',
+        ]);
 
         $respuesta->assertOk();
-        $respuesta->assertJsonPath('success_count', 2);
-
-        $this->assertSame(1, Category::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
+        $respuesta->assertJsonPath('created_count', 0);
+        $respuesta->assertJsonPath('updated_count', 1);
+        $this->assertStringContainsString('no admite más productos', implode(' ', $respuesta->json('errors')));
 
         $productos = Product::withoutTenant()->where('tenant_id', $this->tenant->id)->get();
-        $this->assertNotNull($productos->firstWhere('name', 'Uno')->category_id);
-        $this->assertNull($productos->firstWhere('name', 'Dos')->category_id);
-
-        $this->assertStringContainsString('sin categoría', implode(' ', $respuesta->json('errors')));
+        $this->assertCount(10, $productos);
+        $this->assertSame('250.00', $productos->firstWhere('name', 'Sembrado 3')->price);
     }
 
     private function importar(string $contenido): \Illuminate\Testing\TestResponse

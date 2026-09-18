@@ -6,6 +6,8 @@ import { X, Trash2, Plus, Minus, ShoppingCart, Loader2, Send, Store, Truck, Wall
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
+import { comprobarCupon, type CouponCheck } from '../../api/coupons';
+import { mensajeDeError } from '../../api/erroresDeFormulario';
 import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { metodosDePagoActivos } from '../../utils/paymentMethods';
@@ -44,7 +46,76 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
   const conEnvio = tenant?.delivery_enabled ?? false;
   const costoEnvio = conEnvio && deliveryMethod === 'delivery' ? Number(tenant.delivery_cost) : 0;
-  const totalConEnvio = totalAmount + costoEnvio;
+
+  /**
+   * Cupón (MOD-4). El descuento se calcula sobre los PRODUCTOS y no sobre el
+   * envío, y va antes del impuesto — el mismo orden que aplica el servidor, que
+   * es quien manda: esto solo sirve para que el comprador vea el número antes de
+   * confirmar.
+   *
+   * `cuponAplicado` guarda lo que respondió el servidor. Si el carrito cambia
+   * después de aplicarlo, se vuelve a pedir: un cupón con compra mínima podría
+   * haber dejado de valer al quitar una línea.
+   */
+  const [codigoCupon, setCodigoCupon] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState<CouponCheck | null>(null);
+  const [errorCupon, setErrorCupon] = useState<string | null>(null);
+  const [comprobando, setComprobando] = useState(false);
+
+  const descuento = cuponAplicado
+    ? Math.min(
+        cuponAplicado.type === 'percent'
+          ? (totalAmount * Number(cuponAplicado.value)) / 100
+          : Number(cuponAplicado.value),
+        totalAmount,
+      )
+    : 0;
+
+  const aplicarCupon = async () => {
+    const codigo = codigoCupon.trim();
+
+    if (!codigo) return;
+
+    setComprobando(true);
+    setErrorCupon(null);
+
+    try {
+      setCuponAplicado(await comprobarCupon(slug, codigo, totalAmount));
+    } catch (err) {
+      setCuponAplicado(null);
+      // El motivo concreto —vencido, agotado, compra mínima— en vez de un
+      // "código inválido" que no dice qué hacer (UI-11).
+      setErrorCupon(mensajeDeError(err, { contexto: 'catalogo' }));
+    } finally {
+      setComprobando(false);
+    }
+  };
+
+  const quitarCupon = () => {
+    setCuponAplicado(null);
+    setCodigoCupon('');
+    setErrorCupon(null);
+  };
+
+  const baseDelPedido = totalAmount - descuento + costoEnvio;
+
+  /**
+   * El impuesto de la tienda (MOD-2), calculado igual que en el servidor
+   * (`App\Support\Impuesto`), que es quien manda: esto solo sirve para que el
+   * comprador vea lo mismo ANTES de confirmar.
+   *
+   * La diferencia que importa está en `tax_included`: con `true` el total no
+   * cambia —el precio del catálogo ya lo lleva— y con `false` sí, así que el
+   * comprador tiene que poder ver por qué paga más que la suma de su carrito.
+   */
+  const tasa = tenant?.tax_enabled ? Number(tenant.tax_rate) || 0 : 0;
+  const impuestoIncluido = tenant?.tax_included ?? true;
+  const impuesto = tasa <= 0
+    ? 0
+    : impuestoIncluido
+      ? (baseDelPedido * tasa) / (100 + tasa)
+      : (baseDelPedido * tasa) / 100;
+  const totalConEnvio = impuestoIncluido ? baseDelPedido : baseDelPedido + impuesto;
 
   const metodosDePago = metodosDePagoActivos(tenant?.payment_methods);
 
@@ -118,6 +189,8 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
         // que exista la opción no vale nada, y así el backend distingue "no
         // ofrece envío" de "no eligió".
         delivery_method: conEnvio ? deliveryMethod : undefined,
+        // MOD-4: el código, nunca el descuento.
+        coupon_code: cuponAplicado?.code,
       });
 
       // El total del pedido creado, no `totalConEnvio`: es lo que el
@@ -128,6 +201,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
       toast.success('Pedido enviado. Continúa la conversación por WhatsApp.');
       clear();
+      quitarCupon();
       setName('');
       setPhone('');
       setEmail('');
@@ -235,6 +309,69 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                   </div>
                 </div>
               )}
+              {/* MOD-4: el campo del código. Va antes del desglose porque lo que
+                  se escribe aquí cambia los números de abajo. */}
+              <div className="cart-coupon">
+                {cuponAplicado ? (
+                  <div className="cart-coupon-applied">
+                    <span>
+                      <strong>{cuponAplicado.code}</strong> aplicado
+                    </span>
+                    {/* Con etiqueta propia: cada línea del carrito tiene ya su
+                        botón "Quitar", y sin esto no hay forma de distinguirlos
+                        —ni para quien usa lector de pantalla ni en un test—. */}
+                    <button type="button" aria-label="Quitar cupón" onClick={quitarCupon}>Quitar</button>
+                  </div>
+                ) : (
+                  <div className="cart-coupon-input">
+                    <input
+                      className="premium-input"
+                      placeholder="¿Tienes un cupón?"
+                      value={codigoCupon}
+                      onChange={(e) => setCodigoCupon(e.target.value)}
+                      maxLength={40}
+                      // Sin `type="submit"`: dentro del formulario del checkout,
+                      // Enter aquí enviaría el pedido en vez de aplicar el código.
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          aplicarCupon();
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={aplicarCupon} disabled={comprobando || !codigoCupon.trim()}>
+                      {comprobando ? '…' : 'Aplicar'}
+                    </button>
+                  </div>
+                )}
+                {errorCupon && <span className="cart-coupon-error">{errorCupon}</span>}
+              </div>
+
+              {descuento > 0 && (
+                <div className="cart-tax">
+                  <div className="cart-tax-row cart-discount-row">
+                    <span>Descuento</span>
+                    <span>-{money(descuento)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* MOD-2: el desglose solo si la tienda cobra impuesto. Va antes
+                  del total, como el envío, para que el comprador vea de dónde
+                  sale el número que va a pagar. */}
+              {tasa > 0 && (
+                <div className="cart-tax">
+                  <div className="cart-tax-row">
+                    <span>Op. gravada</span>
+                    <span>{money(totalConEnvio - impuesto)}</span>
+                  </div>
+                  <div className="cart-tax-row">
+                    <span>{tenant?.tax_name || 'Impuesto'} ({tasa}%)</span>
+                    <span>{money(impuesto)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="cart-total">
                 <span>Total</span>
                 <strong>{money(totalConEnvio)}</strong>

@@ -73,8 +73,88 @@ if (!function_exists('tenantPorDominioVerificado')) {
     }
 }
 
+if (!function_exists('urlPublicaDe')) {
+    /**
+     * La URL que hay que indexar de una tienda (INF-4).
+     *
+     * Con dominio propio es su host; con slug, la del frontend y NO la de la
+     * API que esta contestando: es la que la gente comparte y a la que sale
+     * redirigido cualquier humano, asi que indexar la de la API seria mandar a
+     * la gente a una URL que la echa a otro sitio.
+     */
+    function urlPublicaDe(Tenant $tenant): string {
+        return rtrim((string) \App\Support\StoreUrl::forTenant($tenant), '/');
+    }
+}
+
+if (!function_exists('robotsDeLaPlataforma')) {
+    /**
+     * El robots.txt del host de la aplicacion (INF-4).
+     *
+     * Este host NO es donde vive ninguna tienda -las de slug viven en
+     * FRONTEND_URL y las de dominio propio en el suyo-, asi que aqui no hay un
+     * sitemap global que anunciar: la plataforma no es un directorio de tiendas.
+     *
+     * **OJO:** Laravel trae un `public/robots.txt` estatico y el servidor web lo
+     * sirve ANTES de llegar a ninguna ruta. Se borro por eso: con el ahi, esta
+     * ruta no se ejecutaria nunca en un servidor de verdad -y el dominio propio
+     * tampoco recibiria el suyo-. La suite no lo vio, porque en pruebas no hay
+     * archivos estaticos; se descubrio sirviendolo con `artisan serve`.
+     */
+    function robotsDeLaPlataforma() {
+        return response("User-agent: *\nDisallow: /api/\nAllow: /\n")
+            ->header('Content-Type', 'text/plain');
+    }
+}
+
+if (!function_exists('sitemapDe')) {
+    /** El XML del sitemap de una tienda (INF-4). */
+    function sitemapDe(Tenant $tenant, string $base) {
+        // AUD-4: el helper lee productos y paginas, y aqui no hay middleware que
+        // resuelva la tienda; sin esto el sitemap saldria vacio sin decir nada.
+        $tenant->makeCurrent();
+
+        return response()
+            ->view('sitemap', ['urls' => \App\Support\Seo::urlsDelSitemap($tenant, $base)])
+            ->header('Content-Type', 'application/xml');
+    }
+}
+
 Route::get('/', function () {
     return view('welcome');
+});
+
+/*
+| robots.txt del host de la aplicacion (INF-4).
+|
+| Este host NO es donde vive ninguna tienda -las de slug viven en FRONTEND_URL y
+| las de dominio propio en el suyo-, asi que aqui no hay un sitemap global que
+| anunciar: la plataforma no es un directorio de tiendas. Lo unico que dice es
+| que la API no se rastrea, que es lo que de verdad sobra en el indice.
+*/
+Route::get('/robots.txt', function () {
+    return robotsDeLaPlataforma();
+});
+
+/*
+| El sitemap de una tienda por slug (INF-4).
+|
+| Va aqui y no en la raiz porque una tienda sin dominio propio COMPARTE host con
+| la plataforma, y `robots.txt` y `sitemap.xml` son del host y no de un path: no
+| puede tener los suyos en la raiz sin pisar los de las demas. Se envia a mano en
+| Search Console, que es justo para lo que existe esa pantalla.
+|
+| Antes que `/{slug}` a proposito: si no, ese comodin se lo traga como si
+| "sitemap.xml" fuera el slug de una tienda.
+*/
+Route::get('/{slug}/sitemap.xml', function ($slug) {
+    $tenant = Tenant::publica()->where('slug', $slug)->first();
+
+    if (!$tenant) {
+        abort(404);
+    }
+
+    return sitemapDe($tenant, urlPublicaDe($tenant));
 });
 
 // FUN-5: las cuatro rutas de crawler resuelven la tienda con `Tenant::publica()`,
@@ -108,22 +188,9 @@ Route::get('/{slug}/product/{productId}', function ($slug, $productId) {
             abort(404);
         }
         
-        $title = "{$product->name} | {$tenant->name}";
-        $description = $product->description ? substr(strip_tags($product->description), 0, 160) : "Comprar {$product->name} en {$tenant->name}.";
-        
-        // Obtener imagen del producto
-        $image = null;
-        if ($product->images()->count() > 0) {
-            $image = $product->images()->first()->image_url;
-        } elseif ($product->image_url) {
-            $image = $product->image_url;
-        } elseif ($tenant->logo_url) {
-            $image = $tenant->logo_url;
-        }
-        
-        $url = request()->url();
-        
-        return view('catalog_og', compact('title', 'description', 'image', 'url'));
+        $base = urlPublicaDe($tenant);
+
+        return view('catalog_og', \App\Support\Seo::producto($tenant, $product->load('images'), $base.'/product/'.$product->id, $base));
     }
     
     return fallbackToSpa();
@@ -155,12 +222,9 @@ Route::get('/{slug}/p/{pageSlug}', function ($slug, $pageSlug) {
             abort(404);
         }
         
-        $title = "{$page->title} | {$tenant->name}";
-        $description = $page->content ? substr(strip_tags($page->content), 0, 160) : "Página informativa {$page->title} en {$tenant->name}.";
-        $image = $tenant->logo_url;
-        $url = request()->url();
-        
-        return view('catalog_og', compact('title', 'description', 'image', 'url'));
+        $base = urlPublicaDe($tenant);
+
+        return view('catalog_og', \App\Support\Seo::pagina($tenant, $page, $base.'/p/'.$page->slug, $base));
     }
     
     return fallbackToSpa();
@@ -177,12 +241,13 @@ Route::get('/{slug}/builder', function ($slug) {
             abort(404);
         }
         
-        $title = "Armador de PC compatible | {$tenant->name}";
-        $description = "Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada en {$tenant->name}.";
-        $image = $tenant->logo_url;
-        $url = request()->url();
-        
-        return view('catalog_og', compact('title', 'description', 'image', 'url'));
+        // Mismo motivo que en las otras (AUD-4): el helper lee paginas y
+        // productos, y sin tienda resuelta el scope no devolveria nada.
+        $tenant->makeCurrent();
+
+        $base = urlPublicaDe($tenant);
+
+        return view('catalog_og', \App\Support\Seo::armador($tenant, $base.'/builder', $base));
     }
     
     return fallbackToSpa();
@@ -196,12 +261,9 @@ Route::get('/{slug}', function ($slug) {
             abort(404);
         }
 
-        $title = $tenant->name;
-        $description = ($tenant->theme['hero_subtitle'] ?? null) ?: "Catálogo oficial de {$tenant->name}.";
-        $image = $tenant->logo_url;
-        $url = request()->url();
+        $tenant->makeCurrent();
 
-        return view('catalog_og', compact('title', 'description', 'image', 'url'));
+        return view('catalog_og', \App\Support\Seo::catalogo($tenant, urlPublicaDe($tenant)));
     }
 
     return fallbackToSpa();
@@ -236,6 +298,47 @@ Route::group([
         'tenantDominio' => '^(?!' . preg_quote((string) parse_url((string) config('app.url'), PHP_URL_HOST), '/') . '$).+$',
     ],
 ], function () {
+        /*
+        | robots.txt y sitemap.xml de un dominio propio (INF-4).
+        |
+        | Aqui SI van en la raiz, y es la diferencia que hace valioso el dominio
+        | propio para SEO: los dos son del host, no de un path, asi que una
+        | tienda con dominio propio puede tener los suyos de verdad -y el
+        | `Sitemap:` del robots.txt es lo que hace que un buscador lo encuentre
+        | solo, sin que nadie lo envie a mano-. Una tienda por slug comparte host
+        | con la plataforma y no puede.
+        */
+        Route::get('/robots.txt', function ($tenantDominio) {
+            $tenant = tenantPorDominioVerificado($tenantDominio);
+
+            // Un host que no es de ninguna tienda -un alias de la propia app,
+            // una IP, un staging- recibe el robots.txt de la plataforma en vez
+            // de un 404: es lo que de verdad es, y un 404 aqui deja al buscador
+            // sin ninguna instruccion.
+            if (!$tenant) {
+                return robotsDeLaPlataforma();
+            }
+
+            $base = urlPublicaDe($tenant);
+
+            // En una sola linea con \n a proposito: partida en varias, la cadena
+            // se lleva los finales de linea del archivo -CRLF en Windows- y el
+            // robots.txt sale con \r\n. Se vio sirviendolo de verdad, no en la
+            // suite.
+            return response("User-agent: *\nAllow: /\n\nSitemap: {$base}/sitemap.xml\n")
+                ->header('Content-Type', 'text/plain');
+        });
+
+        Route::get('/sitemap.xml', function ($tenantDominio) {
+            $tenant = tenantPorDominioVerificado($tenantDominio);
+
+            if (!$tenant) {
+                abort(404);
+            }
+
+            return sitemapDe($tenant, urlPublicaDe($tenant));
+        });
+
         Route::get('/product/{productId}', function ($tenantDominio, $productId) {
             $tenant = tenantPorDominioVerificado($tenantDominio);
             if (!$tenant) {
@@ -261,21 +364,9 @@ Route::group([
                 abort(404);
             }
 
-            $title = "{$product->name} | {$tenant->name}";
-            $description = $product->description ? substr(strip_tags($product->description), 0, 160) : "Comprar {$product->name} en {$tenant->name}.";
+            $base = urlPublicaDe($tenant);
 
-            $image = null;
-            if ($product->images()->count() > 0) {
-                $image = $product->images()->first()->image_url;
-            } elseif ($product->image_url) {
-                $image = $product->image_url;
-            } elseif ($tenant->logo_url) {
-                $image = $tenant->logo_url;
-            }
-
-            $url = request()->url();
-
-            return view('catalog_og', compact('title', 'description', 'image', 'url'));
+            return view('catalog_og', \App\Support\Seo::producto($tenant, $product->load('images'), $base.'/product/'.$product->id, $base));
         });
 
         Route::get('/p/{pageSlug}', function ($tenantDominio, $pageSlug) {
@@ -299,12 +390,9 @@ Route::group([
                 abort(404);
             }
 
-            $title = "{$page->title} | {$tenant->name}";
-            $description = $page->content ? substr(strip_tags($page->content), 0, 160) : "Página informativa {$page->title} en {$tenant->name}.";
-            $image = $tenant->logo_url;
-            $url = request()->url();
+            $base = urlPublicaDe($tenant);
 
-            return view('catalog_og', compact('title', 'description', 'image', 'url'));
+            return view('catalog_og', \App\Support\Seo::pagina($tenant, $page, $base.'/p/'.$page->slug, $base));
         });
 
         Route::get('/builder', function ($tenantDominio) {
@@ -317,12 +405,11 @@ Route::group([
                 return fallbackToSpaConSlug($tenant->slug, '/builder');
             }
 
-            $title = "Armador de PC compatible | {$tenant->name}";
-            $description = "Arma tu computadora ideal paso a paso con compatibilidad de componentes garantizada en {$tenant->name}.";
-            $image = $tenant->logo_url;
-            $url = request()->url();
+            $tenant->makeCurrent();
 
-            return view('catalog_og', compact('title', 'description', 'image', 'url'));
+            $base = urlPublicaDe($tenant);
+
+            return view('catalog_og', \App\Support\Seo::armador($tenant, $base.'/builder', $base));
         });
 
         Route::get('/', function ($tenantDominio) {
@@ -353,11 +440,8 @@ Route::group([
                 return fallbackToSpaConSlug($tenant->slug, '');
             }
 
-            $title = $tenant->name;
-            $description = ($tenant->theme['hero_subtitle'] ?? null) ?: "Catálogo oficial de {$tenant->name}.";
-            $image = $tenant->logo_url;
-            $url = request()->url();
+            $tenant->makeCurrent();
 
-            return view('catalog_og', compact('title', 'description', 'image', 'url'));
+            return view('catalog_og', \App\Support\Seo::catalogo($tenant, urlPublicaDe($tenant)));
         });
     });

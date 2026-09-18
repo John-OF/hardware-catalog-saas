@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Support\Cupones;
+use App\Support\Impuesto;
 use App\Models\ProductVariant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -140,7 +142,11 @@ class Reportes
      * lo que el dueño ve en el listado de pedidos. `envio` sale aparte porque no
      * es margen de nada: es lo que se le cobra al comprador por llevarselo
      * (MOD-1), y lo que la tienda le paga al repartidor no lo sabe el sistema.
-     * Por eso el margen se mide contra las ventas SIN envio, igual que hace
+     * `impuesto` sale aparte por la misma razon (MOD-2): entro en caja, pero es
+     * del fisco. `descuento` (MOD-4) es lo contrario —lo que NO entro—, y sale
+     * aparte porque `ventas` ya lo tiene restado: sin esta linea no habria forma
+     * de saber cuanto costo una campaña. Por eso el margen se mide contra las
+     * ventas SIN envio, SIN impuesto y con el cupon ya repartido, igual que hace
      * `Order::getUtilidadAttribute()`.
      *
      * @param  bool  $conCostos  si quien mira puede ver el costo (MOD-6). En
@@ -153,6 +159,13 @@ class Reportes
         $vendidos = $this->pedidosDelRango()
             ->where('status', 'attended')
             ->selectRaw('count(*) as pedidos, coalesce(sum(total), 0) as ventas, coalesce(sum(delivery_cost), 0) as envio')
+            // MOD-2: lo que de esas ventas es impuesto. Sale aparte por lo mismo
+            // que el envio: entro en caja pero no es de la tienda.
+            ->selectRaw('coalesce(sum(tax_amount), 0) as impuesto')
+            // MOD-4: lo que se dejo de cobrar en cupones. Sale aparte porque es
+            // lo unico que dice si una campaña salio cara: `ventas` ya viene con
+            // el descuento restado y por si sola no deja verlo.
+            ->selectRaw('coalesce(sum(discount_amount), 0) as descuento')
             ->first();
 
         $pedidos = (int) $vendidos->pedidos;
@@ -168,6 +181,8 @@ class Reportes
         $resumen = [
             'ventas'          => $ventas,
             'envio'           => round((float) $vendidos->envio, 2),
+            'impuesto'        => round((float) $vendidos->impuesto, 2),
+            'descuento'       => round((float) $vendidos->descuento, 2),
             'pedidos'         => $pedidos,
             // Con el envio incluido, que es lo que pago el cliente. Sin pedidos
             // da 0, no una division por cero.
@@ -351,6 +366,8 @@ class Reportes
         $filas = $this->lineasDelRango()
             ->selectRaw('order_items.product_id, order_items.product_name')
             ->selectRaw('sum(order_items.quantity) as unidades')
+            // Lo cobrado por ese producto, con el impuesto dentro si asi se
+            // vendio: es lo que entro en caja, igual que `ventas` del resumen.
             ->selectRaw('sum(order_items.subtotal) as ventas')
             ->selectRaw($this->sumaDeVentaConCosto())
             ->selectRaw($this->sumaDeCosto())
@@ -478,6 +495,12 @@ class Reportes
         return DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->where('orders.tenant_id', $this->tenantId)
+            // MOD-8: la papelera. Esta es la unica consulta de pedidos que no va
+            // por Eloquent, asi que el global scope de `SoftDeletes` no la toca y
+            // el filtro se escribe a mano. Sin el, un pedido borrado seguiria
+            // contando como venta en los reportes y en su CSV -y cuadraria
+            // consigo mismo, que es lo que lo hace dificil de ver-.
+            ->whereNull('orders.deleted_at')
             ->where('orders.status', 'attended')
             // Los mismos instantes exactos que `pedidosDelRango()`; ver alli.
             ->where('orders.created_at', '>=', $this->desde->utc())
@@ -494,7 +517,21 @@ class Reportes
      */
     private function sumaDeVentaConCosto(): string
     {
-        return 'coalesce(sum(case when order_items.unit_cost is null then 0 else order_items.subtotal end), 0) as venta_con_costo';
+        // MOD-2: neta de impuesto, y esto no es un detalle de formato. Si los
+        // precios de la tienda llevan el impuesto dentro, parte de cada
+        // `subtotal` es del fisco: contarlo como venta infla el margen en el
+        // porcentaje entero, y ese numero es el que el dueño usa para decidir
+        // precios. `Impuesto::expresionNeta()` descuenta lo mismo que descuenta
+        // `Order::getUtilidadAttribute()` en un pedido suelto, que es lo que
+        // impide que la ficha de un pedido y el reporte den dos margenes
+        // distintos de la misma venta.
+        // MOD-4: primero se reparte el cupon y despues se saca el impuesto, en
+        // ese orden, porque el descuento se aplico sobre precios que ya llevaban
+        // el impuesto dentro. Al reves saldria un margen distinto del que enseña
+        // la ficha del pedido.
+        $neta = Impuesto::expresionNeta(Cupones::expresionNeta('order_items.subtotal'));
+
+        return "coalesce(sum(case when order_items.unit_cost is null then 0 else {$neta} end), 0) as venta_con_costo";
     }
 
     private function sumaDeCosto(): string

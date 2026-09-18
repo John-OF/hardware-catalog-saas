@@ -6,12 +6,21 @@ use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Order extends Model
 {
-    use BelongsToTenant, HasUuids;
+    /**
+     * La papelera de MOD-8. Un pedido borrado deja de contar como venta en el
+     * resumen, en los reportes y en el CSV sin tocar ninguna de esas consultas,
+     * porque todas van por Eloquent — **salvo una**: `Reportes::lineasDelRango()`
+     * hace un join con `DB::table('orders')` para sumar las lineas, y ahi el
+     * filtro va a mano. Es el tipo de agujero que no da error: sumaria ventas
+     * borradas y cuadraria consigo mismo.
+     */
+    use BelongsToTenant, HasUuids, SoftDeletes;
 
     public function newUniqueId(): string
     {
@@ -28,11 +37,28 @@ class Order extends Model
         // pedido de antes de este cambio). `delivery_cost` es el snapshot de
         // lo que costaba el envío ESE día; ver la migración.
         'delivery_method', 'delivery_cost',
+        // MOD-2: la foto del impuesto del día de la venta. `null` en `tax_rate`
+        // es "se vendió sin impuesto", que no es lo mismo que "con el 0%".
+        'tax_name', 'tax_rate', 'tax_included', 'tax_amount',
+        // MOD-4: el cupón usado y lo que descontó, también como foto del día de
+        // la venta. `coupon_code` sobrevive a que el cupón se borre.
+        'items_subtotal', 'coupon_id', 'coupon_code', 'discount_amount',
     ];
+
+    /**
+     * MOD-2: el desglose se calcula, no se guarda dos veces. Va siempre, también
+     * en los pedidos sin impuesto, donde es igual al total.
+     */
+    protected $appends = ['base_imponible'];
 
     protected $casts = [
         'total' => 'decimal:2',
         'delivery_cost' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
+        'tax_included' => 'boolean',
+        'tax_amount' => 'decimal:2',
+        'items_subtotal' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'number' => 'integer',
     ];
 
@@ -94,6 +120,74 @@ class Order extends Model
         });
     }
 
+    /**
+     * Descuenta o devuelve el stock de las líneas de este pedido.
+     *
+     * Vive en el modelo y no en `OrderController` porque desde `MOD-8` lo llaman
+     * dos sitios: el controlador —al crear, al cambiar de estado y al borrar— y
+     * la papelera, al restaurar un pedido atendido que ya había devuelto su
+     * stock. Si cada uno se escribiera el suyo, restaurar movería el stock con
+     * reglas distintas de las que lo movieron al vender.
+     *
+     * Las líneas guardan un snapshot del producto, así que `product_id` puede
+     * ser null si el artículo se borró del catálogo después de venderse: en ese
+     * caso no hay stock que mover y la línea se salta.
+     *
+     * MOD-5: una línea de una variante mueve el stock de ESA variante y después
+     * recalcula el resumen del producto. Se salta —sin mover nada— en dos casos
+     * en los que no hay dónde devolverlo con sentido: la variante se borró
+     * (queda su nombre pero no su id), o la línea es de antes de que el producto
+     * tuviera variantes (el stock del producto ya es solo un resumen, y el
+     * próximo cálculo pisaría lo que se le sumara a mano).
+     *
+     * MOD-8: el producto se busca **con la papelera incluida**. Un producto
+     * borrado sigue teniendo su número de stock, y saltárselo dejaría que borrar
+     * un producto y luego cancelar una venta suya perdiera unidades en silencio
+     * — y al restaurarlo, el número ya estaría mal.
+     *
+     * Con el modelo (`increment()` de una instancia) y no con una consulta suelta,
+     * para que salten los eventos: el aviso de "ya llegó" al devolver stock de un
+     * pedido cancelado.
+     */
+    public function moverStock(bool $decrement): void
+    {
+        foreach ($this->items as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+
+            if ($item->variant_id) {
+                $variante = ProductVariant::find($item->variant_id);
+
+                if (! $variante) {
+                    continue;
+                }
+
+                $decrement
+                    ? $variante->decrement('stock', $item->quantity)
+                    : $variante->increment('stock', $item->quantity);
+
+                $variante->product()->withTrashed()->first()?->sincronizarResumenDeVariantes();
+
+                continue;
+            }
+
+            if ($item->variant_name !== null) {
+                continue;
+            }
+
+            $producto = Product::withTrashed()->withCount('variants')->find($item->product_id);
+
+            if (! $producto || $producto->variants_count > 0) {
+                continue;
+            }
+
+            $decrement
+                ? $producto->decrement('stock', $item->quantity)
+                : $producto->increment('stock', $item->quantity);
+        }
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
@@ -129,6 +223,13 @@ class Order extends Model
      * le cuesta a ella el reparto no lo sabe el sistema. Meterlo aqui inflaria
      * la utilidad con dinero que se va en gasolina.
      *
+     * **El impuesto tampoco cuenta** (MOD-2). Si los precios de la tienda lo
+     * llevan dentro, parte de lo cobrado por cada línea es del fisco y no de la
+     * tienda: medir el margen contra el precio con impuesto lo infla en el
+     * porcentaje entero, y ese número es el que el dueño usa para decidir
+     * precios. Cuando el impuesto se suma al final, las líneas ya son netas y
+     * aquí no hay nada que descontar.
+     *
      * Si solo algunas lineas tienen costo, esto es una utilidad PARCIAL, y
      * `lineas_sin_costo` es lo que avisa de ello.
      */
@@ -142,7 +243,33 @@ class Order extends Model
 
         $venta = $conCosto->sum(fn (OrderItem $i) => (float) $i->subtotal);
 
+        // MOD-4: la parte del cupón que le tocó a estas líneas, en proporción.
+        // El descuento vive en el pedido y no repartido por línea —`subtotal` es
+        // el snapshot de precio × cantidad—, así que se reparte aquí. Sin esto,
+        // un cupón del 25% no se notaría en la utilidad y el dueño creería estar
+        // ganando lo que no cobró.
+        if ((float) $this->discount_amount > 0 && (float) $this->items_subtotal > 0) {
+            $venta *= 1 - ((float) $this->discount_amount / (float) $this->items_subtotal);
+        }
+
+        // MOD-2: y de lo que queda, lo que es del fisco. En este orden: el
+        // descuento se aplicó sobre precios que ya llevaban el impuesto dentro.
+        $venta -= \App\Support\Impuesto::dentroDe($this, $venta);
+
         return round($venta - (float) $this->costo_total, 2);
+    }
+
+    /**
+     * Lo cobrado sin el impuesto: lo que la cotización llama "operación gravada".
+     *
+     * Sale de `total` y no de la suma de las líneas a propósito: `total` es lo
+     * que paga el cliente en los dos modos de cobro, así que esta resta vale
+     * igual para los dos y para los pedidos de antes de MOD-2, donde
+     * `tax_amount` es null y esto devuelve el total entero.
+     */
+    public function getBaseImponibleAttribute(): float
+    {
+        return round((float) $this->total - (float) ($this->tax_amount ?? 0), 2);
     }
 
     /**

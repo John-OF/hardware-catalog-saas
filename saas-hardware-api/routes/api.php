@@ -7,7 +7,10 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\CouponController;
+use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\TrashController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
@@ -98,6 +101,12 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
     // Páginas informativas públicas
     Route::get('/pages', [PublicCatalogController::class, 'pages']);
     Route::get('/pages/{page_slug}', [PublicCatalogController::class, 'pageDetail']);
+
+    // MOD-4: comprobar un codigo de cupon desde el carrito. Con su propio
+    // limitador, mas estrecho que el resto: es el unico sitio del catalogo donde
+    // adivinar a ciegas tiene premio.
+    Route::post('/coupons/check', [PublicCatalogController::class, 'checkCoupon'])
+        ->middleware('throttle:cupon');
 
     // Crear solicitud de pedido (público, limitado para evitar spam)
     Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
@@ -240,7 +249,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // producto para elegir una.
     Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 
-    // Pedidos
+    // Pedidos. El PDF va ANTES del apiResource, o `orders/{order}` se tragaria
+    // "pdf" como si fuera un id (mismo motivo que `products/export`).
+    // Lo descarga tambien staff (MOD-2): quien atiende el mostrador es quien
+    // cotiza, y el PDF no lleva ningun dato que staff no vea ya en el pedido.
+    Route::get('orders/{order}/pdf', QuoteController::class);
     Route::apiResource('orders', OrderController::class)->except(['destroy']);
 
     // Clientes de la tienda (MOD-10). Lectura: no se crean ni se editan desde el
@@ -290,5 +303,19 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
         // hace el resto del equipo. Lo que escribe cada ruta está en
         // App\Support\Bitacora y lo vigila BitacoraDeTiendaTest.
         Route::get('activity', [ActivityController::class, 'index']);
+
+        // Cupones (MOD-4). Solo admin: un cupon es dinero que se deja de cobrar,
+        // asi que lo decide quien decide los precios (FUN-4).
+        Route::apiResource('coupons', CouponController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
+
+        // Papelera (MOD-8). Solo admin por lo mismo que borrar: si un
+        // colaborador pudiera restaurar y volver a borrar, no borrar no seria
+        // ninguna restriccion. `DELETE trash` va ANTES que `trash/{tipo}/{id}`
+        // para que no se lo trague como si fuera un tipo.
+        Route::get('trash', [TrashController::class, 'index']);
+        Route::delete('trash', [TrashController::class, 'empty']);
+        Route::post('trash/{tipo}/{id}/restore', [TrashController::class, 'restore']);
+        Route::delete('trash/{tipo}/{id}', [TrashController::class, 'destroy']);
     });
 });

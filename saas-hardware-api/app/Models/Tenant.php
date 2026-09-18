@@ -25,6 +25,9 @@ class Tenant extends Model implements IsTenant
         'slug', 'name', 'logo_url', 'primary_color', 'theme',
         'whatsapp_number', 'plan', 'is_active', 'is_published', 'custom_domain', 'currency',
         'timezone', 'payment_methods', 'delivery_enabled', 'delivery_cost',
+        // MOD-2. `tax_included` decide si el porcentaje se saca del precio o se
+        // suma al final, y cambia la aritmética entera: ver `App\Support\Impuesto`.
+        'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
     ];
 
     protected $casts = [
@@ -34,6 +37,9 @@ class Tenant extends Model implements IsTenant
         'payment_methods' => 'array',
         'delivery_enabled' => 'boolean',
         'delivery_cost' => 'decimal:2',
+        'tax_enabled' => 'boolean',
+        'tax_rate' => 'decimal:2',
+        'tax_included' => 'boolean',
         'custom_domain_requested_at' => 'datetime',
         'custom_domain_verified_at' => 'datetime',
         'trial_ends_at' => 'datetime',

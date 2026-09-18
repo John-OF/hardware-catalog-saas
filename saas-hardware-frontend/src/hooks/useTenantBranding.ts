@@ -17,6 +17,25 @@ function getOrCreateFaviconLink(): HTMLLinkElement {
 
 const DEFAULT_FAVICON = getOrCreateFaviconLink().getAttribute('href');
 
+/**
+ * La URL canónica de lo que se está mirando (INF-4).
+ *
+ * Se pone **sin la query**: el catálogo guarda sus filtros ahí (`UI-1`), así que
+ * la misma lista de productos existe bajo decenas de URL distintas y un buscador
+ * las trataría como páginas duplicadas. El canónico las junta todas en una.
+ */
+function updateCanonical() {
+  let link = document.querySelector<HTMLLinkElement>("link[rel='canonical']");
+
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'canonical';
+    document.head.appendChild(link);
+  }
+
+  link.href = window.location.origin + window.location.pathname;
+}
+
 function updateMetaTags(title: string, description: string, imageUrl?: string | null) {
   // Update Meta Description
   let descMeta = document.querySelector('meta[name="description"]');
@@ -93,6 +112,7 @@ export function useTenantBranding(
 
     // Actualizar meta tags dinámicamente en el cliente
     updateMetaTags(finalTitle, finalDesc, finalImage);
+    updateCanonical();
 
     const favicon = tenant.theme?.favicon_url?.trim();
     const link = getOrCreateFaviconLink();

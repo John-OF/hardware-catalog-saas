@@ -69,8 +69,13 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 - **Un worker de colas corriendo** (`php artisan queue:work`): los correos van por cola y sin él no
   sale ninguno
 - **En producción, un cron del sistema llamando `php artisan schedule:run` cada minuto**: es lo que
-  cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`); sin él, ninguna
-  prueba se cierra aunque la fecha ya haya pasado
+  cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`), lo que vacía la
+  papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`) y lo que hace la
+  **copia de seguridad diaria** (`copias:crear`, `INF-7`); sin él, ninguna prueba se cierra aunque la
+  fecha ya haya pasado, la papelera crece sin techo y **no hay ninguna copia de la base**
+- **`mysqldump` accesible** para el usuario que corre el cron (`BACKUP_BIN_PATH` si no está en su
+  PATH), y `BACKUP_DISK` apuntando a almacenamiento **fuera de este servidor** (`r2`/`s3`): una copia
+  en el mismo disco que la base no es una copia
 - Opcional en local, **obligatorio en producción**: almacenamiento compatible con S3 (Cloudflare R2)
   para las imágenes
 - Opcional en local, **obligatorio en producción**: claves de
@@ -118,6 +123,44 @@ migraciones: si sube sin ellas, falla. Hoy hay dos casos con consecuencias grave
 `add_is_published_to_tenants_table` (sin ella, todo el catálogo público da error) y
 `add_origen_to_activity_logs_table` (sin ella fallan suspender una tienda, cambiarle el plan o entrar
 como soporte). `php artisan migrate:status` dice cuáles faltan.
+
+### Copias de seguridad y cómo restaurar una (`INF-7`)
+
+`copias:crear` vuelca la base, comprueba que el volcado trae dentro las tablas que tiene que traer y
+lo guarda en `copias/` del disco de `config/backups.php`, borrando de paso las que pasen de
+`BACKUP_RETENTION_DAYS`. Lo dispara el scheduler a las 03:30, así que **depende del mismo cron** que
+todo lo demás.
+
+Tres cosas que no se ven en el código y hay que tener presentes:
+
+- **La copia es de la base, no de las imágenes.** Las fotos viven en R2/S3 y tienen su propio
+  versionado. Restaurando sólo esto, el catálogo vuelve entero pero una imagen borrada del bucket
+  sigue borrada.
+- **`BACKUP_DISK` tiene que estar fuera de este servidor.** Una copia en el mismo disco que la base
+  se pierde con él.
+- **Un disco público se rechaza**, y no es una precaución teórica: el volcado lleva los datos de
+  todas las tiendas y los correos de todos sus clientes, y el disco `public` se sirve desde
+  `/storage`.
+
+**Restaurar** se hace a mano y mirando —no hay comando, a propósito: uno que pise la base de
+producción a un tecleo de distancia es más peligroso que cómodo—:
+
+```bash
+# 1. Bajar la copia del disco donde esté (r2/s3) al servidor.
+# 2. Restaurarla SIEMPRE primero en una base aparte, nunca encima de la buena.
+mysql -u root -p -e "CREATE DATABASE saas_restore CHARACTER SET utf8mb4"
+mysql -u root -p saas_restore < 2026-09-18_033000-production.sql
+
+# 3. Comprobar que está lo que tiene que estar antes de tocar nada.
+mysql -u root -p saas_restore -e "SELECT COUNT(*) FROM tenants; SELECT COUNT(*) FROM orders"
+
+# 4. Sólo entonces, y con la aplicación en mantenimiento, apuntar DB_DATABASE a la
+#    restaurada o volcarla sobre la de producción.
+php artisan down && php artisan migrate --force && php artisan up
+```
+
+El paso 3 no es opcional: una copia que nadie ha restaurado nunca no se sabe si sirve, y el día que
+haga falta no es el día de averiguarlo.
 
 ---
 
@@ -175,6 +218,9 @@ Flysystem S3 (compatible con Cloudflare R2).
 ```
 app/
 ├── Casts/SanitizedHtml.php        # Limpia el HTML al guardar
+├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8) y
+│                                  # CreateBackup (INF-7), los tres desde el scheduler;
+│                                  # CreateSuperAdmin, a mano
 ├── Enums/ComponentType.php        # Qué pieza de PC vende una categoría
 ├── Exceptions/PlanLimitException  # 422 con la clave del límite alcanzado
 ├── Http/
@@ -188,6 +234,9 @@ app/
 │   │   ├── StockNotificationController.php # Lista de espera
 │   │   ├── PageController.php              # Páginas informativas
 │   │   ├── ActivityController.php          # Actividad del panel: quién cambió qué (INF-3)
+│   │   ├── TrashController.php             # Papelera de productos y pedidos (MOD-8)
+│   │   ├── QuoteController.php             # La cotizacion de un pedido en PDF (MOD-2)
+│   │   ├── CouponController.php            # Cupones de descuento (MOD-4)
 │   │   ├── DashboardController.php         # Métricas
 │   │   ├── PlanController.php              # Plan, límites y consumo
 │   │   ├── PlatformController.php          # Panel del operador
@@ -207,7 +256,7 @@ app/
 │   │   └── RestrictImpersonation.php       # Sesión de soporte: el panel, en solo lectura
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
 ├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
-│                      # Order, OrderItem, Review, StockNotification, Page, ActivityLog
+│                      # Order, OrderItem, Coupon, Review, StockNotification, Page, ActivityLog
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
 ├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
 │                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
@@ -220,20 +269,28 @@ app/
     ├── PlanGate.php        # Aplica los límites del plan
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
+    ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
+    ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
+    ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
+    ├── Seo.php            # Lo que ve un buscador (INF-4): contenido, canonico, JSON-LD y sitemap
+    ├── Copias.php        # Volcado y comprobacion de la copia de seguridad (INF-7)
     ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
     ├── Money.php           # Formato de moneda por tienda
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
+config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
 config/plans.php       # La matriz de planes y límites
 config/timezones.php   # Zonas horarias que puede elegir una tienda (MOD-13).
                        # El criterio es DONDE HAY TIENDAS, no que moneda usan: sacarla
                        # de las monedas dejo fuera a los paises dolarizados. Copia en
                        # utils/timezones.ts, y un test comprueba que no se separen.
+resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-4)
+                       # y cotizacion (el PDF de MOD-2)
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 56 archivos, 506 tests (+1 en tests/Unit)
+tests/Feature/         # 66 archivos, 697 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -248,6 +305,7 @@ tests/Feature/         # 56 archivos, 506 tests (+1 en tests/Unit)
 | GET | `/api/auth/verify-email/{id}/{hash}` | Verificar correo (URL firmada) → redirige al SPA |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
 | GET | `/api/public/plans` | Catálogo de planes con precio, para la landing (INF-1) |
+| GET | `/{slug}/sitemap.xml` · `/robots.txt` | Sitemap de una tienda y robots del host (INF-4). No son `/api/`: van en `routes/web.php` |
 
 **Catálogo público** (prefijo `/api/public/{slug}`, throttle de grupo 120/min, tenant por slug):
 
@@ -260,7 +318,8 @@ tests/Feature/         # 56 archivos, 506 tests (+1 en tests/Unit)
 | GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
-| POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes; `delivery_method` (`pickup`/`delivery`) opcional — el costo lo calcula el servidor, nunca lo que mande el cliente (MOD-1) · 10/min |
+| POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes; `delivery_method` (`pickup`/`delivery`) y `coupon_code` opcionales — el costo del envío y el descuento los calcula el servidor, nunca lo que mande el cliente (MOD-1, MOD-4) · 10/min |
+| POST | `/coupons/check` | Comprueba un código desde el carrito y devuelve cuánto descontaría (MOD-4). Limitador propio (`throttle:cupon`, **5/min**) porque es el único sitio público donde adivinar a ciegas tiene premio |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
 | POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min (el login, por correo; 20/min por IP) |
 | POST | `/auth/forgot-password` · `/auth/reset-password` | Recuperar contraseña del cliente · 5/min |
@@ -283,20 +342,24 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | Sí |
 | GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **no salen para staff** (MOD-6) | Sí, sin costos |
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
-| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1) y `timezone` (MOD-13, whitelist de `config/timezones.php`) | Solo `GET` |
+| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6) | Todo menos `DELETE` |
-| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas | No |
+| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`stock` son suyos. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
+| GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | No |
+| CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | Sí |
 | GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
-| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta` | No |
+| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) | No |
 | GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques | No |
 | GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
 | CRUD | `/api/pages` | Páginas informativas | No |
 | GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto), cambiar rol, activar, eliminar | No |
 | GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página) | No |
+| GET·DELETE | `/api/trash` | La papelera (MOD-8): `?tipo=productos\|pedidos` (paginado, con los totales de los dos) y `DELETE` para vaciarla entera | Sí |
+| POST·DELETE | `/api/trash/{tipo}/{id}/restore` · `/api/trash/{tipo}/{id}` | Restaurar (puede dar 422 si el plan ya no tiene hueco) y eliminar definitivamente | Sí |
 
 **Plataforma** (Bearer + rol `superadmin` + lista de IPs):
 
@@ -317,13 +380,27 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 > `GET /api/auth/me` devuelve `soporte: true` para que el panel avise de que se está en casa ajena.
 
 **Rutas web (no API)** — `routes/web.php`: `/{slug}`, `/{slug}/product/{id}`, `/{slug}/p/{pageSlug}`
-y `/{slug}/builder` devuelven una vista Open Graph si quien pide es un crawler conocido, y
-redirigen a `FRONTEND_URL` si es una persona. Las mismas cuatro vistas existen otra vez sin el
+y `/{slug}/builder` devuelven una vista **indexable** si quien pide es un crawler conocido, y
+redirigen a `FRONTEND_URL` si es una persona. Esa vista (`INF-4`) lleva contenido de verdad
+—productos con enlace y precio, specs, páginas informativas—, `canonical`, y JSON-LD de `Product`
+(precio, moneda, disponibilidad, marca) y de `Store`; los datos los arma `App\Support\Seo`.
+Además hay `/{slug}/sitemap.xml` (no exige crawler: Search Console lo pide sin declararse) y
+`/robots.txt`. Las mismas cuatro vistas existen otra vez sin el
 `{slug}`, bajo `Route::domain('{tenantDominio}')`, para las tiendas con **dominio propio y
 verificado**: resuelven la tienda por el `Host` de la petición en vez de por slug, y un humano sale
 hacia `FRONTEND_URL/{slug}/...` en vez de a la ruta pedida tal cual (sin slug, esa URL no sabría de
 qué tienda se trata). Un host que no es ni el de la app ni el de ninguna tienda cae en 404 —o en la
-vista `welcome` de siempre, si es la raíz.
+vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataforma si es esa ruta.
+
+> **Un dominio propio, además, puede tener `robots.txt` y `sitemap.xml` en su raíz** (`INF-4`), y esa
+> es la diferencia real que da para SEO: los dos son **del host, no de un path**, así que una tienda
+> por slug —que comparte host con la plataforma— no puede tener los suyos ahí; su sitemap vive en
+> `/{slug}/sitemap.xml` y se envía a mano en Search Console.
+>
+> **`public/robots.txt` está borrado a propósito.** Laravel trae uno estático y el servidor web lo
+> sirve **antes** de llegar a ninguna ruta: con él ahí, ni el host de la aplicación ni un dominio
+> propio reciben el suyo. La suite no puede verlo —en pruebas no hay archivos estáticos—, así que hay
+> un caso que comprueba que el archivo no ha vuelto.
 
 ### Variables de entorno relevantes
 
@@ -331,6 +408,7 @@ vista `welcome` de siempre, si es la raíz.
 |---|---|
 | `DB_CONNECTION`, `DB_*` | Base de datos (MySQL en producción; SQLite en los tests) |
 | `FRONTEND_URL` | Base del SPA. De ahí cuelgan los enlaces de los correos y los redirects |
+| `BACKUP_DISK` · `BACKUP_RETENTION_DAYS` · `BACKUP_BIN_PATH` | Copias de seguridad (`INF-7`): disco destino (**fuera de este servidor** en producción; uno público se rechaza), días que se guardan y carpeta de `mysqldump` si no está en el PATH del cron |
 | `CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_ORIGIN_PATTERNS` | Orígenes permitidos (los dominios propios no se conocen de antemano) |
 | `FILESYSTEM_DISK` + `R2_*` | Imágenes. **En producción tiene que ser `r2` o la app no arranca**; salida explícita con `ALLOW_LOCAL_STORAGE=true` |
 | `QUEUE_CONNECTION` | Los correos van por cola: **hace falta un worker** |
@@ -343,8 +421,10 @@ vista `welcome` de siempre, si es la raíz.
 ### Comandos
 
 ```bash
-php artisan test        # 582 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 721 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
+php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
+php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
 composer setup          # install + .env + key + migrate + build
@@ -378,6 +458,8 @@ react-hot-toast. CSS propio, sin framework.
 | `/dashboard` | Resumen con métricas |
 | `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
 | `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
+| `/dashboard/trash` | Papelera de productos y pedidos (solo admin, `MOD-8`; el tipo va en la URL: `tipo`, `pagina`) |
+| `/dashboard/coupons` | Cupones de descuento (solo admin, `MOD-4`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 | `/platform/login` | Acceso del operador del SaaS |
 | `/platform` · `/platform/tenants` · `/platform/tenants/:id` · `/platform/logs` | Panel del operador: resumen, tiendas, ficha y bitácora (layout en `PlatformLayout`) |
@@ -401,7 +483,7 @@ src/
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
 ├── components/
 │   ├── dashboard/  # NewOrderModal (venta de mostrador), EditorDeVariantes, VerifyEmailBanner,
-│   │               # SupportBanner
+│   │               # SupportBanner, InformeDeImport (resultado del import CSV)
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
 │   └── ui/         # Dialogo (ventana flotante del panel), CategoryIcon, ImageSourceField,
@@ -430,6 +512,9 @@ Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartSt
 - **Ojo con la especificidad**: una regla `:where(.page-x) .clase-de-componente` **empata** con el
   CSS del componente y el desempate lo decide el orden de carga de los chunks. Ese tipo de regla va
   en la hoja del componente.
+- **La tarjeta de estado (`.state-card`) y el icono que gira (`.spinner`) tienen valor por defecto en
+  `index.css`** (UI-13): una pantalla nueva no tiene que copiarlos, y la que los define en su hoja
+  solo pisa lo que ella fija. `.spinner` solo gira; el color lo pone quien lo usa.
 - **Toda ventana flotante del panel es `<Dialogo>`** (`components/ui/Dialogo.tsx`), nunca un
   overlay propio: va por portal a `.dashboard-layout` (si no, la barra superior y el menú quedan por
   encima del velo), bloquea el scroll y cierra con Escape. Recibe en `className` la clase de la
@@ -459,7 +544,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 141 tests (Vitest + Testing Library, jsdom)
+npm test          # 169 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -504,7 +589,20 @@ tienen tests.
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.
 - **Cambiar precio o stock de una variante fuera del formulario** (una venta, una devolución, un
   ajuste en lote) obliga a llamar después a `Product::sincronizarResumenDeVariantes()`, o el
-  catálogo enseñará un precio y un stock que ya no son.
+  catálogo enseñará un precio y un stock que ya no son. La cuenta en sí vive en
+  `Product::resumenDeVariantes()`, que es lo que usa el import CSV para escribir la ficha y sus
+  variantes en el mismo INSERT en lote sin releerlas: si algún día cambia la regla del resumen, se
+  cambia ahí y los dos caminos la siguen.
+- **Borrar un producto o un pedido es mandarlo a la papelera** (`MOD-8`): los dos modelos usan
+  `SoftDeletes`, así que desaparecen del catálogo, del panel, del buscador, de los reportes y de los
+  topes del plan sin tocar ninguna de esas consultas. Las excepciones son las dos que **no** pasan
+  por Eloquent y hay que recordar a mano: `Reportes::lineasDelRango()`, que hace un join con
+  `DB::table('orders')` y lleva su `whereNull('orders.deleted_at')` escrito —sin él sumaría ventas
+  borradas y cuadraría consigo mismo—, e `ImageService::borrarSiNadieLasUsa()`, donde lo que se
+  quiere es justo lo contrario: un producto en la papelera **sí** cuenta como que usa su foto.
+  **Las fotos no se borran al mandar a la papelera**, sólo al vaciarla o al purgarla: restaurar un
+  producto sin sus imágenes sería media restauración. Un producto en la papelera **no ocupa hueco del
+  plan**, y por eso el gate se comprueba al **restaurar**.
 - **Las fotos de producto se borran con `ImageService::borrarSiNadieLasUsa()`, después de cambiar la
   base**, nunca borrando el archivo directamente: duplicar un producto comparte las URL con el
   original, y borrar a ciegas le rompía las fotos al otro.
@@ -516,6 +614,39 @@ tienen tests.
   lo es). Es el fallo real que encontró `MOD-3`: un método de pago recién apagado volvía a aparecer
   marcado al recargar Configuración. Si el dato se guarda dentro de un JSON (como `payment_methods`),
   conviértelo con `filter_var($valor, FILTER_VALIDATE_BOOLEAN)` antes de guardar.
+- **El orden del precio de una venta es uno solo y no se reordena**:
+  `productos → descuento (MOD-4) → + envío (MOD-1) → impuesto (MOD-2) → total`. El descuento va
+  **antes** del impuesto o el cupón descontaría también de la parte que es del fisco, que la tienda
+  paga igual; y va **solo sobre los productos**, porque lo que se le paga al repartidor no baja
+  porque el comprador tenga un código. Del navegador viaja **el código, nunca el descuento**, igual
+  que con el envío viaja el método y nunca el costo.
+- **Una división en SQL lleva `* 1.0`.** SQLite divide enteros como enteros (`200/1000` da `0`) y
+  MySQL devuelve decimal, así que la misma expresión da dos resultados según el motor. Es la trampa
+  de las funciones de fecha **al revés y peor**: ahí la suite pasaba y producción fallaba; aquí
+  producción acierta y **la que miente es la suite**, que deja de poder distinguir una fórmula buena
+  de una rota. Las dos expresiones que reparten dinero por línea (`Impuesto::expresionNeta()` y
+  `Cupones::expresionNeta()`) lo llevan, y sus tests usan cifras que **no** dan división exacta a
+  propósito.
+- **El impuesto de una venta se calcula con `App\Support\Impuesto`** (MOD-2), nunca a mano: lo piden
+  el checkout público, la venta de mostrador y los reportes. Dos reglas que no se ven en las
+  columnas. La primera: **`total` es siempre lo que paga el cliente y `tax_amount` es cuánto de eso
+  es impuesto**, cobre la tienda como cobre — con los precios incluyéndolo el total no cambia y el
+  impuesto se saca hacia atrás (`base * tasa / (100 + tasa)`, no `base * tasa / 100`, que es el error
+  clásico y cobra de más); sumándose al final, `total = base + impuesto`. La segunda: **el margen se
+  mide sin impuesto**, igual que se mide sin envío, o con los precios llevándolo dentro la utilidad
+  sale inflada en el porcentaje entero — y ese número es el que el dueño usa para poner precios. Por
+  eso `Order::getUtilidadAttribute()` y `Reportes` usan los dos el mismo helper
+  (`Impuesto::dentroDe()` y `Impuesto::expresionNeta()`): si uno descontara y el otro no, la ficha de
+  un pedido y el reporte darían dos márgenes de la misma venta. En `orders` los cuatro `tax_*` son un
+  **snapshot** del día de la venta, como `delivery_cost` y `unit_cost`: `null` es "se vendió sin
+  impuesto", que no es lo mismo que "con el 0%".
+- **Toda búsqueda de productos pasa por `App\Support\Busqueda`**, nunca un `LIKE` escrito a mano en
+  el controlador. La ofrecen tres sitios —el catálogo público, el listado del panel y la exportación
+  a CSV— y cada uno miraba columnas distintas: la misma palabra daba tres resultados y el CSV no
+  traía lo que el dueño tenía en pantalla. Ahí dentro va además lo que no es obvio: el término se
+  parte en palabras (todas tienen que aparecer, en cualquier orden) y `%` y `_` se escapan con
+  `ESCAPE '!'`, **declarado explícitamente** porque MySQL tiene carácter de escape por defecto y
+  SQLite —donde corre la suite— no, así que sin declararlo los dos motores no harían lo mismo.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
 - **Lo que se difiere al envío de la respuesta (`streamDownload`, `defer()`) corre fuera del alcance
@@ -541,7 +672,7 @@ tienen tests.
   (`origen = tienda`) de la del operador (`plataforma`), y cada pantalla lee solo la suya.
 - **Rate limits con nombre, nunca `throttle:5,1` a secas**: un throttle sin nombre usa como clave
   solo la IP, así que todas las rutas que lo llevan comparten un contador. Los limitadores
-  (`login`, `auth_publica`, `escritura_publica`, `verificacion_correo`, `reenvio_correo`) están en
+  (`login`, `auth_publica`, `escritura_publica`, `cupon`, `verificacion_correo`, `reenvio_correo`) están en
   `AppServiceProvider::limitesPorFormulario()`, con la ruta en la clave; el de login cuenta por
   correo + IP.
 

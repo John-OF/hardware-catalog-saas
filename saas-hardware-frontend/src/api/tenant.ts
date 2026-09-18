@@ -16,6 +16,11 @@ export interface UpdateTenantPayload {
   /** MOD-1. */
   delivery_enabled?: boolean;
   delivery_cost?: number | string;
+  /** MOD-2. */
+  tax_enabled?: boolean;
+  tax_name?: string;
+  tax_rate?: number | string;
+  tax_included?: boolean;
   // Archivos opcionales: si se envían, el backend los sube y usa su URL.
   logoFile?: File | null;
   bannerFile?: File | null;
@@ -69,6 +74,17 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
   }
   if (payload.delivery_cost !== undefined) {
     fd.append('delivery_cost', String(payload.delivery_cost));
+  }
+
+  // MOD-2. Los dos booleanos van como '1'/'0' por lo mismo que `enabled` de los
+  // métodos de pago: la regla `boolean` de Laravel no acepta ''.
+  if (payload.tax_enabled !== undefined) {
+    fd.append('tax_enabled', payload.tax_enabled ? '1' : '0');
+  }
+  if (payload.tax_name !== undefined) fd.append('tax_name', payload.tax_name);
+  if (payload.tax_rate !== undefined) fd.append('tax_rate', String(payload.tax_rate));
+  if (payload.tax_included !== undefined) {
+    fd.append('tax_included', payload.tax_included ? '1' : '0');
   }
 
   if (payload.logoFile) fd.append('logo', payload.logoFile);

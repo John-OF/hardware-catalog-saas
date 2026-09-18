@@ -11,6 +11,9 @@ use App\Models\Product;
 use App\Models\Review;
 use App\Models\StockNotification;
 use App\Models\Tenant;
+use App\Support\Busqueda;
+use App\Support\Cupones;
+use App\Support\Impuesto;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderPlacedNotification;
@@ -37,6 +40,10 @@ class PublicCatalogController extends Controller
     private const COLUMNAS_PUBLICAS_TENANT = [
         'id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency',
         'payment_methods', 'delivery_enabled', 'delivery_cost',
+        // MOD-2: el checkout enseña el desglose antes de confirmar, y con el
+        // impuesto sumándose al final el comprador TIENE que ver que el total no
+        // es la suma del carrito.
+        'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
     ];
 
     public function resolveDomain(Request $request): JsonResponse
@@ -140,57 +147,62 @@ class PublicCatalogController extends Controller
                     'category',
                     fn ($c) => $c->where('component_type', $componentType->value)
                 ))
-                // El comprador busca tanto por modelo como por marca ("Kingston"),
-                // asi que el termino se prueba contra name, brand y sku.
-                // Los OR van agrupados en su propio closure a proposito: sueltos se
-                // mezclarian con los where de tenant_id/is_active/status y la busqueda
-                // acabaria mostrando productos de otras tiendas o despublicados.
-                //
-                // AUD-21 propone FULLTEXT porque este LIKE con comodin delante no
-                // puede usar indice y hace scan. Se evalua y se deja como esta, a
-                // sabiendas:
-                //
-                // - FULLTEXT busca PALABRAS, y aqui media busqueda es un trozo:
-                //   "7600" dentro de "Ryzen 5 7600X", "b550" dentro de un SKU. Eso
-                //   con MATCH ... AGAINST no sale, y el comprador que hoy encuentra
-                //   su pieza dejaria de encontrarla. Un indice mas rapido que no
-                //   devuelve el producto no sirve de nada en una tienda.
-                // - Los tests corren sobre SQLite y produccion sobre MySQL: MATCH
-                //   ... AGAINST partiria en dos el comportamiento probado y el
-                //   ejecutado, justo en la consulta mas usada del proyecto.
-                // - El scan cae sobre las filas de UNA tienda (el filtro por
-                //   tenant_id sigue usando indice) y la respuesta esta cacheada 5
-                //   minutos. Con catalogos de miles de productos no se nota.
-                //
-                // Cuando deje de valer: catalogos de decenas de miles de productos
-                // por tienda, o busquedas que se noten lentas al medirlas. La
-                // salida entonces no es FULLTEXT a secas sino un indice de
-                // busqueda de verdad (Meilisearch/Typesense via Scout), que sabe de
-                // prefijos y de erratas. Queda escrito para no volver a levantarlo.
-                ->when($request->search, function ($q) use ($request) {
-                    $termino = '%'.$request->search.'%';
-
-                    $q->where(function ($sub) use ($termino) {
-                        $sub->where('name', 'like', $termino)
-                            ->orWhere('brand', 'like', $termino)
-                            ->orWhere('sku', 'like', $termino)
-                            // MOD-5: con variantes, el SKU que se busca suele ser
-                            // el de una de ellas ("KF432C16BB/16").
-                            ->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', $termino));
-                    });
-                })
+                // INF-6: nombre, marca, SKU y el SKU de cualquier variante, con
+                // cada palabra buscada por separado. El porque de que siga siendo
+                // un LIKE -y no FULLTEXT, que es lo que proponia AUD-21- esta en
+                // `App\Support\Busqueda`, con el resto de la logica: la misma
+                // busqueda la ofrecen tambien el panel y la exportacion, y antes
+                // cada uno miraba columnas distintas.
+                ->tap(fn ($q) => Busqueda::aplicar($q, $request->search))
                 ->when($request->in_stock, fn ($q) => $q->where('stock', '>', 0))
                 ->when($specs, function ($q) use ($specs) {
                     foreach ($specs as $key => $value) {
                         $q->where('specs->'.$key, $value);
                     }
                 })
-                ->tap(fn ($q) => $this->applyCatalogSort($q, $request->query('sort')))
+                ->tap(fn ($q) => $this->applyCatalogSort($q, $request->query('sort'), $request->search))
                 ->paginate(24)
                 ->toArray();
         });
 
         return response()->json($products);
+    }
+
+    /**
+     * Comprueba un código de cupón desde el carrito, antes de confirmar (MOD-4).
+     *
+     * Existe para que el comprador vea el descuento aplicado y decida con el
+     * número delante, no para decidir nada: **lo que se cobra lo vuelve a
+     * calcular `storeOrder`** con el mismo helper. Si el cupón se agota entre que
+     * se comprueba y se confirma, manda el segundo cálculo.
+     *
+     * El subtotal llega del navegador y aquí eso no importa: solo sirve para
+     * comprobar la compra mínima y enseñar cuánto descontaría. Mentir en él no
+     * consigue un descuento mayor, porque el del pedido se calcula sobre los
+     * precios que pone el servidor.
+     *
+     * **Ritmo propio y más estrecho que el resto** (`throttle:cupon`): es el
+     * único sitio del catálogo donde adivinar a ciegas tiene premio.
+     */
+    public function checkCoupon(Request $request, string $slug): JsonResponse
+    {
+        $tenant = Tenant::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        $data = $request->validate([
+            'code' => 'required|string|max:40',
+            'subtotal' => 'required|numeric|min:0',
+        ]);
+
+        // `resolver()` lanza ValidationException con el motivo legible, que es
+        // justo lo que el carrito enseña debajo del campo.
+        $cupon = Cupones::resolver($tenant, $data['code'], (float) $data['subtotal']);
+
+        return response()->json([
+            'code'     => $cupon['coupon']->code,
+            'type'     => $cupon['coupon']->type,
+            'value'    => $cupon['coupon']->value,
+            'discount' => $cupon['discount'],
+        ]);
     }
 
     /**
@@ -338,13 +350,22 @@ class PublicCatalogController extends Controller
      * nada de lo que escriba el visitante entra en el SQL.
      *
      * Sin `sort` (o con uno desconocido) se mantiene el orden manual que el dueño
-     * definió arrastrando productos (`sort_order`), que es el de siempre.
+     * definió arrastrando productos (`sort_order`), que es el de siempre — salvo
+     * que haya una búsqueda puesta: entonces manda la relevancia (`INF-6`).
+     * Arrastrar productos ordena el escaparate, y un escaparate ordenado a mano
+     * no dice nada sobre lo que alguien acaba de escribir en la caja de buscar.
+     * Si el comprador eligió un orden (precio, novedad, nombre) se respeta el
+     * suyo: lo ha pedido él, y es más explícito que cualquier heurística.
      */
-    private function applyCatalogSort(Builder $query, ?string $sort): void
+    private function applyCatalogSort(Builder $query, ?string $sort, ?string $busqueda = null): void
     {
         // El precio que ve el comprador es el de oferta cuando existe, así que se
         // ordena por ese mismo valor y no por `price` a secas.
         $precioVisible = 'COALESCE(sale_price, price)';
+
+        if ($sort === null || $sort === '') {
+            Busqueda::ordenarPorRelevancia($query, $busqueda);
+        }
 
         match ($sort) {
             'price_asc' => $query->orderByRaw("{$precioVisible} ASC"),
@@ -814,6 +835,10 @@ class PublicCatalogController extends Controller
             // se lee de `tenant.delivery_cost` aquí abajo, o un comprador podría
             // mandar "delivery" con costo 0 y pedir gratis lo que la tienda cobra.
             'delivery_method' => 'nullable|in:pickup,delivery',
+            // MOD-4: solo el CÓDIGO viaja desde el navegador, nunca el descuento
+            // —mismo motivo que el costo del envío en MOD-1—: si no, cualquiera
+            // mandaría su propio descuento.
+            'coupon_code' => 'nullable|string|max:40',
         ]);
 
         // Precios y total se calculan en el servidor: no se confía en lo que
@@ -837,11 +862,23 @@ class PublicCatalogController extends Controller
             $entrega = 'pickup';
         }
 
-        $total = round($itemsTotal + $costoEnvio, 2);
+        // MOD-4: el descuento se calcula sobre los productos y NO sobre el envío,
+        // por lo mismo que el envío queda fuera del margen: lo que la tienda le
+        // paga al repartidor no baja porque el comprador tenga un código.
+        $cupon = Cupones::resolver($tenant, $data['coupon_code'] ?? null, $itemsTotal);
+
+        // MOD-2: el impuesto entra sobre TODO lo que se cobra, envío incluido, y
+        // DESPUÉS del descuento: al revés, el cupón descontaría también de la
+        // parte que es del fisco, que la tienda paga igual.
+        $impuesto = Impuesto::paraVenta($tenant, round($itemsTotal - $cupon['discount'] + $costoEnvio, 2));
 
         $userId = auth('sanctum')->id();
 
-        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $total, $entrega, $costoEnvio, $userId) {
+        $order = DB::transaction(function () use ($tenant, $data, $lineItems, $impuesto, $entrega, $costoEnvio, $userId, $cupon, $itemsTotal) {
+            if ($cupon['coupon']) {
+                Cupones::consumir($cupon['coupon']);
+            }
+
             $order = Order::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $userId,
@@ -850,9 +887,17 @@ class PublicCatalogController extends Controller
                 'customer_email' => $data['customer_email'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
                 'status' => 'pending',
-                'total' => $total,
+                'total' => $impuesto['total'],
+                'items_subtotal' => $itemsTotal,
+                'coupon_id' => $cupon['coupon']?->id,
+                'coupon_code' => $cupon['coupon']?->code,
+                'discount_amount' => $cupon['coupon'] ? $cupon['discount'] : null,
                 'delivery_method' => $entrega,
                 'delivery_cost' => $costoEnvio,
+                'tax_name' => $impuesto['tax_name'],
+                'tax_rate' => $impuesto['tax_rate'],
+                'tax_included' => $impuesto['tax_included'],
+                'tax_amount' => $impuesto['tax_amount'],
             ]);
 
             $order->items()->createMany($lineItems);

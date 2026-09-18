@@ -212,20 +212,25 @@ class PanelBulkQueriesTest extends TestCase
         );
 
         $respuesta->assertOk();
-        // Dos, y fijas: la carga de la galería con eager loading, y la de
-        // TEC-14 que comprueba, al final y de una vez para todas las URL, si otro
-        // producto (una copia hecha con "duplicar") sigue usando alguna foto antes
-        // de borrar su archivo. Lo que este test vigila es que no crezca con el
-        // número de productos, y con seis sigue siendo dos.
+        // MOD-8: cero. Desde que el borrado en lote manda a la papelera en vez de
+        // borrar, la galería ni se lee —no hay fotos que borrar todavía—. Antes
+        // eran dos consultas fijas y lo que vigilaba este test era que no
+        // crecieran con el número de productos; se mantiene por lo mismo, para
+        // que el día que la papelera necesite mirar la galería no lo haga una vez
+        // por producto.
         $this->assertLessThanOrEqual(
             2,
             $consultas,
-            "Borrar 6 productos hizo {$consultas} consultas a product_images; deberían ser dos fijas, no una por producto."
+            "Borrar 6 productos hizo {$consultas} consultas a product_images; no debe crecer con el número de productos."
         );
     }
 
-    public function test_borrar_en_lote_se_lleva_la_galeria_y_deja_la_cache_al_dia(): void
+    public function test_borrar_en_lote_manda_a_la_papelera_sin_tocar_la_galeria(): void
     {
+        // MOD-8: antes este test comprobaba lo contrario —que la galería caía con
+        // el producto—. Ahora borrar en lote es mandar a la papelera, y llevarse
+        // las fotos ahí dejaría restaurar productos sin imágenes, que es media
+        // restauración y la peor mitad.
         $productos = collect(range(1, 3))->map(fn ($i) => $this->conGaleria($this->producto("Con galeria {$i}")));
         $antes = (int) Cache::get("tenant:{$this->tenant->slug}:cache_version", 0);
 
@@ -238,11 +243,17 @@ class PanelBulkQueriesTest extends TestCase
             'bulk_action' => 'delete',
         ])->assertOk();
 
+        // Fuera del catálogo y de todos los listados...
         $this->assertSame(0, Product::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
+        // ...pero en la papelera, enteros.
         $this->assertSame(
-            0,
+            3,
+            Product::withoutTenant()->onlyTrashed()->where('tenant_id', $this->tenant->id)->count(),
+        );
+        $this->assertSame(
+            6,
             ProductImage::whereIn('product_id', $idsDeProductos)->count(),
-            'La galeria sobrevivio al borrado en lote.'
+            'El borrado en lote se llevó la galería, y con ella la posibilidad de restaurar.'
         );
         $this->assertGreaterThan(
             $antes,

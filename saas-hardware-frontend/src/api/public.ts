@@ -15,6 +15,12 @@ export interface CreateOrderPayload {
    * nada ni valdría como oferta. Se omite si la tienda no tiene envío.
    */
   delivery_method?: 'pickup' | 'delivery';
+  /**
+   * MOD-4. Igual que el envío: solo viaja el CÓDIGO. El descuento lo calcula el
+   * servidor sobre sus propios precios, así que mandarlo desde aquí no
+   * descontaría nada.
+   */
+  coupon_code?: string;
 }
 
 export const getPublicTenant = async (slug: string): Promise<Tenant> => {
