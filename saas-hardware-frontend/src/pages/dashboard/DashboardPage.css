@@ -38,6 +38,22 @@
   position: relative;
 }
 
+/* UI-14: el hueco de la barra de desplazamiento, reservado siempre.
+
+   Quien desplaza el panel es la ventana, no `.dashboard-main` (su `min-height`
+   la deja crecer y su `overflow-y` nunca llega a actuar). Asi que la barra solo
+   salia en las paginas mas altas que la pantalla -Productos, Reportes,
+   Resenas- y les comia su ancho: se veian unos pixeles mas angostas que las
+   cortas, y la misma pagina cambiaba de ancho al filtrar.
+
+   En `html` porque la barra es de la ventana, y con `:has()` para que solo pase
+   con el panel montado: en la tienda publica una pagina corta quedaria con una
+   franja vacia a la derecha sin necesidad. Va en esta hoja y no acotada con
+   `:where(.page-dashboard)` porque `html` es el ancestro, no un descendiente. */
+html:has(.dashboard-layout) {
+  scrollbar-gutter: stable;
+}
+
 /* Sidebar Styles */
 /* UI-10: la barra lateral se queda quieta al bajar por el contenido.
 
