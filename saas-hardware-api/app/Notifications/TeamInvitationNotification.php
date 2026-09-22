@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -63,10 +64,17 @@ class TeamInvitationNotification extends Notification implements ShouldQueue, No
 
         $minutos = config('auth.passwords.'.config('auth.defaults.passwords').'.expire');
 
+        // SEC-8: este correo va a una direccion que escribe un admin, y el nombre
+        // de quien invita y el de la tienda los escribe tambien el. Es el segundo
+        // mas expuesto tras el aviso de pedido nuevo: lo recibe alguien que
+        // todavia no tiene cuenta y que no puede comprobar nada.
+        $invitadoPor = TextoDeCorreo::enLinea($this->invitadoPor);
+        $tienda = TextoDeCorreo::enLinea($this->tienda);
+
         return (new MailMessage)
             ->subject("{$this->invitadoPor} te invito a administrar {$this->tienda}")
-            ->greeting("Hola {$notifiable->name},")
-            ->line("{$this->invitadoPor} te dio acceso al panel de administracion de **{$this->tienda}**.")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
+            ->line("{$invitadoPor} te dio acceso al panel de administracion de **{$tienda}**.")
             ->line('Para entrar solo falta que elijas tu contrasenia.')
             ->action('Elegir mi contrasenia', $url)
             ->line("Este enlace caduca en {$minutos} minutos. Si se te pasa, pide una nueva invitacion o usa la opcion de recuperar contrasenia con este mismo correo.")

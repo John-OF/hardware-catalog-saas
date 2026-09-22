@@ -42,9 +42,18 @@
     {{-- JSON-LD: es lo que produce el resultado enriquecido de Google (precio,
          disponibilidad, marca debajo del enlace). Va con `JSON_UNESCAPED_*` para
          que los acentos y las barras de las URL no salgan escapados, que es
-         válido pero ilegible al depurarlo. --}}
+         válido pero ilegible al depurarlo.
+
+         `JSON_HEX_TAG` y `JSON_HEX_AMP` NO son decorativos y no se quitan (`SEC-6`):
+         aquí dentro el escapado de Blade no vale -esto es JavaScript, no HTML- y
+         `json_encode` no toca `<` ni `>`. Lo único que impedía salirse del
+         `<script>` era que por defecto escribe `<\/script>`, y `JSON_UNESCAPED_SLASHES`
+         es exactamente lo que lo quita: un producto llamado `X</script><script>...`
+         cerraba el bloque y lo de detrás pasaba a ser HTML del documento. Con los
+         dos flags, `<` sale como `\u003C` -válido en JSON y en JSON-LD- y los
+         acentos siguen legibles, que era lo que se quería. --}}
     @foreach ($jsonLd ?? [] as $bloque)
-        <script type="application/ld+json">{!! json_encode($bloque, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+        <script type="application/ld+json">{!! json_encode($bloque, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
     @endforeach
 
     <style>

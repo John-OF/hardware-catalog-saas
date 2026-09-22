@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Busqueda;
+use App\Support\CeldaCsv;
 use App\Support\Costos;
 use App\Support\PreciosPorCantidad;
 use App\Support\Reportes;
@@ -72,7 +73,7 @@ class ExportController extends Controller
             ->orderBy('created_at');
 
         return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
-            fputcsv($salida, [
+            $this->fila($salida, [
                 'nombre', 'marca', 'variante', 'sku', 'precio', 'precio_oferta', 'costo',
                 // MOD-15: el precio por mayor, en el texto compacto `10:90|25:85`.
                 // Va por la misma razon que la columna `variante` de MOD-12: sin
@@ -80,7 +81,7 @@ class ExportController extends Controller
                 // habia negociado, y sin decirselo.
                 'tramos',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
-            ], ';');
+            ]);
 
             foreach ($consulta->lazy(self::POR_LOTE) as $producto) {
                 // Lo que describe la ficha va solo en su primera fila, que es
@@ -103,7 +104,7 @@ class ExportController extends Controller
                 ];
 
                 if ($producto->variants->isEmpty()) {
-                    fputcsv($salida, [
+                    $this->fila($salida, [
                         ...$ficha,
                         '',
                         $producto->sku,
@@ -113,13 +114,13 @@ class ExportController extends Controller
                         PreciosPorCantidad::aTexto($producto->price_tiers),
                         $producto->stock,
                         ...$cola,
-                    ], ';');
+                    ]);
 
                     continue;
                 }
 
                 foreach ($producto->variants as $indice => $variante) {
-                    fputcsv($salida, [
+                    $this->fila($salida, [
                         // El nombre SI se repite: es lo que agrupa las filas al
                         // reimportar, asi que sin el la variante se quedaria
                         // suelta.
@@ -133,7 +134,7 @@ class ExportController extends Controller
                         PreciosPorCantidad::aTexto($variante->price_tiers),
                         $variante->stock,
                         ...($indice === 0 ? $cola : ['', '', '', '']),
-                    ], ';');
+                    ]);
                 }
             }
         });
@@ -181,14 +182,14 @@ class ExportController extends Controller
             ->orderBy('created_at');
 
         return $this->csv("pedidos-{$tenant->slug}-".now($zona)->format('Y-m-d').'.csv', function ($salida) use ($consulta, $zona) {
-            fputcsv($salida, [
+            $this->fila($salida, [
                 'numero', 'fecha', 'estado', 'cliente', 'telefono', 'correo',
                 'entrega', 'costo_envio', 'productos', 'total', 'costo_total',
                 'utilidad', 'nota',
-            ], ';');
+            ]);
 
             foreach ($consulta->lazy(self::POR_LOTE) as $pedido) {
-                fputcsv($salida, [
+                $this->fila($salida, [
                     $pedido->number,
                     // En la hora de la tienda, no en UTC (MOD-13): quien abre
                     // esto en Excel cuadra cajas con las horas de su mostrador.
@@ -206,7 +207,7 @@ class ExportController extends Controller
                     $pedido->costo_total,
                     $pedido->utilidad,
                     $pedido->customer_note,
-                ], ';');
+                ]);
             }
         });
     }
@@ -251,25 +252,25 @@ class ExportController extends Controller
 
         return $this->csv($nombre, function ($salida) use ($serie, $masVendidos, $agrupacion, $conCostos) {
             $cabeceraSerie = [$agrupacion === 'mes' ? 'mes' : 'fecha', 'ventas', 'pedidos', 'unidades'];
-            fputcsv($salida, $conCostos ? [...$cabeceraSerie, 'utilidad'] : $cabeceraSerie, ';');
+            $this->fila($salida, $conCostos ? [...$cabeceraSerie, 'utilidad'] : $cabeceraSerie);
 
             foreach ($serie as $fila) {
-                fputcsv($salida, array_values($fila), ';');
+                $this->fila($salida, array_values($fila));
             }
 
             // Una fila en blanco separa las dos tablas: pegadas, Excel las lee
             // como una sola con las columnas descuadradas.
-            fputcsv($salida, [], ';');
+            $this->fila($salida, []);
 
             $cabeceraTop = ['producto', 'unidades', 'ventas'];
-            fputcsv($salida, $conCostos ? [...$cabeceraTop, 'utilidad'] : $cabeceraTop, ';');
+            $this->fila($salida, $conCostos ? [...$cabeceraTop, 'utilidad'] : $cabeceraTop);
 
             foreach ($masVendidos as $fila) {
                 // Sin `product_id`: en la hoja no sirve de nada y el nombre es
                 // el snapshot de la venta, que es lo que se quiere leer.
                 unset($fila['product_id']);
 
-                fputcsv($salida, array_values($fila), ';');
+                $this->fila($salida, array_values($fila));
             }
         });
     }
@@ -296,6 +297,23 @@ class ExportController extends Controller
     /**
      * El envoltorio comun: cabeceras de descarga, BOM y la salida abierta.
      */
+    /**
+     * Una fila del CSV.
+     *
+     * **Todo lo que escribe este controlador pasa por aqui, y por eso existe el
+     * metodo en vez de un `CeldaCsv::segura()` suelto en cada `fputcsv`** (SEC-7):
+     * son diez llamadas en cuatro exportaciones distintas, y la forma de que se
+     * olvide la once es dejar la decision en cada sitio. El delimitador tambien
+     * vive aqui por lo mismo: era el mismo `;` copiado diez veces.
+     *
+     * @param  resource  $salida
+     * @param  array<int, mixed>  $celdas
+     */
+    private function fila($salida, array $celdas): void
+    {
+        fputcsv($salida, array_map(CeldaCsv::segura(...), $celdas), ';');
+    }
+
     private function csv(string $nombre, callable $escribir): StreamedResponse
     {
         return response()->streamDownload(function () use ($escribir) {

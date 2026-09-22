@@ -124,6 +124,20 @@ migraciones: si sube sin ellas, falla. Hoy hay dos casos con consecuencias grave
 `add_origen_to_activity_logs_table` (sin ella fallan suspender una tienda, cambiarle el plan o entrar
 como soporte). `php artisan migrate:status` dice cuáles faltan.
 
+Y **reiniciar el worker de colas** (`INF-13`):
+
+```bash
+php artisan queue:restart
+```
+
+`queue:work` es un proceso largo que **mantiene el código PHP en memoria**: sin este reinicio sigue
+ejecutando la versión con la que arrancó, aunque el código nuevo ya esté en el servidor y la suite
+pase. Todo lo que sale por la cola —los ocho correos— se queda en la versión vieja **sin ningún
+error y sin nada en `failed_jobs`**, que es lo que lo hace difícil de ver. Se descubrió comprobando
+`SEC-8` en local: el primer correo salió todavía vulnerable con el arreglo ya escrito y sus tests en
+verde. `queue:restart` no mata el proceso: le pide terminar el trabajo que tenga y salir, y lo
+vuelve a levantar el supervisor.
+
 ### Copias de seguridad y cómo restaurar una (`INF-7`)
 
 `copias:crear` vuelca la base, comprueba que el volcado trae dentro las tablas que tiene que traer y
@@ -278,6 +292,8 @@ app/
     ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
     ├── Money.php           # Formato de moneda por tienda
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
+    ├── TextoDeCorreo.php   # Escapa el Markdown de un dato antes de meterlo en una linea de correo (SEC-8)
+    ├── CeldaCsv.php        # Neutraliza las formulas de una celda del CSV (SEC-7), y las desneutraliza al importar
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
@@ -422,7 +438,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 752 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 769 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)

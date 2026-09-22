@@ -181,6 +181,58 @@ class SeoIndexableTest extends TestCase
         $this->assertSame('https://tienda.example/tiendaseo', $datos['url']);
     }
 
+    // ------------------------------------------------- SEC-6: salir del script
+
+    /**
+     * `SEC-6`. El nombre de un producto acaba dentro de un `<script>`, y ahí el
+     * escapado de Blade no pinta nada: eso es JavaScript, no HTML. `json_encode`
+     * no toca `<` ni `>`, y lo único que impedía cerrar la etiqueta era que por
+     * defecto escribe `<\/script>` —justo lo que quitaba `JSON_UNESCAPED_SLASHES`,
+     * puesto por legibilidad—. Con un nombre así, el bloque se cerraba solo y lo
+     * de detrás pasaba a ser HTML del documento.
+     *
+     * Se afirma sobre el HTML **crudo** y no sobre el JSON ya decodificado: el
+     * fallo es de la etiqueta, no del dato, y `json_decode` no lo veía.
+     */
+    public function test_un_nombre_con_script_no_puede_cerrar_el_bloque_json_ld(): void
+    {
+        $hostil = 'RTX 4070</script><script>alert(1)</script>';
+        $producto = $this->producto($hostil, 2800);
+
+        $html = $this->get("/tiendaseo/product/{$producto->id}", self::CRAWLER)->getContent();
+
+        // La afirmación que fallaba: en esta vista no hay más `<script>` que los
+        // bloques de JSON-LD. Si uno se cierra antes de tiempo, el `<script>` que
+        // el nombre trae dentro aparece aquí como una etiqueta de verdad.
+        $this->assertSame(
+            substr_count($html, '<script type="application/ld+json">'),
+            substr_count($html, '<script'),
+            'Hay un <script> que no es un bloque JSON-LD: el nombre del producto cerró el bloque.',
+        );
+
+        // Y el dato sigue llegando entero: el arreglo escapa, no mutila.
+        $datos = $this->jsonLdDe($html, 'Product');
+        $this->assertSame($hostil, $datos['name']);
+    }
+
+    /**
+     * El mismo nombre, en el listado del catálogo: ahí entra por `ItemList`, que
+     * es otro bloque y otra llamada. Un arreglo que sólo cubriera la ficha
+     * dejaría abierta la página que más se comparte.
+     */
+    public function test_el_catalogo_tampoco_deja_cerrar_el_bloque_json_ld(): void
+    {
+        $this->producto('RTX 4070</script><script>alert(1)</script>', 2800);
+
+        $html = $this->get('/tiendaseo', self::CRAWLER)->getContent();
+
+        $this->assertSame(
+            substr_count($html, '<script type="application/ld+json">'),
+            substr_count($html, '<script'),
+            'Hay un <script> que no es un bloque JSON-LD en el catálogo.',
+        );
+    }
+
     // -------------------------------------------------------------- sitemap
 
     public function test_el_sitemap_lista_las_urls_publicas_de_la_tienda(): void

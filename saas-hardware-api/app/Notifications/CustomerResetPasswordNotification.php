@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Support\StoreUrl;
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -64,7 +65,7 @@ class CustomerResetPasswordNotification extends Notification implements ShouldQu
 
         return (new MailMessage)
             ->subject('Recupera el acceso a tu cuenta')
-            ->greeting("Hola {$notifiable->name},")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
             ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
             ->action('Elegir nueva contraseña', $url)
             ->line("Este enlace caduca en {$minutos} minutos y sólo puede usarse una vez.")

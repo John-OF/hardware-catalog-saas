@@ -12,6 +12,7 @@ use App\Models\Category;
 use App\Services\ImageService;
 use App\Support\Bitacora;
 use App\Support\Busqueda;
+use App\Support\CeldaCsv;
 use App\Support\Costos;
 use App\Support\PlanGate;
 use App\Support\PreciosPorCantidad;
@@ -420,6 +421,17 @@ class ProductController extends Controller
                 if (empty($row) || (count($row) === 1 && $row[0] === null)) {
                     continue;
                 }
+
+                // SEC-7: la comilla que la exportacion pone delante de una celda
+                // que Excel leeria como formula se quita aqui, en la fila entera
+                // y de una vez, para que exportar y reimportar siga conservando
+                // el catalogo tal cual (la promesa de MOD-12). Va en un solo
+                // sitio y no en los doce `trim($row[...])` de abajo: una columna
+                // nueva no puede nacer olvidandose de esto.
+                $row = array_map(
+                    fn ($celda) => is_string($celda) ? CeldaCsv::sinPrefijo($celda) : $celda,
+                    $row,
+                );
 
                 $name = $map['nombre'] !== false && isset($row[$map['nombre']]) ? trim($row[$map['nombre']]) : '';
 

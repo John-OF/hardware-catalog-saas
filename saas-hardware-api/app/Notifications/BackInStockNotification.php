@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Money;
 use App\Support\StoreUrl;
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -68,10 +69,15 @@ class BackInStockNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        // SEC-8: `cliente` es el nombre que dejo quien pidio el aviso, o sea un
+        // dato del formulario publico.
+        $producto = TextoDeCorreo::enLinea($this->aviso['producto']);
+        $tienda = TextoDeCorreo::enLinea($this->aviso['tienda']);
+
         $mail = (new MailMessage)
             ->subject("Ya llego: {$this->aviso['producto']}")
-            ->greeting("Hola {$this->aviso['cliente']},")
-            ->line("**{$this->aviso['producto']}** volvio a estar disponible en {$this->aviso['tienda']}, a {$this->aviso['precio']}.");
+            ->greeting('Hola '.TextoDeCorreo::enLinea($this->aviso['cliente']).',')
+            ->line("**{$producto}** volvio a estar disponible en {$tienda}, a {$this->aviso['precio']}.");
 
         // Decir cuantas quedan no es un adorno: quien espera una pieza agotada
         // necesita saber si tiene que correr o puede pensarselo.
@@ -84,7 +90,7 @@ class BackInStockNotification extends Notification implements ShouldQueue
         }
 
         if ($this->aviso['whatsapp']) {
-            $mail->line("Si prefieres, escribenos por WhatsApp al {$this->aviso['whatsapp']}.");
+            $mail->line('Si prefieres, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->aviso['whatsapp']).'.');
         }
 
         return $mail->line('Recibes este correo porque pediste que te avisaramos de este producto. No te escribiremos por nada mas.');

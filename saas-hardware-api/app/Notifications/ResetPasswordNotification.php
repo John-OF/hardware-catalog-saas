@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -73,7 +74,7 @@ class ResetPasswordNotification extends Notification implements ShouldQueue, Not
 
         return (new MailMessage)
             ->subject('Recupera el acceso a tu tienda')
-            ->greeting("Hola {$notifiable->name},")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
             ->line('Recibimos una solicitud para restablecer la contrasenia de tu panel de administracion.')
             ->action('Elegir nueva contrasenia', $url)
             ->line("Este enlace caduca en {$minutos} minutos y solo puede usarse una vez.")

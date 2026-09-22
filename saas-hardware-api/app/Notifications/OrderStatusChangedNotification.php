@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Order;
 use App\Support\Money;
 use App\Support\StoreUrl;
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -86,16 +87,19 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        // SEC-8: el nombre de la tienda se escapa **antes** de entrar en
+        // `mensajePorEstado`, porque de ahi sale ya dentro de la linea de Markdown
+        // y alli no se puede distinguir el dato del texto que lo rodea.
         $texto = self::mensajePorEstado(
             $this->pedido['estado'],
             $this->pedido['referencia'],
-            $this->pedido['tienda'],
+            TextoDeCorreo::enLinea($this->pedido['tienda']),
             $this->pedido['total'],
         );
 
         $mail = (new MailMessage)
             ->subject($texto['asunto'])
-            ->greeting("Hola {$this->pedido['cliente']},")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($this->pedido['cliente']).',')
             ->line($texto['cuerpo']);
 
         if ($this->pedido['url']) {
@@ -103,7 +107,7 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
         }
 
         if ($this->pedido['whatsapp']) {
-            $mail->line("Cualquier duda, escribenos por WhatsApp al {$this->pedido['whatsapp']}.");
+            $mail->line('Cualquier duda, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
         }
 
         return $mail;

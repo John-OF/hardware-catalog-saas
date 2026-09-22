@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Order;
 use App\Support\Money;
 use App\Support\StoreUrl;
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -73,18 +74,24 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        // SEC-8: el nombre de la tienda y los de los productos los escribe el
+        // dueno, no un desconocido, pero se escapan igual: decidir caso por caso
+        // cual de los ocho correos merece escapado es como se olvida el noveno.
+        $tienda = TextoDeCorreo::enLinea($this->pedido['tienda']);
+
         $mail = (new MailMessage)
             ->subject("Recibimos tu pedido {$this->pedido['referencia']} en {$this->pedido['tienda']}")
-            ->greeting("Hola {$this->pedido['cliente']},")
-            ->line("Recibimos tu pedido **{$this->pedido['referencia']}** en {$this->pedido['tienda']}. Te avisaremos cuando este listo.")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($this->pedido['cliente']).',')
+            ->line("Recibimos tu pedido **{$this->pedido['referencia']}** en {$tienda}. Te avisaremos cuando este listo.")
             ->line('---');
 
         foreach ($this->pedido['lineas'] as $linea) {
-            $mail->line("{$linea['cantidad']} x {$linea['producto']} — {$linea['subtotal']}");
+            $producto = TextoDeCorreo::enLinea($linea['producto']);
+            $mail->line("{$linea['cantidad']} x {$producto} — {$linea['subtotal']}");
         }
 
         if ($this->pedido['entrega']) {
-            $mail->line("Entrega: {$this->pedido['entrega']}");
+            $mail->line('Entrega: '.TextoDeCorreo::enLinea($this->pedido['entrega']));
         }
 
         $mail->line("**Total: {$this->pedido['total']}**");
@@ -99,7 +106,7 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
         $mail->line("Guarda el numero **{$this->pedido['referencia']}**: es el que necesitas para preguntar por tu pedido.");
 
         if ($this->pedido['whatsapp']) {
-            $mail->line("Cualquier duda, escribenos por WhatsApp al {$this->pedido['whatsapp']}.");
+            $mail->line('Cualquier duda, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
         }
 
         return $mail;

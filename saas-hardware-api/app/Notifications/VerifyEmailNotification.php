@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -60,7 +61,7 @@ class VerifyEmailNotification extends Notification implements ShouldQueue, NotTe
 
         return (new MailMessage)
             ->subject('Confirma tu correo y publica tu tienda')
-            ->greeting("Hola {$notifiable->name},")
+            ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
             ->line('Gracias por crear tu tienda. Solo falta confirmar que este correo es tuyo.')
             ->line('**Hasta que lo confirmes tu catalogo no es visible para el publico.** Puedes entrar al panel y dejarlo todo listo mientras tanto: productos, categorias y personalizacion se guardan igual.')
             ->action('Confirmar mi correo', $url)

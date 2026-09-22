@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Order;
 use App\Support\Money;
+use App\Support\TextoDeCorreo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -79,26 +80,40 @@ class NewOrderNotification extends Notification implements ShouldQueue
         return ['mail'];
     }
 
+    /**
+     * SEC-8: todo lo que viene de fuera pasa por `TextoDeCorreo` antes de entrar
+     * en una linea, porque estas lineas se renderizan como Markdown. Este es el
+     * correo mas expuesto de los ocho: el nombre, el telefono, la nota y la
+     * entrega los escribe **cualquiera** en el checkout publico, y el correo lo
+     * recibe el dueno desde el servidor de su propia tienda. El Markdown nuestro
+     * -las negritas, el `---`- se queda fuera del escapado a proposito: se
+     * escapa el dato interpolado, nunca la linea.
+     */
     public function toMail(object $notifiable): MailMessage
     {
+        $cliente = TextoDeCorreo::enLinea($this->pedido['cliente']);
+
         $mail = (new MailMessage)
             ->subject("Pedido nuevo {$this->pedido['referencia']} por {$this->pedido['total']}")
-            ->greeting("Hola {$notifiable->name},")
-            ->line("**{$this->pedido['cliente']}** acaba de hacer un pedido en tu tienda.")
-            ->line("Telefono: {$this->pedido['telefono']}");
+            ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
+            ->line("**{$cliente}** acaba de hacer un pedido en tu tienda.")
+            ->line('Telefono: '.TextoDeCorreo::enLinea($this->pedido['telefono']));
 
         if ($this->pedido['nota']) {
-            $mail->line("Nota del cliente: {$this->pedido['nota']}");
+            // `enParrafo` y no `enLinea`: una nota si puede traer varias lineas de
+            // verdad, y aplastarlas seria perder lo que el cliente escribio.
+            $mail->line('Nota del cliente: '.TextoDeCorreo::enParrafo($this->pedido['nota']));
         }
 
         if ($this->pedido['entrega']) {
-            $mail->line("Entrega: {$this->pedido['entrega']}");
+            $mail->line('Entrega: '.TextoDeCorreo::enLinea($this->pedido['entrega']));
         }
 
         $mail->line('---');
 
         foreach ($this->pedido['lineas'] as $linea) {
-            $mail->line("{$linea['cantidad']} x {$linea['producto']} — {$linea['subtotal']}");
+            $producto = TextoDeCorreo::enLinea($linea['producto']);
+            $mail->line("{$linea['cantidad']} x {$producto} — {$linea['subtotal']}");
         }
 
         return $mail
