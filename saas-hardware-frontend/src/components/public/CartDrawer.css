@@ -28,6 +28,14 @@
 .cart-item-name { font-size: 0.85rem; color: var(--text-primary); font-weight: 500; line-height: 1.25; }
 /* La variante elegida (MOD-5): "16 GB / Negro", bajo el nombre. */
 .cart-item-variant { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem; }
+
+/* MOD-15: por que esta linea cuesta menos por unidad de lo que decia la ficha. */
+.cart-item-tier {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--primary);
+  margin-top: 0.15rem;
+}
 .cart-item-price { font-size: 0.8rem; color: var(--text-secondary); }
 .cart-item-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
 .qty-stepper { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: var(--radius-sm); }

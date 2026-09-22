@@ -36,6 +36,9 @@ class ProductVariant extends Model
 
     protected $fillable = [
         'product_id', 'options', 'sku', 'price', 'sale_price', 'cost', 'stock',
+        // MOD-15: el precio por mayor de ESTA variante. Va aqui y no solo en la
+        // ficha por lo mismo que el costo: con variantes el precio vive aqui.
+        'price_tiers',
         'low_stock_threshold', 'image_url', 'thumbnail_url', 'sort_order',
     ];
 
@@ -48,6 +51,7 @@ class ProductVariant extends Model
         'options' => 'array',
         'price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'price_tiers' => 'array',
         'cost' => 'decimal:2',
         'stock' => 'integer',
         'low_stock_threshold' => 'integer',
@@ -89,10 +93,26 @@ class ProductVariant extends Model
             ->implode(' / ');
     }
 
+    /** Los tramos, siempre canónicos. El porqué, en `Product::priceTiers()` (MOD-15). */
+    protected function priceTiers(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn ($valor) => \App\Support\PreciosPorCantidad::paraGuardar(
+                is_string($valor) ? json_decode($valor, true) : $valor,
+            ),
+        );
+    }
+
     /** El precio que se cobra: el de oferta cuando existe (mismo criterio que la ficha). */
     public function precioVisible(): float
     {
         return (float) ($this->sale_price ?? $this->price);
+    }
+
+    /** Lo que cuesta cada unidad al llevarse `$cantidad` de ESTA variante (MOD-15). */
+    public function precioPara(int $cantidad): float
+    {
+        return \App\Support\PreciosPorCantidad::precioPara($this->precioVisible(), $this->price_tiers, $cantidad);
     }
 
     /**

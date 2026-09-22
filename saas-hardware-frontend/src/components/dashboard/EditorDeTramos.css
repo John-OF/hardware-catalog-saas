@@ -1,0 +1,124 @@
+/* <EditorDeTramos>: el precio por mayor de un producto o de una variante
+   (MOD-15).
+
+   Global, como la hoja de cualquier componente; las clases llevan el prefijo
+   `tier-` para no chocar con las de ninguna pagina, igual que `variant-`. */
+
+.tier-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+/* Dentro de la ventana de una variante la caja ya la pone el dialogo: otro
+   borde dentro de otro borde solo aprieta el contenido. */
+.tier-editor.compacto,
+.dialogo .tier-editor {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.tier-editor-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tier-editor-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.tier-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tier-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.tier-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.tier-row span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Cuanto rebaja el tramo, debajo de su precio: es lo que el dueño esta
+   decidiendo, y calcularlo de cabeza es justo donde se equivoca. */
+.tier-discount {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--primary);
+}
+
+.tier-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.3rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tier-icon-btn:hover {
+  color: var(--text-primary);
+  background: rgba(var(--overlay-mix), 0.05);
+}
+
+.tier-icon-btn.danger:hover {
+  color: var(--danger);
+}
+
+.tier-add-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+/* El boton que abre el precio por mayor de UNA variante, dentro de su fila. */
+.variant-tier-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.variant-tier-btn.tiene-tramos {
+  font-weight: 600;
+}

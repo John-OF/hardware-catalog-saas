@@ -222,6 +222,46 @@
   flex-direction: column;
 }
 
+/* MOD-15: el precio por mayor, junto al precio y no escondido en las specs.
+   La tarjeta pasa a envolver porque con esta caja son tres y en un movil no
+   caben en una fila; sin el `wrap` la del stock se comprimia hasta partir
+   "unidades disponibles" letra a letra. */
+:where(.page-product-detail) .pricing-stock-card {
+  flex-wrap: wrap;
+}
+
+:where(.page-product-detail) .detail-tiers-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+:where(.page-product-detail) .detail-tiers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+:where(.page-product-detail) .detail-tiers li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+:where(.page-product-detail) .detail-tier-qty {
+  color: var(--text-secondary);
+}
+
+:where(.page-product-detail) .detail-tier-price {
+  color: var(--primary);
+  font-weight: 700;
+}
+
 :where(.page-product-detail) .price-label {
   font-size: 0.75rem;
   color: var(--text-muted);

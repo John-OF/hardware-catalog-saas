@@ -33,6 +33,9 @@ class Product extends Model
 
     protected $fillable = [
         'category_id', 'sku', 'name', 'brand', 'price', 'sale_price', 'cost',
+        // MOD-15: el precio por mayor, `[{"min": 10, "price": 90}]`. Lo normaliza
+        // siempre `App\Support\PreciosPorCantidad`, nunca se escribe a mano.
+        'price_tiers',
         'stock', 'low_stock_threshold', 'description', 'specs',
         'image_url', 'thumbnail_url', 'is_active', 'sort_order', 'status',
     ];
@@ -55,6 +58,7 @@ class Product extends Model
         'specs'                => 'array',
         'price'                => 'decimal:2',
         'sale_price'           => 'decimal:2',
+        'price_tiers'          => 'array',
         'cost'                 => 'decimal:2',
         'low_stock_threshold'  => 'integer',
         'is_active'            => 'boolean',
@@ -219,7 +223,7 @@ class Product extends Model
         }
 
         $this->forceFill(self::resumenDeVariantes(
-            $variantes->map(fn (ProductVariant $v) => $v->only(['price', 'sale_price', 'cost', 'stock']))->all()
+            $variantes->map(fn (ProductVariant $v) => $v->only(['price', 'sale_price', 'cost', 'price_tiers', 'stock']))->all()
         ));
 
         $this->save();
@@ -235,8 +239,8 @@ class Product extends Model
      * por su cuenta era la otra opcion, y es justo la que deja que los dos
      * resumenes se separen el dia que cambie la regla.
      *
-     * @param  array<int, array<string, mixed>>  $variantes  filas con price, sale_price, cost y stock
-     * @return array{price: mixed, sale_price: mixed, cost: mixed, stock: int}
+     * @param  array<int, array<string, mixed>>  $variantes  filas con price, sale_price, cost, price_tiers y stock
+     * @return array{price: mixed, sale_price: mixed, cost: mixed, price_tiers: mixed, stock: int}
      */
     public static function resumenDeVariantes(array $variantes): array
     {
@@ -251,8 +255,51 @@ class Product extends Model
             // de una variante con el costo de otra. Emparejados describen siempre a
             // la misma —la mas barata—, que es lo que ya significaba este resumen.
             'cost'       => $masBarata['cost'] ?? null,
+            // MOD-15: y los tramos de precio por mayor, por lo mismo. La tarjeta
+            // del catalogo lee la ficha, asi que con esto puede decir "hay precio
+            // por mayor" sin cargar las variantes; lo que de verdad se cobra sigue
+            // saliendo de la variante elegida, que es la regla entera de MOD-5.
+            'price_tiers' => $masBarata['price_tiers'] ?? null,
             'stock'      => collect($variantes)->sum(fn (array $v) => max(0, (int) $v['stock'])),
         ];
+    }
+
+    /**
+     * Los tramos de precio por mayor, siempre en su forma canónica (MOD-15).
+     *
+     * Se normaliza **al leer** y no solo al guardar por dos motivos. Uno: una
+     * fila escrita a mano en la base, o por una versión anterior de las reglas,
+     * no puede hacer que el catálogo cobre cualquier cosa. Y dos, el que no se
+     * ve: `json_encode(90.0)` escribe `90`, así que al releer la columna un
+     * precio redondo vuelve como entero y uno con céntimos como decimal. Todo lo
+     * que cobra castea, así que no cambia ningún total — pero deja dos tipos
+     * distintos en la misma columna según el número, y eso acaba rompiendo la
+     * primera comparación estricta que alguien escriba.
+     */
+    protected function priceTiers(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn ($valor) => \App\Support\PreciosPorCantidad::paraGuardar(
+                is_string($valor) ? json_decode($valor, true) : $valor,
+            ),
+        );
+    }
+
+    /** El precio que se cobra por una unidad: el de oferta cuando existe. */
+    public function precioVisible(): float
+    {
+        return (float) ($this->sale_price ?? $this->price);
+    }
+
+    /**
+     * Lo que cuesta cada unidad al llevarse `$cantidad` (MOD-15).
+     *
+     * Con variantes esto **no se cobra**: el precio de la ficha es el resumen de
+     * la más barata (MOD-5) y quien cobra es `ProductVariant::precioPara()`.
+     */
+    public function precioPara(int $cantidad): float
+    {
+        return \App\Support\PreciosPorCantidad::precioPara($this->precioVisible(), $this->price_tiers, $cantidad);
     }
 
     // Accessor útil para el frontend

@@ -93,9 +93,16 @@ class OrderPricing
 
             // El precio que vale es el de oferta cuando existe: es el que ve el
             // comprador en el catalogo.
+            //
+            // MOD-15: y si la cantidad llega a un tramo de precio por mayor, el
+            // del tramo. Es un PRECIO y no un descuento, asi que entra aqui y
+            // `subtotal` sigue siendo precio × cantidad — por eso ni la utilidad
+            // del pedido, ni los reportes, ni el reparto del cupon necesitan
+            // saber que existen los tramos. Nunca cobra mas que el precio normal;
+            // el porque, en `App\Support\PreciosPorCantidad`.
             $unitPrice = $variante
-                ? $variante->precioVisible()
-                : ($product->sale_price !== null ? (float) $product->sale_price : (float) $product->price);
+                ? $variante->precioPara($item['quantity'])
+                : $product->precioPara($item['quantity']);
             $subtotal = round($unitPrice * $item['quantity'], 2);
             $total += $subtotal;
 

@@ -28,6 +28,7 @@ class StoreProductRequest extends FormRequest
         }
 
         $this->decodificarVariantes();
+        $this->decodificarTramos();
     }
 
     public function rules(): array
@@ -58,16 +59,23 @@ class StoreProductRequest extends FormRequest
             'is_active'           => 'nullable|boolean',
             'status'              => 'nullable|string|in:draft,published',
             ...$this->reglasDeVariantes(),
+            // MOD-15: el precio por mayor de la ficha. Con variantes no se cobra
+            // —cobra el de la variante—, pero se admite igual: quitarle las
+            // variantes a un producto no tiene por que borrarle lo que negoció.
+            ...$this->reglasDeTramos(),
         ];
     }
 
     public function messages(): array
     {
-        return $this->mensajesDeVariantes();
+        return [...$this->mensajesDeVariantes(), ...$this->mensajesDeTramos()];
     }
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(fn (Validator $v) => $this->comprobarVariantesRepetidas($v));
+        $validator->after(function (Validator $v) {
+            $this->comprobarVariantesRepetidas($v);
+            $this->comprobarTramos($v);
+        });
     }
 }

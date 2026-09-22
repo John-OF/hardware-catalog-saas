@@ -17,6 +17,11 @@ use Illuminate\Validation\Validator;
  */
 trait ValidaVariantes
 {
+    // MOD-15: las variantes llevan sus propios tramos de precio por cantidad, asi
+    // que las reglas de los tramos se montan desde aqui con el prefijo
+    // `variants.*`. Quien use este trait hereda las dos cosas.
+    use ValidaTramosDePrecio;
+
     protected function decodificarVariantes(): void
     {
         if (is_string($this->variants)) {
@@ -44,6 +49,8 @@ trait ValidaVariantes
             'variants.*.sale_price' => 'nullable|numeric|min:0',
             // MOD-6: cada variante tiene su costo, como tiene su precio.
             'variants.*.cost' => 'nullable|numeric|min:0',
+            // MOD-15: y su precio por mayor, por lo mismo.
+            ...$this->reglasDeTramos('variants.*'),
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.low_stock_threshold' => 'nullable|integer|min:0',
             'variants.*.remove_image' => 'nullable|boolean',

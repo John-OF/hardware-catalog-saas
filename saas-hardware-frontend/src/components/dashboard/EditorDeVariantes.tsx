@@ -1,6 +1,7 @@
 import './EditorDeVariantes.css';
 
-import { ImagePlus, Plus, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+import { ImagePlus, Layers, Plus, Trash2, X } from 'lucide-react';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import {
   MAXIMO_DE_EJES,
@@ -8,6 +9,8 @@ import {
   varianteVacia,
   type VarianteEnFormulario,
 } from '../../utils/variantesEnFormulario';
+import Dialogo from '../ui/Dialogo';
+import EditorDeTramos from './EditorDeTramos';
 
 interface EditorDeVariantesProps {
   ejes: string[];
@@ -34,6 +37,16 @@ const margenDeLaFila = (fila: VarianteEnFormulario) =>
  * admin, y su ausencia significa "no lo toques" al guardar.
  */
 export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = false, onChange }: EditorDeVariantesProps) {
+  /**
+   * MOD-15: qué variante tiene abierto su precio por mayor. En una ventana
+   * aparte y no como columnas de la fila porque son de dos a cinco parejas de
+   * números por variante, y metidos en la rejilla dejarían cada campo en dos
+   * dígitos de ancho. Se guarda la clave y no la fila para que lo que se edite
+   * siga siendo la fila de `filas`, que es la única copia buena.
+   */
+  const [tramosAbiertos, setTramosAbiertos] = useState<string | null>(null);
+  const filaConTramos = filas.find((f) => f.clave === tramosAbiertos) ?? null;
+
   const cambiarEje = (i: number, nombre: string) => {
     onChange(ejes.map((e, j) => (j === i ? nombre : e)), filas);
   };
@@ -186,6 +199,19 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
                       <input type="text" maxLength={100} className="premium-input" value={fila.sku} onChange={(e) => cambiarFila(fila.clave, { sku: e.target.value })} />
                     </label>
                   </div>
+                  {/* MOD-15: el precio por mayor de ESTA variante. El botón dice
+                      cuántos tramos tiene para que se vea sin abrir la ventana
+                      cuál de las variantes lo tiene puesto y cuál no. */}
+                  <button
+                    type="button"
+                    className={`variant-tier-btn ${fila.price_tiers.length > 0 ? 'tiene-tramos' : ''}`}
+                    onClick={() => setTramosAbiertos(fila.clave)}
+                  >
+                    <Layers size={13} />
+                    {fila.price_tiers.length > 0
+                      ? `Precio por mayor (${fila.price_tiers.length})`
+                      : 'Precio por mayor'}
+                  </button>
                 </div>
 
                 <button type="button" className="variant-icon-btn danger" onClick={() => quitarFila(fila.clave)} title="Quitar variante">
@@ -203,6 +229,28 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
         </button>
       ) : (
         <p className="variant-editor-hint">Has llegado al máximo de {MAXIMO_DE_VARIANTES} variantes por producto.</p>
+      )}
+
+      {/* MOD-15. No guarda nada por su cuenta: escribe en la misma fila que el
+          resto del formulario, y se guarda todo junto con el producto. Por eso
+          solo se cierra, sin botón de aceptar que prometería otra cosa. */}
+      {filaConTramos && (
+        <Dialogo
+          titulo={`Precio por mayor · ${filaConTramos.valores.filter(Boolean).join(' / ') || 'variante nueva'}`}
+          subtitulo="Al llegar a las unidades que pongas, todas se cobran a ese precio."
+          className="page-products"
+          onCerrar={() => setTramosAbiertos(null)}
+        >
+          <div className="dialogo-cuerpo">
+            <EditorDeTramos
+              filas={filaConTramos.price_tiers}
+              moneda={moneda}
+              precioBase={filaConTramos.price}
+              compacto
+              onChange={(tramos) => cambiarFila(filaConTramos.clave, { price_tiers: tramos })}
+            />
+          </div>
+        </Dialogo>
       )}
     </div>
   );

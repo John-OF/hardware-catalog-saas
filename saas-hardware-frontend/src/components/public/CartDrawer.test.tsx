@@ -486,4 +486,64 @@ describe('CartDrawer (checkout)', () => {
     const mensaje = url.searchParams.get('text');
     expect(mensaje).toContain('Formas de pago: Yape (987654321 · Ana), Efectivo contra entrega');
   });
+
+  // ------------------------------------------------- MOD-15: precio por mayor
+
+  it('al llegar al tramo baja el precio de la línea y lo dice', async () => {
+    const user = userEvent.setup();
+    useCartStore.getState().addItem(
+      'tienda-demo',
+      unProducto({ id: 'p-cpu', price: 100, stock: 50, price_tiers: [{ min: 10, price: 90 }] }),
+      9,
+    );
+    abrirCarrito();
+
+    // Con nueve, el precio de siempre.
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$900.00');
+    expect(screen.queryByText(/Precio por mayor/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Más' }));
+
+    // Con diez, las DIEZ a 90: es un precio, no un descuento sobre la décima.
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$900.00');
+    expect(screen.getByText('Precio por mayor (desde 10 u.)')).toBeInTheDocument();
+  });
+
+  it('no anuncia un tramo que la oferta ya deja por debajo', async () => {
+    // Con una oferta de 70 gana la oferta, y anunciar entonces un precio "por
+    // mayor" de 90 sería invitar a comprar más para pagar lo mismo.
+    useCartStore.getState().addItem(
+      'tienda-demo',
+      unProducto({ id: 'p-cpu', price: 100, sale_price: 70, stock: 50, price_tiers: [{ min: 10, price: 90 }] }),
+      10,
+    );
+    abrirCarrito();
+
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent('$700.00');
+    expect(screen.queryByText(/Precio por mayor/)).not.toBeInTheDocument();
+  });
+
+  it('el mensaje de WhatsApp lleva el subtotal de línea ya con el tramo', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(7, 900));
+    useCartStore.getState().addItem(
+      'tienda-demo',
+      unProducto({ id: 'p-cpu', name: 'Memoria', price: 100, stock: 50, price_tiers: [{ min: 10, price: 90 }] }),
+      10,
+    );
+    abrirCarrito();
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(createPublicOrder).toHaveBeenCalled());
+    // Del navegador viaja la cantidad y nada más: ningún precio ni ningún tramo.
+    expect(vi.mocked(createPublicOrder).mock.calls[0][1].items).toEqual([
+      { product_id: 'p-cpu', variant_id: null, quantity: 10 },
+    ]);
+
+    const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string);
+    expect(url.searchParams.get('text')).toContain('10 x Memoria — $900.00');
+  });
 });

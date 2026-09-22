@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Busqueda;
 use App\Support\Costos;
+use App\Support\PreciosPorCantidad;
 use App\Support\Reportes;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -73,6 +74,11 @@ class ExportController extends Controller
         return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
             fputcsv($salida, [
                 'nombre', 'marca', 'variante', 'sku', 'precio', 'precio_oferta', 'costo',
+                // MOD-15: el precio por mayor, en el texto compacto `10:90|25:85`.
+                // Va por la misma razon que la columna `variante` de MOD-12: sin
+                // el, exportar y reimportar deja el catalogo sin lo que el dueño
+                // habia negociado, y sin decirselo.
+                'tramos',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
             ], ';');
 
@@ -104,6 +110,7 @@ class ExportController extends Controller
                         $producto->price,
                         $producto->sale_price,
                         $producto->cost,
+                        PreciosPorCantidad::aTexto($producto->price_tiers),
                         $producto->stock,
                         ...$cola,
                     ], ';');
@@ -123,6 +130,7 @@ class ExportController extends Controller
                         $variante->price,
                         $variante->sale_price,
                         $variante->cost,
+                        PreciosPorCantidad::aTexto($variante->price_tiers),
                         $variante->stock,
                         ...($indice === 0 ? $cola : ['', '', '', '']),
                     ], ';');

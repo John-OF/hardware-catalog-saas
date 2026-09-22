@@ -272,6 +272,7 @@ app/
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
+    ├── PreciosPorCantidad.php  # El precio por mayor (MOD-15): un tramo es un PRECIO, no un descuento
     ├── Seo.php            # Lo que ve un buscador (INF-4): contenido, canonico, JSON-LD y sitemap
     ├── Copias.php        # Volcado y comprobacion de la copia de seguridad (INF-7)
     ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
@@ -345,13 +346,13 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6) | Todo menos `DELETE` |
-| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`stock` son suyos. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
+| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
 | GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | No |
 | CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | Sí |
 | GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
-| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) | No |
+| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) y la columna `tramos` con el precio por mayor (MOD-15) | No |
 | GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques | No |
 | GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
@@ -421,7 +422,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 721 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 752 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -483,6 +484,7 @@ src/
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
 ├── components/
 │   ├── dashboard/  # NewOrderModal (venta de mostrador), EditorDeVariantes, VerifyEmailBanner,
+│   │               # EditorDeTramos (precio por mayor, MOD-15),
 │   │               # SupportBanner, InformeDeImport (resultado del import CSV)
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
@@ -544,7 +546,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 169 tests (Vitest + Testing Library, jsdom)
+npm test          # 195 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -620,6 +622,21 @@ tienen tests.
   paga igual; y va **solo sobre los productos**, porque lo que se le paga al repartidor no baja
   porque el comprador tenga un código. Del navegador viaja **el código, nunca el descuento**, igual
   que con el envío viaja el método y nunca el costo.
+- **El precio por mayor se calcula con `App\Support\PreciosPorCantidad`** (MOD-15), nunca a mano:
+  lo piden el checkout público, la venta de mostrador, la ficha y el importador CSV. La decisión de
+  la que cuelga todo lo demás es que **un tramo es un PRECIO y no un descuento**: el precio del tramo
+  entra en `order_items.unit_price` igual que entraba el de oferta, así que `subtotal` sigue siendo
+  precio × cantidad y ni la utilidad del pedido, ni los reportes, ni el reparto proporcional del
+  cupón necesitan saber que los tramos existen. Por eso tampoco reordena nada: los productos entran
+  al orden de arriba ya a su precio por cantidad, y el cupón **se acumula** encima. Dos reglas que no
+  se ven en la columna: **un tramo nunca cobra más que el precio normal** (con una oferta por debajo
+  gana la oferta, o quien compra diez pagaría más por unidad que quien compra una), y **todas las
+  unidades de la línea van al mismo precio** —tramo plano, no marginal—, que es lo único que deja que
+  la línea tenga un solo `unit_price`. `price_tiers` es JSON (`[{"min":10,"price":90}]`) en
+  `products` y `product_variants`, y se normaliza **al leer y al guardar**: `json_encode(90.0)`
+  escribe `90`, así que sin el accessor la misma columna devuelve enteros o decimales según el
+  número. Con variantes, los de la ficha son un resumen de la más barata y **no cobran nada**, como
+  el precio y el costo.
 - **Una división en SQL lleva `* 1.0`.** SQLite divide enteros como enteros (`200/1000` da `0`) y
   MySQL devuelve decimal, así que la misma expresión da dos resultados según el motor. Es la trampa
   de las funciones de fecha **al revés y peor**: ahí la suite pasaba y producción fallaba; aquí

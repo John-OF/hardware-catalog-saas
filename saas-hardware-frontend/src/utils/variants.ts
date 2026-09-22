@@ -1,4 +1,5 @@
 import type { Product, ProductVariant } from '../types';
+import { precioPorCantidad } from './preciosPorCantidad';
 
 /**
  * Variantes de producto (MOD-5): lo que comparten catálogo, ficha, carrito,
@@ -16,15 +17,21 @@ export const tieneVariantes = (product: Pick<Product, 'variants'>): boolean =>
 export const precioVisible = (item: { price: number | string; sale_price: number | string | null }): number =>
   Number(item.sale_price !== null && item.sale_price !== undefined ? item.sale_price : item.price);
 
-/** Precio, oferta y stock que valen para una línea: los de la variante si la hay. */
-export const datosDeVenta = (product: Product, variant?: ProductVariant | null) => {
+/**
+ * Precio, oferta y stock que valen para una línea: los de la variante si la hay.
+ *
+ * `cantidad` solo cambia `precio`, que es lo que se cobra por unidad: con ella
+ * entra el precio por mayor (MOD-15). `price` y `sale_price` siguen siendo los
+ * de una unidad, que es lo que se tacha y se enseña en la tarjeta.
+ */
+export const datosDeVenta = (product: Product, variant?: ProductVariant | null, cantidad = 1) => {
   const fuente = variant ?? product;
 
   return {
     price: Number(fuente.price),
     sale_price: fuente.sale_price !== null && fuente.sale_price !== undefined ? Number(fuente.sale_price) : null,
     stock: fuente.stock,
-    precio: precioVisible(fuente),
+    precio: precioPorCantidad(precioVisible(fuente), fuente.price_tiers, cantidad),
   };
 };
 

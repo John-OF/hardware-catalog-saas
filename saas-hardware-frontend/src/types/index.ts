@@ -236,6 +236,18 @@ export interface ProductImage {
   sort_order: number;
 }
 
+/**
+ * Un escalón de precio por mayor (MOD-15): "desde 10 unidades, a 90 cada una".
+ *
+ * Es un **precio**, no un descuento: al llegar a `min` todas las unidades de la
+ * línea valen `price`. El backend lo devuelve siempre ordenado por `min` y con
+ * los precios bajando.
+ */
+export interface PriceTier {
+  min: number;
+  price: number;
+}
+
 export interface Product {
   id: string;
   tenant_id: string;
@@ -253,6 +265,12 @@ export interface Product {
    * `price`.
    */
   cost?: number | string | null;
+  /**
+   * Precio por mayor (MOD-15): a partir de cuántas unidades y a cuánto sale
+   * cada una. `null` es lo normal. Con variantes es, como `price` y `cost`, el
+   * resumen de la más barata: **no se cobra**, cobra el de la variante.
+   */
+  price_tiers?: PriceTier[] | null;
   stock: number;
   low_stock_threshold: number;
   sku: string | null;
@@ -296,6 +314,8 @@ export interface ProductVariant {
   sale_price: number | string | null;
   /** Costo de compra de ESTA variante (MOD-6). Solo para admin; ver `Product.cost`. */
   cost?: number | string | null;
+  /** Precio por mayor de ESTA variante (MOD-15). Es el que se cobra. */
+  price_tiers?: PriceTier[] | null;
   stock: number;
   low_stock_threshold: number;
   image_url: string | null;

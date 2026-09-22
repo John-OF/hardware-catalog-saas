@@ -1,4 +1,10 @@
 import type { ProductVariant, VariantOption } from '../types';
+import {
+  problemaDeTramos,
+  tramosDesdeProducto,
+  tramosParaGuardar,
+  type TramoEnFormulario,
+} from './tramosEnFormulario';
 
 /**
  * Las variantes mientras se editan en el formulario de producto del panel
@@ -24,6 +30,8 @@ export interface VarianteEnFormulario {
   sale_price: string;
   /** Costo de compra (MOD-6). Vacío para staff, que ni ve la columna. */
   cost: string;
+  /** Precio por mayor de ESTA variante (MOD-15), que es el que se cobra. */
+  price_tiers: TramoEnFormulario[];
   stock: string;
   low_stock_threshold: string;
   /** Foto nueva elegida, que se sube al guardar. */
@@ -43,6 +51,7 @@ export const varianteVacia = (ejes: string[]): VarianteEnFormulario => ({
   price: '',
   sale_price: '',
   cost: '',
+  price_tiers: [],
   stock: '',
   low_stock_threshold: '5',
   imagen: null,
@@ -69,6 +78,7 @@ export const variantesDesdeProducto = (variantes: ProductVariant[] = []) => {
     price: String(v.price),
     sale_price: v.sale_price !== null ? String(v.sale_price) : '',
     cost: v.cost !== null && v.cost !== undefined ? String(v.cost) : '',
+    price_tiers: tramosDesdeProducto(v.price_tiers),
     stock: String(v.stock),
     low_stock_threshold: String(v.low_stock_threshold ?? 5),
     imagen: null,
@@ -97,6 +107,11 @@ export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[
     if (fila.sale_price !== '' && Number(fila.sale_price) >= Number(fila.price)) {
       return `En la variante ${n}, el precio de oferta debe ser menor que el regular.`;
     }
+    // MOD-15: el problema del tramo se cuenta diciendo de qué variante es, o el
+    // dueño ve "el tramo 2 cuesta más que el 1" sin saber dónde mirar: los
+    // tramos de una variante se editan en su propia ventana, que está cerrada.
+    const deTramos = problemaDeTramos(fila.price_tiers, fila.price);
+    if (deTramos) return `En la variante ${n}: ${deTramos.charAt(0).toLowerCase()}${deTramos.slice(1)}`;
     const clave = fila.valores.map((v) => v.trim().toLowerCase()).join('|');
     if (vistas.has(clave)) return `La variante ${n} repite las mismas opciones que otra.`;
     vistas.add(clave);
@@ -126,6 +141,10 @@ export const agregarVariantesAlFormulario = (
     price: fila.price,
     sale_price: fila.sale_price === '' ? null : fila.sale_price,
     ...(incluirCosto ? { cost: fila.cost === '' ? null : fila.cost } : {}),
+    // MOD-15: siempre, también vacío. A diferencia del costo, el precio por
+    // mayor lo ve y lo edita todo el panel, así que una lista vacía significa de
+    // verdad "quítalos" y no "no te dejan verlos".
+    price_tiers: tramosParaGuardar(fila.price_tiers),
     stock: fila.stock,
     low_stock_threshold: fila.low_stock_threshold || '5',
     remove_image: fila.quitarImagen,

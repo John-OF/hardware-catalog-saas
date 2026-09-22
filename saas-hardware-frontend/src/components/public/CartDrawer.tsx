@@ -12,7 +12,8 @@ import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { metodosDePagoActivos } from '../../utils/paymentMethods';
 import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
-import { claveDeLinea, datosDeVenta, nombreConVariante } from '../../utils/variants';
+import { claveDeLinea, datosDeVenta, nombreConVariante, precioVisible } from '../../utils/variants';
+import { tramoPara, tramosDeVenta } from '../../utils/preciosPorCantidad';
 
 interface CartDrawerProps {
   open: boolean;
@@ -143,7 +144,9 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
    */
   const buildWhatsappMessage = (orderNumber: number, total: number) => {
     const lines = items.map((i) => {
-      const { precio } = datosDeVenta(i.product, i.variant);
+      // MOD-15: con la cantidad, o el mensaje diría un subtotal de línea que no
+      // cuadra con el total que acaba de cobrar el servidor.
+      const { precio } = datosDeVenta(i.product, i.variant, i.quantity);
       return `• ${i.quantity} x ${nombreConVariante(i.product.name, i.variant?.nombre)} — ${money(precio * i.quantity)}`;
     });
 
@@ -237,9 +240,16 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
             <div className="cart-items">
               {items.map((i) => {
                 // MOD-5: precio y foto de la variante elegida, si la hay.
-                const venta = datosDeVenta(i.product, i.variant);
+                // MOD-15: y con la cantidad, porque el precio por mayor depende
+                // de cuántas se lleve de ESTA línea.
+                const venta = datosDeVenta(i.product, i.variant, i.quantity);
                 const miniatura = i.variant?.thumbnail_url ?? i.product.thumbnail_url;
                 const varianteId = i.variant?.id ?? null;
+                const tramo = tramoPara(tramosDeVenta(i.product, i.variant), i.quantity);
+                // Solo si de verdad rebaja: con una oferta por debajo del precio
+                // por mayor gana la oferta, y anunciar un tramo que no se aplica
+                // sería prometer un descuento que el total no enseña.
+                const conTramo = tramo !== null && venta.precio < precioVisible(i.variant ?? i.product);
 
                 return (
                 <div className="cart-item" key={claveDeLinea(i.product.id, varianteId)}>
@@ -252,7 +262,16 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                     <p className="cart-item-name">{i.product.name}</p>
                     {i.variant && <p className="cart-item-variant">{i.variant.nombre}</p>}
                     <span className="cart-item-price">
-                      {venta.sale_price !== null ? (
+                      {conTramo ? (
+                        <>
+                          <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.35rem', opacity: 0.6 }}>
+                            {money(precioVisible(i.variant ?? i.product))}
+                          </span>
+                          <span className="sale-price-active" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                            {money(venta.precio)}
+                          </span>
+                        </>
+                      ) : venta.sale_price !== null ? (
                         <>
                           <span className="strike-price" style={{ textDecoration: 'line-through', marginRight: '0.35rem', opacity: 0.6 }}>
                             {money(venta.price)}
@@ -265,6 +284,11 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                         money(venta.price)
                       )}
                     </span>
+                    {/* MOD-15: por qué esta línea cuesta menos por unidad que lo
+                        que decía la ficha. Sin decirlo, el total parece un error. */}
+                    {conTramo && (
+                      <span className="cart-item-tier">Precio por mayor (desde {tramo!.min} u.)</span>
+                    )}
                   </div>
                   <div className="cart-item-actions">
                     <div className="qty-stepper">

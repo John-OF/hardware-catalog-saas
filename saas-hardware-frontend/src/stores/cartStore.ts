@@ -54,8 +54,10 @@ export const useCartStore = create<CartState>()(
       clear: () => set({ items: [] }),
 
       totalItems: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
+      // MOD-15: el precio de cada línea depende de SU cantidad, así que la
+      // cantidad entra en el cálculo y no solo multiplica al final.
       totalAmount: () =>
-        get().items.reduce((acc, i) => acc + datosDeVenta(i.product, i.variant).precio * i.quantity, 0),
+        get().items.reduce((acc, i) => acc + datosDeVenta(i.product, i.variant, i.quantity).precio * i.quantity, 0),
     }),
     { name: 'catalog-cart' }
   )

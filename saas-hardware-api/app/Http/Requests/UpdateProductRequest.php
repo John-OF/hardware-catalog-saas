@@ -28,6 +28,7 @@ class UpdateProductRequest extends FormRequest
         }
 
         $this->decodificarVariantes();
+        $this->decodificarTramos();
     }
 
     public function rules(): array
@@ -55,16 +56,21 @@ class UpdateProductRequest extends FormRequest
             'is_active'           => 'nullable|boolean',
             'status'              => 'nullable|string|in:draft,published',
             ...$this->reglasDeVariantes(),
+            // MOD-15: ver StoreProductRequest.
+            ...$this->reglasDeTramos(),
         ];
     }
 
     public function messages(): array
     {
-        return $this->mensajesDeVariantes();
+        return [...$this->mensajesDeVariantes(), ...$this->mensajesDeTramos()];
     }
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(fn (Validator $v) => $this->comprobarVariantesRepetidas($v));
+        $validator->after(function (Validator $v) {
+            $this->comprobarVariantesRepetidas($v);
+            $this->comprobarTramos($v);
+        });
     }
 }

@@ -44,7 +44,8 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 const TURNSTILE_SITEKEY = import.meta.env.VITE_TURNSTILE_SITEKEY as string | undefined;
 import type { Tenant, Product, Page, ProductVariant } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
-import { claveDeLinea, datosDeVenta, nombreConVariante, precioEsDesde, tieneVariantes } from '../../utils/variants';
+import { claveDeLinea, datosDeVenta, nombreConVariante, precioEsDesde, precioVisible, tieneVariantes } from '../../utils/variants';
+import { tramosDeVenta } from '../../utils/preciosPorCantidad';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -404,6 +405,14 @@ export default function ProductDetailPage() {
   // `venta` solo es null sin producto, y aquí ya lo hay.
   const { price: precioBase, sale_price: precioOferta, stock: stockVisible } = venta!;
 
+  // MOD-15: solo los tramos que de verdad rebajan sobre lo que se está
+  // enseñando. Con una oferta por debajo del precio por mayor gana la oferta, y
+  // anunciar entonces un precio "por mayor" más caro sería mentir dos veces: no
+  // se aplica, y además invita a comprar más para pagar lo mismo.
+  const tramosVisibles = (tramosDeVenta(product, varianteElegida) ?? []).filter(
+    (tramo) => Number(tramo.price) < precioVisible(varianteElegida ?? product),
+  );
+
   return (
     <div className="product-detail-container animate-fade-in page-product-detail">
       {/* Back button */}
@@ -582,6 +591,26 @@ export default function ProductDetailPage() {
                 )}
               </span>
             </div>
+
+            {/* MOD-15: el precio por mayor. Va junto al precio y no escondido en
+                las especificaciones porque es una razón para comprar más, y
+                porque si el total del carrito baja solo el comprador cree que se
+                equivocó alguien. Los tramos son los de la variante elegida
+                cuando la hay (MOD-5): la ficha resume los de la más barata y
+                esos no son los que se cobran. */}
+            {tramosVisibles.length > 0 && (
+              <div className="detail-tiers-box">
+                <span className="price-label">Precio por mayor</span>
+                <ul className="detail-tiers">
+                  {tramosVisibles.map((tramo) => (
+                    <li key={tramo.min}>
+                      <span className="detail-tier-qty">Desde {tramo.min} u.</span>
+                      <span className="detail-tier-price">{money(tramo.price)} c/u</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="detail-stock-box">
               {stockVisible > 0 ? (

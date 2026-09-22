@@ -14,6 +14,7 @@ use App\Support\Bitacora;
 use App\Support\Busqueda;
 use App\Support\Costos;
 use App\Support\PlanGate;
+use App\Support\PreciosPorCantidad;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -57,11 +58,13 @@ class ProductController extends Controller
     /** Lo que el informe del import cuenta de una ficha: campo => cómo se llama (FUN-19). */
     private const CAMPOS_EN_INFORME = [
         'brand' => 'marca', 'sku' => 'SKU', 'price' => 'precio', 'sale_price' => 'oferta',
-        'cost' => 'costo', 'stock' => 'stock', 'category' => 'categoría',
+        'cost' => 'costo', 'price_tiers' => 'precio por mayor', 'stock' => 'stock',
+        'category' => 'categoría',
     ];
 
     private const CAMPOS_DE_VARIANTE_EN_INFORME = [
-        'sku' => 'SKU', 'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo', 'stock' => 'stock',
+        'sku' => 'SKU', 'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo',
+        'price_tiers' => 'precio por mayor', 'stock' => 'stock',
     ];
 
     public function __construct(private ImageService $imageService) {}
@@ -347,6 +350,10 @@ class ProductController extends Controller
             // ausente, todo se comporta como antes; por eso no hay fallback por
             // posicion para ella.
             'variante'         => array_search('variante', $header),
+            // MOD-15: el precio por mayor, en el texto compacto `10:90|25:85`.
+            // Existe para que exportar y reimportar no pierda los tramos, que es
+            // la promesa que dejo escrita MOD-12 sobre las variantes.
+            'tramos'           => array_search('tramos', $header),
         ];
 
         // Alternativas en inglés
@@ -360,6 +367,7 @@ class ProductController extends Controller
         if ($map['descripcion'] === false) $map['descripcion'] = array_search('description', $header);
         if ($map['especificaciones'] === false) $map['especificaciones'] = array_search('specs', $header);
         if ($map['variante'] === false) $map['variante'] = array_search('variant', $header);
+        if ($map['tramos'] === false) $map['tramos'] = array_search('price_tiers', $header);
 
         // Fallbacks por posición si fallan cabeceras
         if ($map['nombre'] === false) $map['nombre'] = 0;
@@ -448,6 +456,25 @@ class ProductController extends Controller
                     ? (float) $costoStr
                     : null;
 
+                // MOD-15: los tramos de precio por mayor. Lo que no se entiende se
+                // tira en `PreciosPorCantidad` y la celda se queda sin tramos: una
+                // fila no se rechaza por esto, igual que no se rechaza por las
+                // especificaciones. Lo que SI se comprueba es que no cobren mas que
+                // el precio de la fila —un tramo asi no llegaria a aplicarse nunca
+                // y dejaria al dueño creyendo que puso un precio por mayor—.
+                $tramosStr = $map['tramos'] !== false && isset($row[$map['tramos']]) ? trim($row[$map['tramos']]) : '';
+                $tramos = PreciosPorCantidad::desdeTexto($tramosStr);
+
+                if ($tramos !== null) {
+                    $precioDeReferencia = $salePrice ?? $price;
+                    $caros = collect($tramos)->filter(fn (array $t) => $t['price'] >= $precioDeReferencia);
+
+                    if ($caros->isNotEmpty()) {
+                        $errors[] = "Fila {$rowCount}: Un tramo de precio por mayor ({$caros->first()['price']}) no es menor que el precio de la fila ({$precioDeReferencia}).";
+                        continue;
+                    }
+                }
+
                 $stockStr = $map['stock'] !== false && isset($row[$map['stock']]) ? trim($row[$map['stock']]) : '';
                 $stock = is_numeric($stockStr) ? (int) $stockStr : null;
 
@@ -535,7 +562,7 @@ class ProductController extends Controller
                 // Repetirlo en cada fila y quedarse con lo ultimo haria que el
                 // orden de las filas cambiara el resultado sin que se note.
                 if (! $fichaEsNueva) {
-                    $variante = $this->varianteDeFila($opciones, $sku, $price, $salePrice, $costo, $stock);
+                    $variante = $this->varianteDeFila($opciones, $sku, $price, $salePrice, $costo, $stock, $tramos);
                     $fichas[$claveDeFicha]['variantes'][] = $variante;
                     $fichas[$claveDeFicha]['vistas'][$this->claveDeOpciones($opciones)] = true;
                     continue;
@@ -609,6 +636,9 @@ class ProductController extends Controller
                         'price'       => $price,
                         'sale_price'  => $salePrice,
                         'cost'        => $costo,
+                        // MOD-15: con variantes esto lo pisa `resumenDeVariantes()`
+                        // con los de la mas barata, igual que el precio y el costo.
+                        'price_tiers' => $tramos,
                         'stock'       => $stock,
                         'category_id' => $categoryId,
                         'description' => $description,
@@ -620,7 +650,7 @@ class ProductController extends Controller
                 ];
 
                 if ($opciones !== []) {
-                    $fichas[$claveDeFicha]['variantes'][] = $this->varianteDeFila($opciones, $sku, $price, $salePrice, $costo, $stock);
+                    $fichas[$claveDeFicha]['variantes'][] = $this->varianteDeFila($opciones, $sku, $price, $salePrice, $costo, $stock, $tramos);
                     $fichas[$claveDeFicha]['vistas'][$this->claveDeOpciones($opciones)] = true;
                 }
             }
@@ -909,8 +939,9 @@ class ProductController extends Controller
         }
 
         // Con variantes, el precio, la oferta, el costo, el stock y el SKU de la
-        // fila son de la variante, no de la ficha.
-        $deLaFicha = array_diff_key($cambios, array_flip(['sku', 'price', 'sale_price', 'cost', 'stock']));
+        // fila son de la variante, no de la ficha. MOD-15: y sus tramos, que la
+        // ficha recibe de `sincronizarResumenDeVariantes()`.
+        $deLaFicha = array_diff_key($cambios, array_flip(['sku', 'price', 'sale_price', 'cost', 'price_tiers', 'stock']));
 
         $porOpciones = $producto->variants->keyBy(fn (ProductVariant $v) => $this->claveDeOpciones($v->options));
         $total = $producto->variants->count();
@@ -1030,6 +1061,9 @@ class ProductController extends Controller
             'price'       => $producto->price,
             'sale_price'  => $producto->sale_price,
             'cost'        => $producto->cost,
+            // MOD-15: en el texto compacto del CSV, que es el que trae la columna
+            // y el que el dueño reconoce del archivo que acaba de subir.
+            'price_tiers' => PreciosPorCantidad::aTexto($producto->price_tiers),
             'stock'       => $producto->stock,
             'category'    => $nombresDeCategoria[$producto->category_id] ?? null,
             // Crudos: la descripción que devuelve el modelo ya pasó por su cast.
@@ -1041,7 +1075,8 @@ class ProductController extends Controller
     /** @return array<string, mixed> */
     private function fotoDeVariante(ProductVariant $variante): array
     {
-        return $variante->only(['sku', 'price', 'sale_price', 'cost', 'stock']);
+        return $variante->only(['sku', 'price', 'sale_price', 'cost', 'stock'])
+            + ['price_tiers' => PreciosPorCantidad::aTexto($variante->price_tiers)];
     }
 
     /**
@@ -1349,7 +1384,18 @@ class ProductController extends Controller
         if ($variantes) {
             // MOD-6: el costo de la ficha es, como el precio, el resumen de la
             // variante mas barata, y lo escribe `sincronizarResumenDeVariantes()`.
-            unset($validado['price'], $validado['sale_price'], $validado['stock'], $validado['cost']);
+            // MOD-15: y sus tramos de precio por mayor, por lo mismo — quien cobra
+            // es la variante, y dejar en la ficha unos tramos que no se cobran
+            // seria un precio escrito que no es el de nadie.
+            unset($validado['price'], $validado['sale_price'], $validado['stock'], $validado['cost'], $validado['price_tiers']);
+        }
+
+        // MOD-15: la columna es JSON, asi que nadie mas puede obligarla a tener
+        // forma. `null` cuando no queda ningun tramo: la base distingue "sin
+        // tramos" de "una lista vacia" y guardar `[]` dejaria dos formas que todo
+        // lo que lee tendria que acordarse de comprobar.
+        if (array_key_exists('price_tiers', $validado)) {
+            $validado['price_tiers'] = PreciosPorCantidad::paraGuardar($validado['price_tiers']);
         }
 
         // MOD-6: staff no ve el costo, asi que su formulario no lo manda. Que no
@@ -1396,6 +1442,11 @@ class ProductController extends Controller
             // asi que quien lo toca queda escrito como con el precio. La bitacora
             // solo la lee un admin, que es quien puede verlo.
             'cost'        => $product->cost,
+            // MOD-15: el precio por mayor cambia lo que se cobra, asi que queda
+            // escrito como el precio. En el texto compacto del CSV (`10:90|25:85`)
+            // para que quepa en una linea de bitacora y para que sea el mismo
+            // formato que el dueño ya ve al exportar.
+            'price_tiers' => PreciosPorCantidad::aTexto($product->price_tiers),
             'stock'       => $product->stock,
             'is_active'   => (bool) $product->is_active,
             'status'      => $product->status === 'draft' ? 'borrador' : 'publicado',
@@ -1406,11 +1457,12 @@ class ProductController extends Controller
             'specs'       => md5((string) json_encode($product->specs)),
             'fotos'       => md5($product->image_url.'|'.$product->images->pluck('image_url')->implode('|')),
             'variantes'   => $product->variants->mapWithKeys(fn (ProductVariant $v) => [$v->id => [
-                'nombre'     => $v->nombre,
-                'price'      => $v->price,
-                'sale_price' => $v->sale_price,
-                'cost'       => $v->cost,
-                'stock'      => $v->stock,
+                'nombre'      => $v->nombre,
+                'price'       => $v->price,
+                'sale_price'  => $v->sale_price,
+                'cost'        => $v->cost,
+                'price_tiers' => PreciosPorCantidad::aTexto($v->price_tiers),
+                'stock'       => $v->stock,
             ]])->all(),
         ];
     }
@@ -1435,7 +1487,10 @@ class ProductController extends Controller
         ];
 
         if (! $conVariantes) {
-            $campos += ['price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo', 'stock' => 'stock'];
+            $campos += [
+                'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo',
+                'price_tiers' => 'precio por mayor', 'stock' => 'stock',
+            ];
         }
 
         $cambios = Bitacora::cambios($antes, $despues, $campos);
@@ -1450,7 +1505,8 @@ class ProductController extends Controller
             }
 
             $deVariante = Bitacora::cambios($antes['variantes'][$id], $variante, [
-                'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo', 'stock' => 'stock',
+                'price' => 'precio', 'sale_price' => 'oferta', 'cost' => 'costo',
+                'price_tiers' => 'precio por mayor', 'stock' => 'stock',
             ]);
 
             foreach ($deVariante as $etiqueta => $par) {
@@ -1521,6 +1577,9 @@ class ProductController extends Controller
                 'sku'                 => $datos['sku'] ?? null,
                 'price'               => $datos['price'],
                 'sale_price'          => $datos['sale_price'] ?? null,
+                // MOD-15: normalizados aqui como los de la ficha. La lista manda,
+                // igual que con las variantes: lo que no viene se queda sin tramos.
+                'price_tiers'         => PreciosPorCantidad::paraGuardar($datos['price_tiers'] ?? null),
                 'stock'               => $datos['stock'],
                 'low_stock_threshold' => $datos['low_stock_threshold'] ?? 5,
                 'sort_order'          => $posicion,
@@ -1679,15 +1738,18 @@ class ProductController extends Controller
      * @param  array<int, array{name: string, value: string}>  $opciones
      * @return array<string, mixed>
      */
-    private function varianteDeFila(array $opciones, ?string $sku, float $price, ?float $salePrice, ?float $costo, int $stock): array
+    private function varianteDeFila(array $opciones, ?string $sku, float $price, ?float $salePrice, ?float $costo, int $stock, ?array $tramos = null): array
     {
         return [
-            'options'    => $opciones,
-            'sku'        => $sku ?: null,
-            'price'      => $price,
-            'sale_price' => $salePrice,
-            'cost'       => $costo,
-            'stock'      => $stock,
+            'options'     => $opciones,
+            'sku'         => $sku ?: null,
+            'price'       => $price,
+            'sale_price'  => $salePrice,
+            'cost'        => $costo,
+            // MOD-15: de la fila de la variante, porque con variantes el precio
+            // por mayor es de cada una.
+            'price_tiers' => $tramos,
+            'stock'       => $stock,
         ];
     }
 

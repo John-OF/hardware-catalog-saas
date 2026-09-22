@@ -79,10 +79,11 @@ class ExportacionCsvTest extends TestCase
     {
         $csv = $this->descargar('/api/products/export');
 
-        // La columna `variante` es de MOD-12: va vacia en un producto sin ellas.
-        $this->assertStringContainsString('nombre;marca;variante;sku;precio;precio_oferta;costo', $csv);
+        // La columna `variante` es de MOD-12 y `tramos` de MOD-15: las dos van
+        // vacias en un producto sin variantes y sin precio por mayor.
+        $this->assertStringContainsString('nombre;marca;variante;sku;precio;precio_oferta;costo;tramos', $csv);
         // `fputcsv` entrecomilla lo que lleva espacios, de ahi las comillas.
-        $this->assertStringContainsString('"Ryzen 5 7600";AMD;;CPU-7600;900.00;850.00;700.00;4;Procesadores', $csv);
+        $this->assertStringContainsString('"Ryzen 5 7600";AMD;;CPU-7600;900.00;850.00;700.00;;4;Procesadores', $csv);
         $this->assertStringContainsString('Procesadores', $csv);
         $this->assertStringContainsString('Socket: AM5 | TDP: 65W', $csv);
     }
@@ -248,8 +249,9 @@ class ExportacionCsvTest extends TestCase
 
         // El nombre se repite en las dos filas (es lo que las agrupa al volver) y
         // la descripcion de la ficha solo va en la primera.
-        $this->assertStringContainsString('"Capacidad: 1 TB";SSD-1T;400.00;;320.00;3;Procesadores', $csv);
-        $this->assertStringContainsString('"Capacidad: 2 TB";SSD-2T;700.00;650.00;560.00;1;;;', $csv);
+        // La celda vacia entre el costo y el stock es `tramos` (MOD-15).
+        $this->assertStringContainsString('"Capacidad: 1 TB";SSD-1T;400.00;;320.00;;3;Procesadores', $csv);
+        $this->assertStringContainsString('"Capacidad: 2 TB";SSD-2T;700.00;650.00;560.00;;1;;;', $csv);
 
         [$destino, $duenia] = $this->tiendaQueRecibe();
 

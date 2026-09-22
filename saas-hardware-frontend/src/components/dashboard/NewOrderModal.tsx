@@ -30,8 +30,16 @@ type Line = { product: Product; variant: ProductVariant | null; quantity: number
 
 const claveDe = (line: Line) => claveDeLinea(line.product.id, line.variant?.id);
 
-/** Precio que efectivamente se cobra: el de oferta cuando existe, de la variante si la hay. Igual criterio que el servidor. */
-const priceOf = (line: Pick<Line, 'product' | 'variant'>): number => datosDeVenta(line.product, line.variant).precio;
+/**
+ * Precio que efectivamente se cobra: el de oferta cuando existe, de la variante
+ * si la hay. Igual criterio que el servidor.
+ *
+ * MOD-15: y con la cantidad, porque el precio por mayor depende de cuantas se
+ * lleve esa linea. Sin pasarla, el pie del modal sumaba a precio de lista y el
+ * servidor cobraba el tramo: el dueño veia un total y se le guardaba otro.
+ */
+const priceOf = (line: Pick<Line, 'product' | 'variant'>, cantidad = 1): number =>
+  datosDeVenta(line.product, line.variant, cantidad).precio;
 
 export default function NewOrderModal({ onClose, onCreated, currency }: NewOrderModalProps) {
   const money = (n: number | string | null | undefined) => formatMoney(n, currency);
@@ -60,7 +68,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
   const results = productsPage?.data ?? [];
 
   const total = useMemo(
-    () => lines.reduce((sum, line) => sum + priceOf(line) * line.quantity, 0),
+    () => lines.reduce((sum, line) => sum + priceOf(line, line.quantity) * line.quantity, 0),
     [lines],
   );
 
@@ -203,7 +211,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                         {line.product.name}
                         {line.variant && <span className="line-variant"> · {line.variant.nombre}</span>}
                       </span>
-                      <span className="line-price">{money(priceOf(line) * line.quantity)}</span>
+                      <span className="line-price">{money(priceOf(line, line.quantity) * line.quantity)}</span>
                     </div>
                     <div className="line-actions">
                       <button type="button" onClick={() => setQuantity(claveDe(line), line.quantity - 1)}>

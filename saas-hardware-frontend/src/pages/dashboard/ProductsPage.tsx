@@ -31,6 +31,7 @@ import { getCategories } from '../../api/categories';
 import { getPlan } from '../../api/plan';
 import Dialogo from '../../components/ui/Dialogo';
 import EditorDeVariantes from '../../components/dashboard/EditorDeVariantes';
+import EditorDeTramos from '../../components/dashboard/EditorDeTramos';
 import InformeDeImport from '../../components/dashboard/InformeDeImport';
 import {
   agregarVariantesAlFormulario,
@@ -38,6 +39,12 @@ import {
   variantesDesdeProducto,
   type VarianteEnFormulario,
 } from '../../utils/variantesEnFormulario';
+import {
+  problemaDeTramos,
+  tramosDesdeProducto,
+  tramosParaGuardar,
+  type TramoEnFormulario,
+} from '../../utils/tramosEnFormulario';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { exportarCatalogo } from '../../api/exportaciones';
@@ -153,6 +160,11 @@ export default function ProductsPage() {
   const [ejesVariantes, setEjesVariantes] = useState<string[]>([]);
   const [filasVariantes, setFilasVariantes] = useState<VarianteEnFormulario[]>([]);
   const conVariantesEnFormulario = filasVariantes.length > 0;
+
+  // MOD-15: el precio por mayor de la ficha. Solo se usa sin variantes; con
+  // ellas cobra la variante y el backend descarta lo que venga aqui, asi que el
+  // editor tampoco se ensena (seria un precio escrito que no es el de nadie).
+  const [tramosFicha, setTramosFicha] = useState<TramoEnFormulario[]>([]);
 
   /** Lo que deja el producto que se está editando, con el precio que se cobra. */
   const margenDelFormulario = margenDe(precioQueSeCobra(price, salePrice), cost);
@@ -332,6 +344,7 @@ export default function ProductsPage() {
     setSpecsList([]);
     setEjesVariantes([]);
     setFilasVariantes([]);
+    setTramosFicha([]);
     setIsModalOpen(true);
   };
 
@@ -371,6 +384,7 @@ export default function ProductsPage() {
     const { ejes, filas } = variantesDesdeProducto(product.variants);
     setEjesVariantes(ejes);
     setFilasVariantes(filas);
+    setTramosFicha(tramosDesdeProducto(product.price_tiers));
 
     setIsModalOpen(true);
   };
@@ -427,6 +441,15 @@ export default function ProductsPage() {
         toast.error('El precio de oferta debe ser menor que el precio regular.');
         return;
       }
+
+      // MOD-15: las mismas reglas que comprueba el backend. Se miran aqui para
+      // poder decir "el tramo 2" en vez de dejar que el 422 hable de
+      // `price_tiers.1.price`, que el formulario no sabria senalar.
+      const deTramos = problemaDeTramos(tramosFicha, price);
+      if (deTramos) {
+        toast.error(deTramos);
+        return;
+      }
     }
 
     const formData = new FormData();
@@ -446,6 +469,11 @@ export default function ProductsPage() {
       if (puedeVerCostos) {
         formData.append('cost', cost);
       }
+
+      // MOD-15: siempre, tambien vacio. A diferencia del costo esto lo ve todo
+      // el panel, asi que una lista vacia significa de verdad "quitalos" y es
+      // como se le quita el precio por mayor a un producto que lo tenia.
+      formData.append('price_tiers', JSON.stringify(tramosParaGuardar(tramosFicha)));
     }
     formData.append('category_id', categoryId);
     formData.append('description', description);
@@ -1239,6 +1267,17 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+
+              {/* MOD-15: el precio por mayor de la ficha, debajo del precio y
+                  del stock porque se decide mirando los dos. Solo sin variantes:
+                  con ellas cobra la variante y cada una lleva el suyo, en el
+                  boton de su fila. */}
+              <EditorDeTramos
+                filas={tramosFicha}
+                moneda={currencyCode}
+                precioBase={price}
+                onChange={setTramosFicha}
+              />
               </>)}
 
               <div className="form-group">
