@@ -207,9 +207,12 @@ Hay **tres autenticaciones separadas**, todas con Sanctum (tokens Bearer):
 1. **Equipo de la tienda** — panel (header `X-Tenant` + Bearer). Token de 7 días, una sesión activa
    por usuario. Dos roles: `admin` (todo) y `staff` (el día a día: pedidos, productos sin borrar,
    reseñas, lista de espera). El rol se lee del usuario en cada petición, no del token. Un correo
-   solo puede estar en el panel de **una** tienda, porque el login no pide la tienda.
+   solo puede estar en el panel de **una** tienda, porque el login no pide la tienda. Un token con
+   la ability `customer` no entra al panel aunque su usuario sea del equipo (`ACC-3`).
 2. **Clientes finales** — cuentas por tienda dentro del catálogo público (favoritos e historial).
-   Token de 30 días. El middleware `customer` exige que el token sea **de esa tienda**.
+   Token de 30 días. El login sólo acepta usuarios con rol `customer`, y el middleware `customer`
+   exige un cliente activo **de esa tienda** (`User::esClienteDe()`, la misma regla que usan las
+   reseñas): ni el token del panel ni el de soporte valen en las rutas de cliente (`ACC-3`).
 3. **Operador de la plataforma** (`superadmin`) — panel propio, restringido además por IP. Token de
    1 día. Puede **entrar en una tienda como soporte**: eso emite un token del admin de esa tienda
    con la ability `soporte`, que caduca en 15 minutos, **no puede escribir nada** (middleware
@@ -438,7 +441,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 794 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 802 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)

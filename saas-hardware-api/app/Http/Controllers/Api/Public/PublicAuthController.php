@@ -79,9 +79,15 @@ class PublicAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        // Buscar el usuario del tenant
+        // ACC-3: solo clientes. Sin el rol, un admin o staff que entraba por aqui
+        // se llevaba un token de 30 dias que tambien valia en el panel -los
+        // middleware del panel leen el rol del usuario, no el token- y que no
+        // cerraba su sesion del panel, asi que quedaban dos en paralelo. El
+        // error es el mismo que el de una contrasena mal puesta: decir "esa
+        // cuenta es del panel" diria que correos tiene el equipo de la tienda.
         $user = User::where('tenant_id', $tenant->id)
             ->where('email', $data['email'])
+            ->where('role', 'customer')
             ->first();
 
         if (!$user || !Hash::check($data['password'], $user->password)) {

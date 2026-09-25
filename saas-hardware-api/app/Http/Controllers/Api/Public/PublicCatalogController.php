@@ -547,11 +547,7 @@ class PublicCatalogController extends Controller
     {
         $user = $request->user('sanctum');
 
-        if (! $user || $user->tenant_id !== $tenant->id || $user->role !== 'customer' || ! $user->is_active) {
-            return null;
-        }
-
-        return $user;
+        return $user?->esClienteDe($tenant) ? $user : null;
     }
 
     public function storeReview(Request $request, string $slug, string $productId): JsonResponse

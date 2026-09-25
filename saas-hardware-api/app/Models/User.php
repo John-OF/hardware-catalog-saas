@@ -57,6 +57,23 @@ class User extends Authenticatable implements MustVerifyEmail
         return in_array($this->role, self::ROLES_DE_PANEL, true);
     }
 
+    /**
+     * Si es un cliente activo de ESA tienda (AUD-3, ACC-3).
+     *
+     * Las tres condiciones hacen falta: la tienda, porque el registro de
+     * clientes es abierto y un token de otra tienda no acredita nada aqui; el
+     * rol, porque un admin o staff de la tienda no es un cliente -ni su token
+     * de panel debe servir en las rutas de cliente, ni el de cliente en el
+     * panel-; y estar activo. Vive aqui y no en cada sitio que lo pregunta
+     * porque estaba escrita dos veces y una se habia quedado sin el rol.
+     */
+    public function esClienteDe(Tenant $tenant): bool
+    {
+        return $this->tenant_id === $tenant->id
+            && $this->role === 'customer'
+            && $this->is_active;
+    }
+
     // Usar UUID v7 ordenados cronológicamente para evitar fragmentación de índices en MySQL
     public function newUniqueId(): string
     {

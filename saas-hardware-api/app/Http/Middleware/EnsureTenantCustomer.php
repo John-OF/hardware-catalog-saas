@@ -45,7 +45,11 @@ class EnsureTenantCustomer
 
         $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
 
-        if (!$tenant || $user->tenant_id !== $tenant->id) {
+        // ACC-3: no basta con que sea de la tienda, tiene que ser un cliente.
+        // Antes pasaba cualquier usuario de la tienda, asi que el token de
+        // soporte (INF-2), que es del admin, escribia en favoritos: el bloqueo
+        // de solo lectura va en el grupo del panel y aqui no llega.
+        if (!$tenant || !$user->esClienteDe($tenant)) {
             abort(401, 'No autenticado en esta tienda.');
         }
 
