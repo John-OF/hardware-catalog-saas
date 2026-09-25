@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# ACC-6: el .env es de cada maquina. Lo que se versiona es .env.example.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

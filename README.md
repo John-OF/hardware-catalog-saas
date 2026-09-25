@@ -100,6 +100,7 @@ php artisan queue:work        # OJO: sin esto no sale ningún correo
 # Frontend
 cd saas-hardware-frontend
 npm install
+cp .env.example .env          # sin él arranca, pero con el formulario de reseñas apagado
 npm run dev                   # http://localhost:5173
 ```
 
@@ -554,6 +555,10 @@ Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartSt
 - La sesión de cliente (`customerAuthStore`) es independiente de la de admin (`authStore`).
 
 ### Variables de entorno y scripts
+
+Van en `saas-hardware-frontend/.env`, que **no está en git** (`ACC-6`): se copia de `.env.example`.
+Todo lo que empieza por `VITE_` acaba dentro del bundle y lo lee cualquiera que abra la tienda, así
+que aquí sólo van valores públicos; una clave secreta nunca va en el frontend.
 
 | Variable | Uso | Por defecto |
 |---|---|---|
