@@ -50,8 +50,13 @@ class Product extends Model
      * una consulta publica nueva no filtra el costo por descuido, sino que no lo
      * lleva de entrada. Al reves, cualquier ruta nueva que se olvidara de
      * quitarlo se lo estaria ensenando a la competencia.
+     *
+     * `views_count`, por lo mismo (ACC-7): las visitas por producto dicen que
+     * mira la clientela y cuanto trafico mueve la tienda, que es justo lo que
+     * AUD-9 le quito a la respuesta publica de la tienda. Solo lo destapa el
+     * resumen del panel (`DashboardController`).
      */
-    protected $hidden = ['cost'];
+    protected $hidden = ['cost', 'views_count'];
 
     protected $casts = [
         'description'          => \App\Casts\SanitizedHtml::class,

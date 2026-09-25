@@ -29,6 +29,16 @@ class Review extends Model
         'is_approved',
     ];
 
+    /**
+     * ACC-1: lo que identifica a quien reseñó NO sale en ninguna respuesta por
+     * defecto. La ficha pública lista las reseñas aprobadas sin token, así que
+     * un campo que se serializara solo acabaría publicado. Falla en cerrado, como
+     * el costo (MOD-6): una columna nueva de datos personales tampoco se publica
+     * sola. El panel destapa el correo a mano (`ReviewController`); `visitor_id`
+     * y `user_id` no los necesita nadie fuera del servidor.
+     */
+    protected $hidden = ['customer_email', 'visitor_id', 'user_id'];
+
     protected $casts = [
         'rating'            => 'integer',
         'verified_purchase' => 'boolean',

@@ -53,6 +53,24 @@ trait BelongsToTenant
     }
 
     /**
+     * La relacion `tenant` no se serializa nunca como parte de este modelo (ACC-7).
+     *
+     * Cualquier codigo que lea `$modelo->tenant` -una notificacion que busca la
+     * moneda, un hook que invalida la cache- deja la relacion cargada en esa
+     * misma instancia, y si luego la instancia sale en una respuesta, sale con
+     * la fila ENTERA de la tienda: plan, fin de la prueba, visitas, el token del
+     * dominio propio. Asi se colaba en el pedido y en la resena del catalogo
+     * publico, y lo cargaba un efecto secundario que el controlador ni veia.
+     * Falla en cerrado, como el costo (MOD-6): quien necesite la tienda en una
+     * respuesta la manda en una clave propia y con sus columnas, como ya hacen
+     * `AuthController` y `TenantController`.
+     */
+    public function initializeBelongsToTenant(): void
+    {
+        $this->makeHidden('tenant');
+    }
+
+    /**
      * Consulta que mira por encima de las tiendas, a sabiendas.
      *
      * Para el panel de plataforma, los comandos de consola y los tests que

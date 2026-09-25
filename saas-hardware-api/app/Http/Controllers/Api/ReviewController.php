@@ -46,6 +46,9 @@ class ReviewController extends Controller
         // Paginación
         $reviews = $query->paginate(Paginacion::porPagina($request, 15));
 
+        // ACC-1: el correo va oculto en el modelo; el panel es el único sitio que lo ve.
+        $reviews->getCollection()->each->makeVisible('customer_email');
+
         return response()->json($reviews);
     }
 
@@ -74,7 +77,7 @@ class ReviewController extends Controller
             );
         }
 
-        return response()->json($review);
+        return response()->json($review->makeVisible('customer_email'));
     }
 
     /**

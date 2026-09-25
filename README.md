@@ -438,7 +438,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 776 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 783 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -602,6 +602,14 @@ tienen tests.
   mira sea admin. Una consulta pública nueva no lo filtra por descuido: no lo lleva de entrada. Y en
   el formulario, **una clave `cost` ausente significa "no lo toques"**, no "bórralo": es lo que
   impide que un colaborador —que no ve el campo— vacíe los costos al editar un producto.
+- **Lo que no es del comprador va oculto en el modelo, no quitado en el controlador** (`ACC-1`,
+  `ACC-7`): el correo, el `visitor_id` y el `user_id` de las reseñas (`Review::$hidden`), las visitas
+  de cada producto (`Product::$hidden`) y **la relación `tenant` de cualquier modelo con
+  `BelongsToTenant`**, que el trait oculta siempre. Esa última es la que no se ve venir: basta con
+  que algo lea `$modelo->tenant` —una notificación, un hook— para que la relación quede cargada y
+  la respuesta salga con la fila entera de la tienda. Quien necesite la tienda en una respuesta la
+  manda en una clave propia. Al añadir una ruta pública, se suma al barrido de
+  `RutasPublicasNoExponenDatosInternosTest`.
 - **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
   igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.

@@ -39,7 +39,9 @@ class DashboardController extends Controller
             ->orderByDesc('views_count')
             ->orderByDesc('created_at')
             ->take(5)
-            ->get();
+            ->get()
+            // ACC-7: las visitas van ocultas en el modelo; aqui son el dato.
+            ->each->makeVisible('views_count');
 
         // 6. Pedidos Recientes (Top 5)
         $recentOrders = Order::where('tenant_id', $tenant->id)
