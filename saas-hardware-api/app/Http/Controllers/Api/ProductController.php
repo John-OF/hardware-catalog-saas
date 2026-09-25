@@ -14,6 +14,7 @@ use App\Support\Bitacora;
 use App\Support\Busqueda;
 use App\Support\CeldaCsv;
 use App\Support\Costos;
+use App\Support\DeLaTienda;
 use App\Support\PlanGate;
 use App\Support\PreciosPorCantidad;
 use Illuminate\Http\JsonResponse;
@@ -1193,8 +1194,11 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'product_ids'      => 'nullable|array',
-            'product_ids.*'    => 'uuid|exists:products,id',
-            'category_id'      => 'nullable|uuid|exists:categories,id',
+            // ACC-5: con `exists:` a secas, un id de otra tienda pasaba la
+            // validacion -la escritura si filtraba, asi que no tocaba nada ajeno-
+            // y el 200 frente al 422 de un id inventado decia que existia.
+            'product_ids.*'    => ['uuid', DeLaTienda::existe('products')],
+            'category_id'      => ['nullable', 'uuid', DeLaTienda::existe('categories')],
             'bulk_action'      => 'required|string|in:activate,deactivate,delete,adjust_price',
             'price_adjustment' => 'nullable|numeric',
         ]);
@@ -1365,7 +1369,8 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'ids' => 'required|array',
-            'ids.*' => 'required|uuid|exists:products,id',
+            // ACC-5: ver `bulkAction()`.
+            'ids.*' => ['required', 'uuid', DeLaTienda::existe('products')],
         ]);
 
         $tenant = app('currentTenant');

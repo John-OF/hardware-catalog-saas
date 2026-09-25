@@ -7,6 +7,7 @@ use App\Http\Requests\StoreCategoryRequest;
 use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Support\Bitacora;
+use App\Support\DeLaTienda;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -89,7 +90,9 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'ids' => 'required|array',
-            'ids.*' => 'required|uuid|exists:categories,id',
+            // ACC-5: sin acotar a la tienda, un id ajeno pasaba y el 200 frente
+            // al 422 de uno inventado decia que existia en otra tienda.
+            'ids.*' => ['required', 'uuid', DeLaTienda::existe('categories')],
         ]);
 
         $tenant = app('currentTenant');

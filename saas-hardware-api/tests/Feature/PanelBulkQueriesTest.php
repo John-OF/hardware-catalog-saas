@@ -154,18 +154,21 @@ class PanelBulkQueriesTest extends TestCase
         $propio = $this->producto('Propio');
         $ajeno = $this->producto('Ajeno', $otraTienda);
 
-        // Se cuela el id de la otra tienda en la lista: el CASE lo nombraria,
-        // pero el WHERE por tenant_id no lo deja pasar.
+        // Se cuela el id de la otra tienda en la lista. Desde ACC-5 la
+        // validacion lo rechaza antes de escribir -y rechaza la peticion
+        // entera, asi que el propio tampoco se mueve-; el WHERE por tenant_id
+        // del UPDATE sigue ahi como segunda barrera, aunque por HTTP ya no se
+        // llega a el.
         $this->panel()->postJson('/api/products/reorder', [
             'ids' => [$ajeno->id, $propio->id],
-        ])->assertOk();
+        ])->assertStatus(422);
 
         $this->assertSame(
             0,
             (int) Product::withoutTenant()->find($ajeno->id)->sort_order,
             'El reorden de una tienda movio un producto de otra.'
         );
-        $this->assertSame(1, (int) Product::withoutTenant()->find($propio->id)->sort_order);
+        $this->assertSame(0, (int) Product::withoutTenant()->find($propio->id)->sort_order);
     }
 
     public function test_reordenar_invalida_la_cache_publica(): void
@@ -274,12 +277,15 @@ class PanelBulkQueriesTest extends TestCase
         $propio = $this->producto('Propio');
         $ajeno = $this->producto('Ajeno', $otraTienda);
 
+        // Desde ACC-5 la validacion rechaza la lista entera por el id ajeno,
+        // antes de borrar nada; el filtro por tienda del borrado queda como
+        // segunda barrera.
         $this->panel()->postJson('/api/products/bulk', [
             'product_ids' => [$propio->id, $ajeno->id],
             'bulk_action' => 'delete',
-        ])->assertOk();
+        ])->assertStatus(422);
 
-        $this->assertNull(Product::withoutTenant()->find($propio->id));
+        $this->assertNotNull(Product::withoutTenant()->find($propio->id), 'Una peticion rechazada borro algo.');
         $this->assertNotNull(
             Product::withoutTenant()->find($ajeno->id),
             'El borrado en lote de una tienda se llevo un producto de otra.'

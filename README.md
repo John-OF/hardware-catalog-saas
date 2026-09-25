@@ -286,6 +286,7 @@ app/
     ├── PlanGate.php        # Aplica los límites del plan
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
+    ├── DeLaTienda.php      # La regla `exists` acotada a la tienda resuelta (ACC-5)
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
@@ -441,7 +442,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 805 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 812 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -693,6 +694,10 @@ tienen tests.
   SQLite —donde corre la suite— no, así que sin declararlo los dos motores no harían lo mismo.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
+- **Un id de una tabla con `tenant_id` se valida con `DeLaTienda::existe('tabla')`**, nunca con
+  `exists:tabla,id` a secas (`ACC-5`): la regla del validador consulta la tabla directamente, **no
+  pasa por el scope de `BelongsToTenant`**, y un id de otra tienda la supera. Sin tienda resuelta,
+  ningún id existe.
 - **Lo que se difiere al envío de la respuesta (`streamDownload`, `defer()`) corre fuera del alcance
   de la tienda**: para entonces el middleware ya la olvidó, y el fallo en cerrado devuelve cero filas
   **sin ningún error**. Esas consultas van con `withoutTenant()` y el `tenant_id` fijado antes de

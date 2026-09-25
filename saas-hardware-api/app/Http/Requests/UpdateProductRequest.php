@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\ValidaVariantes;
+use App\Support\DeLaTienda;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -46,7 +47,9 @@ class UpdateProductRequest extends FormRequest
             'cost'                => 'nullable|numeric|min:0',
             'sku'                 => 'nullable|string|max:100',
             'low_stock_threshold' => 'nullable|integer|min:0',
-            'category_id'         => 'nullable|uuid|exists:categories,id',
+            // ACC-5: la categoria tiene que ser de ESTA tienda; `exists:` a secas
+            // aceptaba la de cualquiera.
+            'category_id'         => ['nullable', 'uuid', DeLaTienda::existe('categories')],
             'description'         => 'nullable|string|max:5000',
             'specs'               => 'nullable|array',
             'image'               => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
