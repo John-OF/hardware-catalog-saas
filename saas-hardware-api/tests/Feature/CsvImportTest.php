@@ -863,6 +863,136 @@ class CsvImportTest extends TestCase
         return strtr($texto, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n']);
     }
 
+    // ------------------------------------------------------- FUN-21: el estado
+
+    /**
+     * `FUN-21`. `ExportController` escribia la columna `estado` desde `MOD-7` y
+     * el importador **no la leia**: como no tocaba `status` y la columna de la
+     * base vale `published` por defecto, exportar un catalogo con borradores y
+     * reimportarlo los publicaba todos, en silencio. Era la unica columna que
+     * rompia la promesa de `MOD-12` sobre ese viaje.
+     */
+    public function test_el_import_respeta_el_estado_borrador_de_la_columna(): void
+    {
+        $csv = "nombre;precio;stock;categoria;estado
+"
+            ."Un borrador;100;5;Procesadores;borrador
+"
+            ."Un publicado;200;5;Procesadores;publicado
+";
+
+        $this->importar($csv)->assertOk();
+
+        $productos = $this->productosDeLaTienda()->keyBy('name');
+
+        $this->assertSame('draft', $productos['Un borrador']->status);
+        $this->assertSame('published', $productos['Un publicado']->status);
+    }
+
+    /** Las dos parejas: la que escribe la exportacion y la que usa la API. */
+    public function test_el_import_acepta_tambien_draft_y_published_en_ingles(): void
+    {
+        $csv = "nombre;precio;stock;categoria;estado
+"
+            ."En ingles;100;5;Procesadores;draft
+";
+
+        $this->importar($csv)->assertOk();
+
+        $this->assertSame('draft', $this->productosDeLaTienda()->first()->status);
+    }
+
+    /**
+     * Un archivo sin la columna crea productos publicados, que es lo que hacia
+     * antes el valor por defecto de la base: el arreglo no puede cambiar lo que
+     * ya pasaba con los archivos que la gente tiene escritos.
+     */
+    public function test_un_archivo_sin_la_columna_sigue_creando_publicados(): void
+    {
+        $this->importar("nombre;precio;stock;categoria
+Sin columna;100;5;Procesadores
+")->assertOk();
+
+        $this->assertSame('published', $this->productosDeLaTienda()->first()->status);
+    }
+
+    /**
+     * Un valor que no se entiende rechaza la fila. Caer al silencio aqui seria
+     * publicar sin querer, que es justo lo que `FUN-21` viene a evitar.
+     */
+    public function test_un_estado_que_no_se_entiende_rechaza_la_fila(): void
+    {
+        $respuesta = $this->importar("nombre;precio;stock;categoria;estado
+Raro;100;5;Procesadores;archivado
+");
+
+        $respuesta->assertOk()->assertJsonPath('created_count', 0);
+        $this->assertStringContainsString("El estado 'archivado' no es valido", $this->sinAcentos($respuesta->json('errors.0')));
+    }
+
+    /** En `actualizar`, una celda vacia no toca el estado (la regla de `FUN-17`). */
+    public function test_al_actualizar_una_celda_de_estado_vacia_no_publica_un_borrador(): void
+    {
+        $this->existente('Ya estaba', ['status' => 'draft']);
+
+        $csv = "nombre;precio;stock;categoria;estado
+Ya estaba;150;9;Procesadores;
+";
+
+        $this->importarEnModo($csv, 'actualizar')->assertOk()->assertJsonPath('updated_count', 1);
+
+        $producto = $this->productosDeLaTienda()->first();
+
+        $this->assertSame('draft', $producto->status, 'Una celda vacia publico un borrador.');
+        $this->assertSame('150.00', $producto->price, 'El resto de la fila si tenia que actualizarse.');
+    }
+
+    /** Y con valor, lo cambia y lo cuenta en el informe (`FUN-19`). */
+    public function test_al_actualizar_el_estado_cambia_y_sale_en_el_informe(): void
+    {
+        $this->existente('Ya estaba', ['status' => 'published']);
+
+        $csv = "nombre;precio;stock;categoria;estado
+Ya estaba;100;1;Procesadores;borrador
+";
+
+        $respuesta = $this->importarEnModo($csv, 'actualizar')->assertOk();
+
+        $this->assertSame('draft', $this->productosDeLaTienda()->first()->status);
+        $this->assertStringContainsString('estado publicado', $respuesta->json('changes.0.detalle'));
+    }
+
+    /**
+     * **El viaje completo, que es la promesa que se rompia**: exportar un
+     * catalogo con un borrador dentro y volver a importarlo tiene que dejarlo
+     * borrador. Antes salia publicado sin que nadie lo dijera, porque la columna
+     * viajaba en el archivo y el importador no la miraba.
+     */
+    public function test_exportar_un_borrador_y_reimportarlo_lo_deja_borrador(): void
+    {
+        $this->existente('Un borrador', ['status' => 'draft']);
+
+        $token = $this->admin->createToken('test', ['admin'])->plainTextToken;
+        $csv = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'X-Tenant'      => $this->tenant->slug,
+        ])->get('/api/products/export')->streamedContent();
+
+        $this->assertStringContainsString('borrador', $csv, 'La exportacion tiene que escribir el estado.');
+
+        $this->app['auth']->forgetGuards();
+        $this->importarEnModo($csv, 'duplicar')->assertOk()->assertJsonPath('created_count', 1);
+
+        $productos = $this->productosDeLaTienda();
+
+        $this->assertCount(2, $productos);
+        $this->assertSame(
+            ['draft', 'draft'],
+            $productos->pluck('status')->all(),
+            'La copia salio publicada: el viaje de ida y vuelta perdio el estado.',
+        );
+    }
+
     /**
      * Las variantes de un producto leidas fuera de la peticion.
      *

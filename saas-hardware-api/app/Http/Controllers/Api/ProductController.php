@@ -60,7 +60,7 @@ class ProductController extends Controller
     private const CAMPOS_EN_INFORME = [
         'brand' => 'marca', 'sku' => 'SKU', 'price' => 'precio', 'sale_price' => 'oferta',
         'cost' => 'costo', 'price_tiers' => 'precio por mayor', 'stock' => 'stock',
-        'category' => 'categoría',
+        'category' => 'categoría', 'status' => 'estado',
     ];
 
     private const CAMPOS_DE_VARIANTE_EN_INFORME = [
@@ -355,6 +355,12 @@ class ProductController extends Controller
             // Existe para que exportar y reimportar no pierda los tramos, que es
             // la promesa que dejo escrita MOD-12 sobre las variantes.
             'tramos'           => array_search('tramos', $header),
+            // FUN-21: publicado o borrador. La exportacion la escribia desde
+            // MOD-7 y aqui no se leia, asi que exportar un catalogo con
+            // borradores y reimportarlo los publicaba todos en silencio -la
+            // columna `status` de la base vale `published` por defecto-. Era la
+            // unica columna que rompia la promesa de MOD-12 sobre ese viaje.
+            'estado'           => array_search('estado', $header),
         ];
 
         // Alternativas en inglés
@@ -369,6 +375,7 @@ class ProductController extends Controller
         if ($map['especificaciones'] === false) $map['especificaciones'] = array_search('specs', $header);
         if ($map['variante'] === false) $map['variante'] = array_search('variant', $header);
         if ($map['tramos'] === false) $map['tramos'] = array_search('price_tiers', $header);
+        if ($map['estado'] === false) $map['estado'] = array_search('status', $header);
 
         // Fallbacks por posición si fallan cabeceras
         if ($map['nombre'] === false) $map['nombre'] = 0;
@@ -492,6 +499,20 @@ class ProductController extends Controller
 
                 if ($stock === null || $stock < 0) {
                     $errors[] = "Fila {$rowCount}: El stock '{$stockStr}' no es válido (debe ser un entero >= 0).";
+                    continue;
+                }
+
+                // FUN-21: `null` es "el archivo no lo dice", que al crear es
+                // publicado y al actualizar es "no lo toques" -lo filtra
+                // `soloLoQueTrae()`, igual que el resto de celdas vacias-. Un
+                // valor que no se entiende rechaza la fila en vez de caer al
+                // silencio: publicar sin querer el catalogo entero es
+                // precisamente lo que este arreglo viene a evitar.
+                $estadoStr = $map['estado'] !== false && isset($row[$map['estado']]) ? trim($row[$map['estado']]) : '';
+                $estado = $this->estadoDeFila($estadoStr);
+
+                if ($estadoStr !== '' && $estado === null) {
+                    $errors[] = "Fila {$rowCount}: El estado '{$estadoStr}' no es válido (usa 'publicado' o 'borrador').";
                     continue;
                 }
 
@@ -656,6 +677,9 @@ class ProductController extends Controller
                         'description' => $description,
                         'specs'       => $specs,
                         'is_active'   => true,
+                        // FUN-21: la describe la primera fila del grupo, como el
+                        // resto de la ficha (MOD-12).
+                        'status'      => $estado,
                     ],
                     'variantes'  => [],
                     'vistas'     => [],
@@ -696,6 +720,16 @@ class ProductController extends Controller
                 if ($ficha['variantes'] !== []) {
                     $atributos = array_merge($atributos, Product::resumenDeVariantes($ficha['variantes']));
                 }
+
+                // FUN-21: al CREAR, un archivo que no trae la columna deja el
+                // producto publicado, que es lo que hacia antes el valor por
+                // defecto de la base. Se pone aqui y no en la ficha porque en la
+                // ficha `null` tiene que seguir significando "no lo toques" para
+                // el modo `actualizar`. Y se pone SIEMPRE, sin dejar la clave
+                // fuera: `Product::insert()` saca las columnas de la primera fila
+                // del lote, asi que una fila con menos claves que otra
+                // desalinearia el insert entero.
+                $atributos['status'] ??= 'published';
 
                 $fila   = $this->filaAAtributos($atributos);
                 $lote[] = $fila;
@@ -1077,6 +1111,9 @@ class ProductController extends Controller
             // y el que el dueño reconoce del archivo que acaba de subir.
             'price_tiers' => PreciosPorCantidad::aTexto($producto->price_tiers),
             'stock'       => $producto->stock,
+            // FUN-21: con las palabras del CSV y no con las de la base, que es
+            // lo que el dueño acaba de escribir en el archivo.
+            'status'      => $producto->status === 'draft' ? 'borrador' : 'publicado',
             'category'    => $nombresDeCategoria[$producto->category_id] ?? null,
             // Crudos: la descripción que devuelve el modelo ya pasó por su cast.
             'description' => (string) ($producto->getAttributes()['description'] ?? ''),
@@ -1684,6 +1721,23 @@ class ProductController extends Controller
      * salta -el uuid de HasUuids, el `tenant_id` de BelongsToTenant y los
      * timestamps- hay que ponerlo aqui a mano.
      */
+    /**
+     * El `estado` de una fila del CSV: `published`, `draft` o `null` si no lo dice.
+     *
+     * Acepta las dos parejas -las de la exportacion y las de la base- porque el
+     * archivo puede venir de cualquiera de los dos sitios: lo que escribe
+     * `ExportController` es `publicado`/`borrador`, y quien arma el CSV a mano
+     * mirando la API escribe `published`/`draft`.
+     */
+    private function estadoDeFila(string $texto): ?string
+    {
+        return match (mb_strtolower(trim($texto))) {
+            'publicado', 'published' => 'published',
+            'borrador', 'draft' => 'draft',
+            default => null,
+        };
+    }
+
     /**
      * "Capacidad: 1 TB | Color: Negro" -> [['name' => 'Capacidad', 'value' => '1 TB'], ...].
      *
