@@ -179,6 +179,16 @@ export default function ReviewsPage() {
                         {review.customer_email && (
                           <span className="customer-email">{review.customer_email}</span>
                         )}
+                        {/* ACC-2: una pista para moderar, no una prueba. En una
+                            anónima sale de un teléfono que nadie comprobó. */}
+                        {review.verified_purchase && (
+                          <span
+                            className="verified-badge"
+                            title={review.user_id ? 'Pedido atendido a nombre de su cuenta' : 'El teléfono que escribió coincide con un pedido atendido; nadie comprobó que sea suyo'}
+                          >
+                            {review.user_id ? 'Compra verificada' : 'Compra por teléfono'}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>

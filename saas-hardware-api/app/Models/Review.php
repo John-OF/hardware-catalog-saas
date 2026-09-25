@@ -34,10 +34,17 @@ class Review extends Model
      * defecto. La ficha pública lista las reseñas aprobadas sin token, así que
      * un campo que se serializara solo acabaría publicado. Falla en cerrado, como
      * el costo (MOD-6): una columna nueva de datos personales tampoco se publica
-     * sola. El panel destapa el correo a mano (`ReviewController`); `visitor_id`
-     * y `user_id` no los necesita nadie fuera del servidor.
+     * sola. El panel destapa a mano `VISIBLES_EN_EL_PANEL` (`ReviewController`);
+     * el `visitor_id` no lo necesita nadie fuera del servidor.
      */
     protected $hidden = ['customer_email', 'visitor_id', 'user_id'];
+
+    /**
+     * Lo que el panel sí ve: el correo, y el `user_id` para distinguir al moderar
+     * una compra verificada con cuenta de una que sólo coincidió por teléfono
+     * (ACC-2).
+     */
+    public const VISIBLES_EN_EL_PANEL = ['customer_email', 'user_id'];
 
     protected $casts = [
         'rating'            => 'integer',

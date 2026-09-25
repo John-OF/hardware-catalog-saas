@@ -557,6 +557,8 @@ export interface Review {
   product_id: string;
   customer_name: string;
   customer_email: string | null;
+  /** Sólo en el panel: el público nunca lo recibe (ACC-1). */
+  user_id?: string | null;
   rating: number;
   comment: string | null;
   is_approved: boolean;

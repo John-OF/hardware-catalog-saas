@@ -37,6 +37,13 @@ class PublicCatalogController extends Controller
      * anade una columna a `tenants`, lo que NO puede pasar es que se publique
      * sola por estar en dos sitios y haberse actualizado uno.
      */
+    /**
+     * Dígitos mínimos para que un teléfono cuente como el de un pedido (ACC-2).
+     * Ocho deja fuera coincidencias de azar y cabe en los números más cortos de
+     * la región sin prefijo.
+     */
+    private const MIN_DIGITOS_TELEFONO = 8;
+
     private const COLUMNAS_PUBLICAS_TENANT = [
         'id', 'slug', 'name', 'logo_url', 'primary_color', 'theme', 'whatsapp_number', 'currency',
         'payment_methods', 'delivery_enabled', 'delivery_cost',
@@ -420,6 +427,13 @@ class PublicCatalogController extends Controller
                     }
                 })
                 ->first();
+
+            // ACC-2: mismo motivo que en `storeReview()`. La reseña propia se
+            // pide con un `visitor_id` que pone el navegador, así que mientras
+            // esté pendiente no dice si el teléfono coincidió.
+            if ($userReview && ! $userReview->is_approved) {
+                $userReview->makeHidden('verified_purchase');
+            }
         }
 
         // Algoritmo básico de productos relacionados (Cross-selling)
@@ -600,37 +614,29 @@ class PublicCatalogController extends Controller
             return response()->json(['message' => 'Ya has enviado una reseña para este producto.'], 422);
         }
 
-        // Capa 3: Estado Inteligente (Compra Verificada & Auto-aprobación)
-        $verifiedPurchase = false;
-        $customerPhone = $data['customer_phone'] ?? null;
+        // Capa 3: compra verificada y aprobación (ACC-2).
+        //
+        // Antes se publicaban solas dos cosas que no acreditaban nada: la de
+        // cualquier cliente registrado -el registro es abierto, así que "tener
+        // cuenta" cuesta un formulario- y la de un anónimo cuyo teléfono
+        // coincidiera POR SUFIJO con un pedido atendido: con `customer_phone: "7"`
+        // bastaba con que algún comprador acabara en 7. Las dos se saltaban la
+        // moderación del dueño, que es la única barrera contra la difamación.
+        //
+        // Ahora sólo se publica sola la reseña de quien DE VERDAD compró: un
+        // cliente con sesión de esta tienda con un pedido atendido de este
+        // producto a su nombre. El teléfono de un anónimo se sigue comparando
+        // -para la insignia, que el dueño ve al moderar-, pero ya no aprueba.
+        $compraConCuenta = $cliente && Order::where('tenant_id', $tenant->id)
+            ->where('user_id', $cliente->id)
+            ->where('status', 'attended')
+            ->whereHas('items', fn ($q) => $q->where('product_id', $product->id))
+            ->exists();
 
-        if ($customerPhone) {
-            $cleanPhone = preg_replace('/[^0-9]/', '', $customerPhone);
+        $verifiedPurchase = $compraConCuenta
+            || (! $cliente && $this->telefonoCompro($tenant, $product, $data['customer_phone'] ?? null));
 
-            if (! empty($cleanPhone)) {
-                $verifiedPurchase = Order::where('tenant_id', $tenant->id)
-                    ->where('status', 'attended')
-                    ->where(function ($q) use ($customerPhone, $cleanPhone) {
-                        $q->where('customer_phone', $customerPhone)
-                            ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}"]);
-                    })
-                    ->whereHas('items', function ($iq) use ($product) {
-                        $iq->where('product_id', $product->id);
-                    })
-                    ->exists();
-            }
-        }
-
-        if ($cliente) {
-            // Caso A: Cliente registrado en ESTA tienda
-            $isApproved = true;
-        } elseif ($verifiedPurchase) {
-            // Caso B: Compra Verificada (Anónimo)
-            $isApproved = true;
-        } else {
-            // Caso C: Anónimo Puro (Sin historial de compra)
-            $isApproved = false;
-        }
+        $isApproved = $compraConCuenta;
 
         $review = $product->reviews()->create([
             'tenant_id' => $tenant->id,
@@ -651,11 +657,60 @@ class PublicCatalogController extends Controller
             ? '¡Reseña publicada con éxito!'
             : 'Tu reseña ha sido enviada. Se mostrará en el catálogo una vez aprobada por la tienda.';
 
+        // ACC-2: una reseña pendiente responde IGUAL haya coincidido el teléfono
+        // o no. Si no, la respuesta diría si ese número compró este producto en
+        // esta tienda, a quien escriba el número de otro.
+        if (! $isApproved) {
+            $review->makeHidden('verified_purchase');
+        }
+
         return response()->json([
             'review' => $review,
             'message' => $message,
             'is_approved' => $isApproved,
         ], 201);
+    }
+
+    /**
+     * Si el teléfono que escribió un anónimo es el de un pedido atendido de este
+     * producto (ACC-2).
+     *
+     * Sólo pone la insignia, que el dueño ve al moderar: no aprueba nada, porque
+     * nadie comprueba que el teléfono sea de quien lo escribe. Se compara por
+     * dígitos y con un mínimo de `MIN_DIGITOS_TELEFONO`, admitiendo que uno de
+     * los dos lleve el prefijo del país y el otro no -el checkout lo guarda con
+     * prefijo y la venta de mostrador como lo escriba el dueño-. Antes era un
+     * `LIKE '%{dígitos}'` sin mínimo, y un solo dígito coincidía con cualquiera.
+     */
+    private function telefonoCompro(Tenant $tenant, Product $product, ?string $telefono): bool
+    {
+        $escrito = preg_replace('/\D/', '', (string) $telefono);
+
+        if (strlen($escrito) < self::MIN_DIGITOS_TELEFONO) {
+            return false;
+        }
+
+        // El `LIKE` sólo acota candidatos en la base; quien decide es la
+        // comparación de abajo, en PHP.
+        $candidatos = Order::where('tenant_id', $tenant->id)
+            ->where('status', 'attended')
+            ->whereHas('items', fn ($q) => $q->where('product_id', $product->id))
+            ->whereRaw(
+                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '') LIKE ?",
+                ['%'.substr($escrito, -self::MIN_DIGITOS_TELEFONO)]
+            )
+            ->pluck('customer_phone');
+
+        foreach ($candidatos as $delPedido) {
+            $guardado = preg_replace('/\D/', '', (string) $delPedido);
+            [$corto, $largo] = strlen($guardado) <= strlen($escrito) ? [$guardado, $escrito] : [$escrito, $guardado];
+
+            if (strlen($corto) >= self::MIN_DIGITOS_TELEFONO && str_ends_with($largo, $corto)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

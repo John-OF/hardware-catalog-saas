@@ -47,7 +47,9 @@ class ReviewController extends Controller
         $reviews = $query->paginate(Paginacion::porPagina($request, 15));
 
         // ACC-1: el correo va oculto en el modelo; el panel es el único sitio que lo ve.
-        $reviews->getCollection()->each->makeVisible('customer_email');
+        // El `user_id` distingue al moderar la compra con cuenta de la que sólo
+        // coincidió por teléfono (ACC-2).
+        $reviews->getCollection()->each->makeVisible(Review::VISIBLES_EN_EL_PANEL);
 
         return response()->json($reviews);
     }
@@ -77,7 +79,7 @@ class ReviewController extends Controller
             );
         }
 
-        return response()->json($review->makeVisible('customer_email'));
+        return response()->json($review->makeVisible(Review::VISIBLES_EN_EL_PANEL));
     }
 
     /**

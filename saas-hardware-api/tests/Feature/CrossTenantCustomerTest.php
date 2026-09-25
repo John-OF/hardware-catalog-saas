@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\Tenant;
@@ -76,8 +77,25 @@ class CrossTenantCustomerTest extends TestCase
         $this->assertSame($this->tiendaB->id, $review->tenant_id);
     }
 
-    public function test_una_resenia_del_cliente_de_la_tienda_si_se_auto_aprueba(): void
+    /**
+     * Control del de arriba: el cliente de la casa sí se auto-aprueba. Desde
+     * ACC-2, sólo si además compró el producto -tener cuenta ya no basta, porque
+     * el registro es abierto-; ese caso lo cubre `ResenasCompraVerificadaTest`.
+     */
+    public function test_una_resenia_del_cliente_de_la_tienda_con_compra_si_se_auto_aprueba(): void
     {
+        $pedido = new Order([
+            'customer_name' => 'Cliente B', 'customer_phone' => '51900000000',
+            'status' => 'attended', 'total' => 100,
+        ]);
+        $pedido->tenant_id = $this->tiendaB->id;
+        $pedido->user_id = $this->clienteDeB->id;
+        $pedido->save();
+        $pedido->items()->create([
+            'product_id' => $this->productoDeB->id, 'product_name' => $this->productoDeB->name,
+            'unit_price' => 100, 'quantity' => 1, 'subtotal' => 100,
+        ]);
+
         $this->postReview($this->tokenDe($this->clienteDeB))->assertStatus(201);
 
         $review = Review::withoutGlobalScopes()->sole();

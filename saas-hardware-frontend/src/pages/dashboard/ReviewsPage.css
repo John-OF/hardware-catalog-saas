@@ -193,6 +193,18 @@
   color: var(--text-muted);
 }
 
+:where(.page-reviews) .verified-badge {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--warning);
+  background: var(--warning-glow);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
 /* Las estrellas salen de --warning y no de un ambar fijo: el token ya tiene su
    version clara y su version oscura, y un #fbbf24 quemado se leia mal sobre el
    fondo blanco del panel en modo claro. */
