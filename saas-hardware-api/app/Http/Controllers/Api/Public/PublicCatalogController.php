@@ -923,7 +923,14 @@ class PublicCatalogController extends Controller
         // parte que es del fisco, que la tienda paga igual.
         $impuesto = Impuesto::paraVenta($tenant, round($itemsTotal - $cupon['discount'] + $costoEnvio, 2));
 
-        $userId = auth('sanctum')->id();
+        // ACC-4: el pedido queda a nombre de alguien sólo si es un cliente de ESTA
+        // tienda, con la misma regla que las reseñas. Antes valía cualquier token
+        // que Sanctum resolviera, y el del panel dejaba al dueño como cliente de
+        // su propia tienda. El de otra tienda ya no llegaba -el scope de `User`
+        // filtra por la tienda resuelta-, pero eso era un efecto de rebote, no
+        // una regla de aquí. Comprar sin cuenta sigue siendo legítimo: en esos
+        // casos el pedido entra, sólo que sin dueño.
+        $userId = $this->clienteDeLaTienda($request, $tenant)?->id;
 
         $order = DB::transaction(function () use ($tenant, $data, $lineItems, $impuesto, $entrega, $costoEnvio, $userId, $cupon, $itemsTotal) {
             if ($cupon['coupon']) {

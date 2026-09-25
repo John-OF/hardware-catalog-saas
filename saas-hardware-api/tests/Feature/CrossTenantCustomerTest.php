@@ -125,6 +125,43 @@ class CrossTenantCustomerTest extends TestCase
         $this->assertFalse((bool) Review::withoutGlobalScopes()->sole()->is_approved);
     }
 
+    // ---------------------------------------------------------------- pedidos
+
+    /**
+     * ACC-4: el mismo caso que la reseña, en el checkout. Comprar sin cuenta es
+     * legítimo, así que el pedido entra; lo que no hace es quedar colgado de un
+     * usuario de otra tienda. Este ya pasaba antes del arreglo -el scope de
+     * `User` no deja a Sanctum resolver un usuario de otra tienda- y queda como
+     * regresión: el que fallaba era el del panel, el de abajo.
+     */
+    public function test_un_pedido_con_token_de_otra_tienda_entra_sin_duenio(): void
+    {
+        $this->postOrder($this->tokenDe($this->clienteDeA))->assertStatus(201);
+
+        $pedido = Order::withoutGlobalScopes()->sole();
+
+        $this->assertNull($pedido->user_id, 'El pedido de la tienda B quedo a nombre de un usuario de la A.');
+        $this->assertSame($this->tiendaB->id, $pedido->tenant_id);
+    }
+
+    /** Y el dueño que prueba su propio checkout no queda como cliente de su tienda. */
+    public function test_un_pedido_con_token_del_panel_entra_sin_duenio(): void
+    {
+        $admin = $this->makeUser($this->tiendaB, 'duenio@example.com', 'admin');
+
+        $this->postOrder($admin->createToken('spa-token', ['admin'])->plainTextToken)->assertStatus(201);
+
+        $this->assertNull(Order::withoutGlobalScopes()->sole()->user_id);
+    }
+
+    /** Control: el cliente de la casa sí queda como dueño de su pedido. */
+    public function test_un_pedido_del_cliente_de_la_tienda_queda_a_su_nombre(): void
+    {
+        $this->postOrder($this->tokenDe($this->clienteDeB))->assertStatus(201);
+
+        $this->assertSame($this->clienteDeB->id, Order::withoutGlobalScopes()->sole()->user_id);
+    }
+
     // --------------------------------------- rutas con sesión de cliente obligatoria
 
     /**
@@ -218,6 +255,18 @@ class CrossTenantCustomerTest extends TestCase
     private function conToken(string $token): self
     {
         return $this->withHeaders(['Authorization' => "Bearer {$token}"]);
+    }
+
+    /**
+     * Compra el producto de la tienda B desde su checkout, con token.
+     */
+    private function postOrder(string $token): TestResponse
+    {
+        return $this->conToken($token)->postJson("/api/public/{$this->tiendaB->slug}/orders", [
+            'customer_name'  => 'Quien sea',
+            'customer_phone' => '51911111111',
+            'items'          => [['product_id' => $this->productoDeB->id, 'quantity' => 1]],
+        ]);
     }
 
     /**
