@@ -56,11 +56,13 @@
 <table class="cabecera">
     <tr>
         <td width="60%">
-            @if ($tienda->logo_url)
-                {{-- Si la imagen no se puede descargar, dompdf deja el hueco y no
-                     rompe el documento: el nombre de abajo sigue identificando la
-                     tienda. --}}
-                <img class="logo" src="{{ $tienda->logo_url }}" alt="">
+            @if ($logo)
+                {{-- FUN-20: el logo va empotrado (`data:` URI leído del disco por
+                     `ImageService::logoEmpotrable()`), no como URL: dompdf no
+                     descarga nada remoto, a propósito, y con la URL el logo no
+                     salía nunca. Sin logo empotrable, el nombre de abajo sigue
+                     identificando la tienda. --}}
+                <img class="logo" src="{{ $logo }}" alt="">
                 <br>
             @endif
             <span class="tienda-nombre">{{ $tienda->name }}</span>

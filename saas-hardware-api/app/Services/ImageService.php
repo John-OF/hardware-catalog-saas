@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Encoders\PngEncoder;
 use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\Laravel\Facades\Image;
 
@@ -151,6 +154,85 @@ class ImageService
         }
 
         Storage::disk($this->disco())->delete($relativePath);
+    }
+
+    /**
+     * El logo de la tienda como `data:` URI, para empotrarlo en el PDF de la
+     * cotización (FUN-20). `null` si no hay uno que se pueda empotrar.
+     *
+     * dompdf tiene `enable_remote` apagado, así que un `<img src>` con la URL del
+     * logo no se dibujaba nunca: el logo siempre es remoto (R2, o `/storage` en
+     * local). Encender `enable_remote` NO es el arreglo: `logo_url` la escribe el
+     * dueño, y el servidor iría a descargar lo que él pusiera —la metadata de la
+     * nube incluida—. Aquí se lee del disco de imágenes por su propio cliente, sin
+     * ninguna petición a una URL.
+     *
+     * Por eso solo vale un archivo de este disco y de la carpeta de logo de ESTA
+     * tienda: un logo pegado desde otra web no sale (no se descarga), y una URL
+     * que apunte al logo de otra tienda tampoco —se podría meter en el PDF propio
+     * un archivo ajeno—. Se pasa a PNG y al doble del tamaño con que se imprime:
+     * el PDF no engorda con la foto de 1200 px, y no se depende de que el GD de
+     * dompdf lea WebP, sino del mismo motor que lo escribió al subirlo.
+     *
+     * Si algo falla, el PDF sale sin logo, como antes, en vez de no salir.
+     */
+    public function logoEmpotrable(Tenant $tenant): ?string
+    {
+        $ruta = $this->rutaEnElDisco($tenant->logo_url);
+
+        if ($ruta === null || ! str_starts_with($ruta, "products/{$tenant->slug}/logo/")) {
+            return null;
+        }
+
+        try {
+            $contenido = Storage::disk($this->disco())->get($ruta);
+
+            if ($contenido === null) {
+                return null;
+            }
+
+            $png = Image::decodeBinary($contenido)
+                ->scaleDown(width: 360, height: 112)
+                ->encode(new PngEncoder());
+
+            return 'data:image/png;base64,'.base64_encode($png->toString());
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo empotrar el logo en la cotización', [
+                'tenant_id' => $tenant->id,
+                'ruta' => $ruta,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * La ruta dentro del disco de imágenes de una URL que generó ese mismo disco
+     * con `url()`, o `null` si la URL es de otro sitio.
+     *
+     * Es la operación inversa exacta de cómo se guardaron (`Storage::url()`), y
+     * no la de `borrarArchivo()`, que se queda con lo que venga detrás de
+     * cualquier dominio: para borrar un archivo propio da igual, pero para LEER
+     * algo a partir de una URL que escribe el dueño, no. Si el dominio del disco
+     * cambió desde que se subió la imagen (`TEC-15`), no la reconoce: mejor sin
+     * logo que leer por aproximación.
+     */
+    private function rutaEnElDisco(?string $url): ?string
+    {
+        if (blank($url)) {
+            return null;
+        }
+
+        $base = Storage::disk($this->disco())->url('');
+
+        if ($base === '' || ! str_starts_with($url, $base)) {
+            return null;
+        }
+
+        $ruta = substr($url, strlen($base));
+
+        return $ruta === '' || str_contains($ruta, '..') ? null : $ruta;
     }
 
     /**

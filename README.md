@@ -376,7 +376,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
-| GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | No |
+| GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo —empotrado desde el disco, y solo si se subió: uno pegado de otra web no se descarga (FUN-20)— y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | No |
 | CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | Sí |
 | GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
 | GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) y la columna `tramos` con el precio por mayor (MOD-15) | No |
@@ -449,7 +449,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 836 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 841 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)

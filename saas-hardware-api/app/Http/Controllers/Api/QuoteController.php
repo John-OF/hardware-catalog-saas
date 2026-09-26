@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\ImageService;
 use App\Support\Money;
 use App\Support\StoreUrl;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -34,7 +35,7 @@ use Illuminate\Http\Response;
  */
 class QuoteController extends Controller
 {
-    public function __invoke(Request $request, Order $order): Response
+    public function __invoke(Request $request, Order $order, ImageService $imagenes): Response
     {
         $tenant = app('currentTenant');
 
@@ -64,6 +65,8 @@ class QuoteController extends Controller
         $pdf = Pdf::loadView('cotizacion', [
             'pedido'    => $order,
             'tienda'    => $tenant,
+            // FUN-20: empotrado, no una URL que dompdf no va a descargar.
+            'logo'      => $imagenes->logoEmpotrable($tenant),
             'titulo'    => 'Cotización',
             // El correlativo de la tienda (FUN-3), que es el número que el dueño
             // y el cliente se dicen por teléfono. No se inventa una serie aparte:
