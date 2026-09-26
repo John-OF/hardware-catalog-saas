@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\ValidaVariantes;
 use App\Support\DeLaTienda;
+use App\Support\Subidas;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -56,9 +57,10 @@ class StoreProductRequest extends FormRequest
             'category_id'         => ['nullable', 'uuid', DeLaTienda::existe('categories')],
             'description'         => 'nullable|string|max:5000',
             'specs'               => 'nullable|array',
-            'image'               => 'nullable|image|mimes:jpeg,jpg,png,webp|max:10240',
+            // UI-15: tipo y tope de `config/subidas.php`, que es lo que avisa el navegador.
+            'image'               => ['nullable', 'image', ...Subidas::reglas('imagen')],
             'gallery'             => 'nullable|array',
-            'gallery.*'           => 'image|mimes:jpeg,jpg,png,webp|max:10240',
+            'gallery.*'           => ['image', ...Subidas::reglas('imagen')],
             'is_active'           => 'nullable|boolean',
             'status'              => 'nullable|string|in:draft,published',
             ...$this->reglasDeVariantes(),

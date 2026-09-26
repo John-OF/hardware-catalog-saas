@@ -3,6 +3,7 @@ import './OrdersPage.css';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   Search,
   Eye,
@@ -100,8 +101,7 @@ export default function OrdersPage() {
       }
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al actualizar el pedido';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al actualizar el pedido');
     }
   });
 
@@ -114,8 +114,7 @@ export default function OrdersPage() {
       setSelectedOrder(null);
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al eliminar el pedido';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al eliminar el pedido');
     }
   });
 

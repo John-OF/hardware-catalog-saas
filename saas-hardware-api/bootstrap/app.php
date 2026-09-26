@@ -3,7 +3,10 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -110,5 +113,39 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return redirect(rtrim((string) config('app.frontend_url'), '/').'/login?verificacion=caducada');
+        });
+
+        // UI-15: los 404 y 405 que escribe Laravel llegan en inglés, y el de un
+        // registro que no existe enseña además el nombre interno de la clase
+        // ("No query results for model [App\Models\Product] ..."): es lo que ve
+        // el dueño al guardar algo que otra pestaña acaba de borrar. Los 404 con
+        // texto propio -`abort(404, '...')`, `InitializeTenantBySlug`- no se
+        // tocan, y se distinguen sin mirar el texto: el de Laravel trae de causa
+        // un `ModelNotFoundException`, o llega sin ruta porque ninguna encajó.
+        //
+        // Con esto, todo 4xx de la API trae un `message` en español, que es lo
+        // que deja al panel enseñarlo tal cual (`mensajeDeErrorEnSesion`).
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            if ($e->getPrevious() instanceof ModelNotFoundException) {
+                return response()->json(['message' => 'No se encontró: puede que se haya borrado.'], 404);
+            }
+
+            if ($request->route() === null) {
+                return response()->json(['message' => 'Esa dirección no existe en la API.'], 404);
+            }
+
+            return null;
+        });
+
+        $exceptions->render(function (MethodNotAllowedHttpException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json(['message' => 'Esa dirección de la API no admite esta operación.'], 405);
         });
     })->create();

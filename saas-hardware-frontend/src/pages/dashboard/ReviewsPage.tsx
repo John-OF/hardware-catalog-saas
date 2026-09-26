@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   Search,
   Check,
@@ -50,8 +51,7 @@ export default function ReviewsPage() {
       toast.success('Estado de la reseña actualizado');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al actualizar la reseña';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al actualizar la reseña');
     }
   });
 
@@ -63,8 +63,7 @@ export default function ReviewsPage() {
       toast.success('Reseña eliminada permanentemente');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al eliminar la reseña';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al eliminar la reseña');
     }
   });
 

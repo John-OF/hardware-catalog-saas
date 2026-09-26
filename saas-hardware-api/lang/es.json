@@ -1,0 +1,10 @@
+{
+    "(and :count more error)": "(y :count error más)",
+    "(and :count more errors)": "(y :count errores más)",
+    "The given data was invalid.": "Los datos enviados no son válidos.",
+    "Hello!": "¡Hola!",
+    "Whoops!": "¡Vaya!",
+    "Regards,": "Saludos,",
+    "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\ninto your web browser:": "Si el botón \":actionText\" no funciona, copia y pega esta dirección en tu navegador:",
+    "All rights reserved.": "Todos los derechos reservados."
+}

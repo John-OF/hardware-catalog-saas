@@ -19,6 +19,7 @@ import {
   Bell
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { mensajeDeError } from '../../api/erroresDeFormulario';
 import api from '../../api/axios';
 import { getPublicTenant, getPublicProduct, resolveTenantDomain, createPublicReview, subscribeStockNotification } from '../../api/public';
 import { getPublicPages } from '../../api/pages';
@@ -202,8 +203,7 @@ export default function ProductDetailPage() {
       setIsReviewFormOpen(false);
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al enviar la reseña. Inténtalo de nuevo.';
-      toast.error(msg);
+      toast.error(mensajeDeError(err, { contexto: 'catalogo' }));
       if (widgetIdRef.current && (window as any).turnstile) {
         (window as any).turnstile.reset(widgetIdRef.current);
       }
@@ -221,7 +221,7 @@ export default function ProductDetailPage() {
       setNotifyContact('');
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'No se pudo registrar tu aviso. Inténtalo de nuevo.');
+      toast.error(mensajeDeError(err, { contexto: 'catalogo' }));
     }
   });
 

@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Support\Subidas;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         $this->guardarDeAppDebug();
         $this->guardarDeAlmacenamiento();
         $this->politicaDeContrasenias();
+        $this->mensajesDeValidacion();
 
         // AUD-2: el catalogo publico no tenia ningun limite. La auditoria lo
         // comprobo a mano: 70 peticiones seguidas, 70 respuestas 200, ningun 429.
@@ -209,6 +212,27 @@ class AppServiceProvider extends ServiceProvider
             return config('auth.password_uncompromised')
                 ? $regla->uncompromised()
                 : $regla;
+        });
+    }
+
+    /**
+     * El tope de un archivo en MB y no en kilobytes (UI-15).
+     *
+     * El mensaje de `max` para archivos (`lang/es/validation.php`) dice
+     * ":tamano", y aquí se rellena con `Subidas::legible()`: "10 MB" y no
+     * "10240 kilobytes", que no es un número que nadie tenga en la cabeza. Un
+     * reemplazo propio SUSTITUYE al de Laravel -`makeReplacements()` usa uno u
+     * otro, no los dos-, así que también hay que poner `:max`, que es lo único
+     * que hacía el original y lo que usan los mensajes de texto, número y lista.
+     */
+    private function mensajesDeValidacion(): void
+    {
+        Validator::replacer('max', function (string $mensaje, string $atributo, string $regla, array $parametros) {
+            return str_replace(
+                [':max', ':tamano'],
+                [$parametros[0], Subidas::legible((int) $parametros[0])],
+                $mensaje,
+            );
         });
     }
 }

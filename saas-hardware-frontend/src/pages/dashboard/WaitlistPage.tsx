@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   Bell,
   Check,
@@ -69,7 +70,7 @@ export default function WaitlistPage() {
       toast.success(variables.notified ? 'Marcado como avisado' : 'Vuelve a estar pendiente');
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'No se pudo actualizar el aviso');
+      avisarErrorEnSesion(err, 'No se pudo actualizar el aviso');
     },
   });
 
@@ -81,7 +82,7 @@ export default function WaitlistPage() {
       toast.success('Espera eliminada');
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'No se pudo eliminar la espera');
+      avisarErrorEnSesion(err, 'No se pudo eliminar la espera');
     },
   });
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -26,7 +27,6 @@ import type { PlatformTenantDetail } from '../../api/platform';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
 
-type ApiError = { response?: { data?: { message?: string } } };
 
 const PLANES = ['free', 'pro', 'enterprise'];
 
@@ -80,7 +80,7 @@ export default function PlatformTenantPage() {
       toast.success(tenant.is_active ? `${tenant.name} está activa` : `${tenant.name} quedó suspendida`);
     },
     onError: (error) => {
-      toast.error((error as ApiError).response?.data?.message || 'No se pudo actualizar la tienda.');
+      avisarErrorEnSesion(error, 'No se pudo actualizar la tienda.');
     },
   });
 
@@ -91,7 +91,7 @@ export default function PlatformTenantPage() {
       toast.success(res.message);
     },
     onError: (error) => {
-      toast.error((error as ApiError).response?.data?.message || 'No se pudo enviar el enlace.');
+      avisarErrorEnSesion(error, 'No se pudo enviar el enlace.');
     },
   });
 
@@ -103,7 +103,7 @@ export default function PlatformTenantPage() {
       toast.success(`${usuario.name} ya es administrador. Se le cerró la sesión para que entre con su nuevo acceso.`);
     },
     onError: (error) => {
-      toast.error((error as ApiError).response?.data?.message || 'No se pudo nombrar administrador.');
+      avisarErrorEnSesion(error, 'No se pudo nombrar administrador.');
     },
   });
 
@@ -123,7 +123,7 @@ export default function PlatformTenantPage() {
       navigate('/dashboard');
     },
     onError: (error) => {
-      toast.error((error as ApiError).response?.data?.message || 'No se pudo entrar como soporte.');
+      avisarErrorEnSesion(error, 'No se pudo entrar como soporte.');
     },
   });
 

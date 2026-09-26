@@ -1,7 +1,9 @@
 import './ImageSourceField.css';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { Link2, Upload, Image as ImageIcon } from 'lucide-react';
+import { aceptaDe, pistaDe, problemaDelArchivo, type TipoDeSubida } from '../../utils/subidas';
 
 interface ImageSourceFieldProps {
   label: string;
@@ -12,7 +14,12 @@ interface ImageSourceFieldProps {
   /** Archivo seleccionado (modo "subir"). */
   file: File | null;
   onFileChange: (file: File | null) => void;
-  accept?: string;
+  /**
+   * Qué se sube (UI-15): decide el `accept`, los formatos y el tope que se
+   * enseñan, y la comprobación antes de aceptar el archivo. Salen de
+   * `utils/subidas.ts`, la copia de los topes del servidor.
+   */
+  tipo: TipoDeSubida;
 }
 
 // Campo de imagen que permite elegir entre pegar una URL o subir un archivo,
@@ -24,7 +31,7 @@ export default function ImageSourceField({
   onUrlChange,
   file,
   onFileChange,
-  accept = 'image/*',
+  tipo,
 }: ImageSourceFieldProps) {
   const [mode, setMode] = useState<'url' | 'upload'>(file ? 'upload' : 'url');
   const [preview, setPreview] = useState('');
@@ -80,13 +87,27 @@ export default function ImageSourceField({
           <input
             className="premium-input file-input"
             type="file"
-            accept={accept}
-            onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+            accept={aceptaDe(tipo)}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0] ?? null;
+              const problema = archivo ? problemaDelArchivo(archivo, tipo) : null;
+
+              // UI-15: se avisa aquí, antes de subir nada, con el mismo tope que
+              // el servidor. El archivo anterior se queda, y el input se vacía
+              // para que volver a elegir el mismo archivo vuelva a avisar.
+              if (problema) {
+                toast.error(problema);
+                e.target.value = '';
+                return;
+              }
+
+              onFileChange(archivo);
+            }}
           />
         )}
       </div>
 
-      {hint && <span className="img-source-hint">{hint}</span>}
+      <span className="img-source-hint">{hint ? `${hint} ` : ''}{pistaDe(tipo)}.</span>
 
     </div>
   );

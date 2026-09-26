@@ -9,6 +9,7 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import { getPages, createPage, updatePage, deletePage } from '../../api/pages';
 import type { Page } from '../../types';
 import './PagesPage.css';
@@ -56,8 +57,7 @@ export default function PagesPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al crear la página';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al crear la página');
     }
   });
 
@@ -70,8 +70,7 @@ export default function PagesPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al actualizar la página';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al actualizar la página');
     }
   });
 
@@ -83,8 +82,7 @@ export default function PagesPage() {
       toast.success('Página eliminada');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al eliminar la página';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al eliminar la página');
     }
   });
 

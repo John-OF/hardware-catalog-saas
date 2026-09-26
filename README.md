@@ -288,6 +288,7 @@ app/
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
     ├── DeLaTienda.php      # La regla `exists` acotada a la tienda resuelta (ACC-5)
+    ├── Subidas.php         # Topes de subida (UI-15): sus reglas `mimes`/`max` y el tope en MB
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
@@ -303,10 +304,15 @@ app/
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
 config/plans.php       # La matriz de planes y límites
+config/subidas.php     # Qué se puede subir y cuánto (UI-15). Copia en utils/subidas.ts,
+                       # y un test comprueba que no se separen.
 config/timezones.php   # Zonas horarias que puede elegir una tienda (MOD-13).
                        # El criterio es DONDE HAY TIENDAS, no que moneda usan: sacarla
                        # de las monedas dejo fuera a los paises dolarizados. Copia en
                        # utils/timezones.ts, y un test comprueba que no se separen.
+lang/es/validation.php # Los mensajes de validación en español, con los nombres de los campos
+lang/es.json           # Textos sueltos de Laravel: el recuento de errores y la plantilla de
+                       # correo (UI-15). La aplicación está en español fijo (config/app.php).
 resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-4)
                        # y cotizacion (el PDF de MOD-2)
 routes/api.php         # Toda la API
@@ -443,7 +449,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 812 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 832 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -518,7 +524,8 @@ src/
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes, variants,
 │                   # variantesEnFormulario, plataforma (¿es el host del SaaS?),
-│                   # paymentMethods (qué mostrarle al comprador)
+│                   # paymentMethods (qué mostrarle al comprador), subidas (qué se
+│                   # puede subir y cuánto, copia de config/subidas.php, UI-15)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -571,7 +578,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 195 tests (Vitest + Testing Library, jsdom)
+npm test          # 218 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -579,7 +586,9 @@ npm run test:watch
 variante y su oferta, cambio de tienda), el checkout de `CartDrawer` (lo que se manda a
 `POST /orders`, el mensaje de WhatsApp con el número de pedido, y que un pedido rechazado no vacíe
 el carrito), la validación de variantes del formulario de producto, los mensajes de error de los
-formularios sin sesión (`erroresDeFormulario`), los interceptores de Axios (qué token va a cada
+formularios sin sesión y de las pantallas con sesión (`erroresDeFormulario`, con una guardia que falla
+si una pantalla vuelve a pintar el `message` de un error a mano), el aviso antes de subir un archivo
+(`utils/subidas`, `ImageSourceField`), los interceptores de Axios (qué token va a cada
 ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
 plataforma (`utils/plataforma`), el envío y los métodos de pago en el checkout (`utils/paymentMethods`,
 la selección de entrega y su costo en `CartDrawer`), que el `FormData` de Configuración mande
@@ -699,6 +708,19 @@ tienen tests.
   SQLite —donde corre la suite— no, así que sin declararlo los dos motores no harían lo mismo.
 - **Listados paginados con `Paginacion::porPagina($request, $porDefecto)`**, nunca
   `$request->integer('per_page')` a secas: sin tope, `per_page=100000` devuelve la tabla entera.
+- **La aplicación está en español fijo** (`config/app.php`; `APP_LOCALE` ya no se lee, `UI-15`). Los
+  mensajes de validación están en `lang/es/validation.php` y los textos sueltos de Laravel en
+  `lang/es.json`. **Un campo nuevo en una regla lleva su nombre en `attributes`**, o el mensaje dirá
+  "category id"; `MensajesEnEspanolTest` falla si alguna regla de Laravel se queda sin traducir.
+- **Un archivo que se sube saca su tipo y su tope de `config/subidas.php`** con
+  `Subidas::reglas('tipo')`, nunca `mimes:`/`max:` a mano: el navegador avisa antes de subir con la
+  copia de `utils/subidas.ts`, y `LimitesDeSubidaTest` falla si las dos se separan o si una regla
+  escribe su tope a mano (`UI-15`).
+- **Los errores de la API se pintan con `api/erroresDeFormulario.ts`**, nunca con
+  `err.response?.data?.message` a mano: `mensajeDeErrorEnSesion`/`avisarErrorEnSesion` en el panel y
+  la plataforma, `mensajeDeError`/`avisarError` sin sesión. Con sesión, un 4xx enseña el texto del
+  backend, que siempre llega en español —los 404 y 405 de Laravel se reescriben en
+  `bootstrap/app.php`—; `erroresDeFormulario.guardia.test.ts` falla si el patrón vuelve (`UI-15`).
 - **Un id de una tabla con `tenant_id` se valida con `DeLaTienda::existe('tabla')`**, nunca con
   `exists:tabla,id` a secas (`ACC-5`): la regla del validador consulta la tabla directamente, **no
   pasa por el scope de `BelongsToTenant`**, y un id de otra tienda la supera. Sin tienda resuelta,

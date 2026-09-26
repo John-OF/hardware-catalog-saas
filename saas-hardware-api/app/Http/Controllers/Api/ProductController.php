@@ -16,6 +16,7 @@ use App\Support\CeldaCsv;
 use App\Support\Costos;
 use App\Support\DeLaTienda;
 use App\Support\PlanGate;
+use App\Support\Subidas;
 use App\Support\PreciosPorCantidad;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -263,7 +264,8 @@ class ProductController extends Controller
         PlanGate::ensureAllows('csv_import');
 
         $validado = $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:4096',
+            // UI-15: tipo y tope de `config/subidas.php`.
+            'file' => ['required', 'file', ...Subidas::reglas('csv')],
             'modo' => 'nullable|in:'.implode(',', self::MODOS_DE_IMPORT),
         ]);
 

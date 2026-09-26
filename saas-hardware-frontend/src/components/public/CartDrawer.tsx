@@ -212,8 +212,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       setDeliveryMethod('pickup');
       onClose();
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'No se pudo enviar el pedido. Intenta de nuevo.';
-      toast.error(msg);
+      toast.error(mensajeDeError(err, { contexto: 'catalogo' }));
     } finally {
       setSending(false);
     }

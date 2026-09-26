@@ -9,6 +9,7 @@ use App\Services\DomainVerifier;
 use App\Services\ImageService;
 use App\Support\Bitacora;
 use App\Support\PlanGate;
+use App\Support\Subidas;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,8 @@ class TenantController extends Controller
             'whatsapp_number' => 'sometimes|string|max:20',
             'primary_color' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'logo_url' => 'sometimes|nullable|url|max:500',
-            'logo' => 'nullable|image|mimes:jpeg,png,webp|max:2048',
+            // UI-15: tipos y topes de `config/subidas.php`, los mismos que avisa el navegador.
+            'logo' => ['nullable', 'image', ...Subidas::reglas('logo')],
 
             // Cerrojo de FUN-6: un closure y no `unique:tenants,custom_domain`
             // a secas, porque "ocupado" ya no es una pregunta binaria. Un
@@ -129,12 +131,12 @@ class TenantController extends Controller
             'tax_included' => 'sometimes|boolean',
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
-            'banner' => 'nullable|image|mimes:jpeg,png,webp|max:5120',
+            'banner' => ['nullable', 'image', ...Subidas::reglas('banner')],
             // Sin SVG (TEC-7): un .svg puede llevar <script> dentro y se sirve
             // desde el mismo origen que la tienda, así que aceptarlo es aceptar
             // que un dueño suba JS ejecutable. Los formatos de favicon de verdad
             // son png e ico.
-            'favicon' => 'nullable|file|mimes:png,ico|max:512',
+            'favicon' => ['nullable', 'file', ...Subidas::reglas('favicon')],
 
             // Personalización visual de la tienda (theme JSON)
             'theme' => 'sometimes|nullable|array',

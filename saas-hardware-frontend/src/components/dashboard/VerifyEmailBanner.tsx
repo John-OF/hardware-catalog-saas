@@ -2,6 +2,7 @@ import './VerifyEmailBanner.css';
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { mensajeDeErrorEnSesion } from '../../api/erroresDeFormulario';
 import { MailWarning, Loader2 } from 'lucide-react';
 import { resendVerificationEmail } from '../../api/auth';
 import { useAuthStore } from '../../stores/authStore';
@@ -65,7 +66,7 @@ export default function VerifyEmailBanner() {
       const message =
         error.response?.status === 429
           ? 'Acabas de pedir un correo. Espera un minuto antes de volver a intentarlo.'
-          : error.response?.data?.message || 'No pudimos reenviar el correo. Inténtalo de nuevo en un momento.';
+          : mensajeDeErrorEnSesion(error, 'No pudimos reenviar el correo. Inténtalo de nuevo en un momento.');
       toast.error(message);
     } finally {
       setIsSending(false);

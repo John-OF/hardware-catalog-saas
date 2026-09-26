@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'react-hot-toast';
@@ -9,6 +10,17 @@ import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { unaRamConVariantes, unaTienda, unProducto } from '../../test/fixtures';
 import type { Order } from '../../types';
+
+/**
+ * Como rechaza axios de verdad. Los helpers de `api/erroresDeFormulario.ts` solo
+ * se fían de un `AxiosError`: un objeto suelto con `response` no llega nunca en
+ * la aplicación, y con él el test probaba un caso imposible (UI-15).
+ */
+const errorDelServidor = (status: number, data: unknown) => {
+  const config = { headers: new AxiosHeaders() };
+  const response = { status, data, statusText: '', headers: {}, config } as AxiosResponse;
+  return new AxiosError('fallo', 'ERR_BAD_REQUEST', config, {}, response);
+};
 
 vi.mock('../../api/public', () => ({ createPublicOrder: vi.fn() }));
 vi.mock('../../api/coupons', () => ({ comprobarCupon: vi.fn() }));
@@ -125,9 +137,9 @@ describe('CartDrawer (checkout)', () => {
   it('si el backend rechaza el pedido, enseña su mensaje y no pierde el carrito ni abre WhatsApp', async () => {
     const user = userEvent.setup();
     const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
-    vi.mocked(createPublicOrder).mockRejectedValue({
-      response: { status: 422, data: { message: 'No hay stock suficiente de Kingston Fury (32 GB).' } },
-    });
+    vi.mocked(createPublicOrder).mockRejectedValue(
+      errorDelServidor(422, { message: 'No hay stock suficiente de Kingston Fury (32 GB).' }),
+    );
     llenarCarrito();
     const { onClose } = abrirCarrito();
 
@@ -142,16 +154,17 @@ describe('CartDrawer (checkout)', () => {
     expect(screen.getByRole('button', { name: /Enviar pedido/ })).toBeEnabled();
   });
 
-  it('sin respuesta del servidor dice un texto genérico en vez de callarse', async () => {
+  it('sin respuesta del servidor dice que no se llegó a él, en vez de callarse', async () => {
     const user = userEvent.setup();
-    vi.mocked(createPublicOrder).mockRejectedValue(new Error('Network Error'));
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    vi.mocked(createPublicOrder).mockRejectedValue(new AxiosError('Network Error', 'ERR_NETWORK', { headers: new AxiosHeaders() }, {}));
     llenarCarrito();
     abrirCarrito();
 
     await rellenarDatos(user);
     await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No se pudo enviar el pedido. Intenta de nuevo.'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/No se pudo contactar con el servidor/)));
   });
 
   it('bloquea el botón mientras se envía, para no crear el pedido dos veces', async () => {

@@ -3,6 +3,7 @@ import './CategoriesPage.css';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import { 
   Plus, 
   Edit2, 
@@ -70,8 +71,7 @@ export default function CategoriesPage() {
       toast.success('Orden de categorías actualizado');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al reordenar las categorías';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al reordenar las categorías');
       if (categories) {
         setLocalCategories([...categories].sort((a, b) => a.sort_order - b.sort_order));
       }
@@ -112,8 +112,7 @@ export default function CategoriesPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al crear la categoría';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al crear la categoría');
     }
   });
 
@@ -127,8 +126,7 @@ export default function CategoriesPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al actualizar la categoría';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al actualizar la categoría');
     }
   });
 
@@ -140,8 +138,7 @@ export default function CategoriesPage() {
       toast.success('Categoría eliminada');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al eliminar la categoría';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al eliminar la categoría');
     }
   });
 

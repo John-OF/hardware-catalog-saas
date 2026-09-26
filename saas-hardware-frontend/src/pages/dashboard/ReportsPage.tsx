@@ -2,6 +2,7 @@ import './ReportsPage.css';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { mensajeDeErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   AlertTriangle,
   Download,
@@ -643,10 +644,9 @@ function etiquetaLarga(periodo: string, agrupacion: Agrupacion): string {
 
 /**
  * El rango demasiado largo lo rechaza el servidor con un 422 y un motivo
- * escrito; enseñarlo es más útil que "error al cargar".
+ * escrito; enseñarlo es más útil que "error al cargar". Pasa por
+ * `mensajeDeErrorEnSesion` (UI-15) para que un 500 no llegue como "Server Error".
  */
 function mensajeDeError(error: unknown): string {
-  const respuesta = (error as { response?: { data?: { message?: string } } })?.response;
-
-  return respuesta?.data?.message ?? 'Inténtalo de nuevo en un momento.';
+  return mensajeDeErrorEnSesion(error, 'Inténtalo de nuevo en un momento.');
 }

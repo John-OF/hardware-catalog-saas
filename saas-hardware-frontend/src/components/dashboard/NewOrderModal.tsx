@@ -3,6 +3,7 @@ import './NewOrderModal.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import { Search, Plus, Minus, Trash2, Loader2, ShoppingBag, AlertTriangle } from 'lucide-react';
 import Dialogo from '../ui/Dialogo';
 import { getProducts } from '../../api/products';
@@ -112,9 +113,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
       onClose();
     },
     onError: (err: unknown) => {
-      const response = (err as { response?: { data?: { message?: string } } }).response;
-      const msg = response?.data?.message || 'No se pudo registrar la venta.';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'No se pudo registrar la venta.');
     },
   });
 

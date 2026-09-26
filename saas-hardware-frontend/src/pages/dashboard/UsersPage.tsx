@@ -3,6 +3,7 @@ import './UsersPage.css';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import {
   Plus,
   Loader2,
@@ -76,8 +77,8 @@ export default function UsersPage() {
     queryClient.invalidateQueries({ queryKey: ['plan'] });
   };
 
-  const alFallar = (err: any, porDefecto: string) => {
-    toast.error(err?.response?.data?.message || porDefecto);
+  const alFallar = (err: unknown, porDefecto: string) => {
+    avisarErrorEnSesion(err, porDefecto);
   };
 
   const invitarMutation = useMutation({

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Concerns;
 
 use App\Models\ProductVariant;
+use App\Support\Subidas;
 use Illuminate\Validation\Validator;
 
 /**
@@ -55,7 +56,8 @@ trait ValidaVariantes
             'variants.*.low_stock_threshold' => 'nullable|integer|min:0',
             'variants.*.remove_image' => 'nullable|boolean',
             'variant_images' => 'nullable|array',
-            'variant_images.*' => 'image|mimes:jpeg,jpg,png,webp|max:10240',
+            // UI-15: el mismo tope que la foto de la ficha (`config/subidas.php`).
+            'variant_images.*' => ['image', ...Subidas::reglas('imagen')],
         ];
     }
 

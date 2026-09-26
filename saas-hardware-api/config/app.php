@@ -95,9 +95,18 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    // UI-15: fijo, como la zona horaria de arriba, y no leído del entorno. La
+    // aplicación solo existe en español; con `env()` cada `.env` ya creado
+    // -todos traían `APP_LOCALE=en` del `.env.example`- seguiría en inglés sin
+    // que nada lo delatara, y los errores de validación llegarían al panel como
+    // "The image field must not be greater than 10240 kilobytes.". Los textos
+    // están en `lang/es/validation.php` y `lang/es.json`.
+    'locale' => 'es',
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    // Si falta una traducción, mejor el inglés de Laravel que la clave cruda
+    // ("validation.foo"). Para que no falte ninguna, `MensajesEnEspanolTest`
+    // compara las reglas de `lang/es/validation.php` con las de Laravel.
+    'fallback_locale' => 'en',
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 

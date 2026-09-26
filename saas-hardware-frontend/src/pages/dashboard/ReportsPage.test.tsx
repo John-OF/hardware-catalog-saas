@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,6 +8,17 @@ import ReportsPage from './ReportsPage';
 import { getReport } from '../../api/reports';
 import { exportarReporte } from '../../api/exportaciones';
 import type { Reporte } from '../../api/reports';
+
+/**
+ * Como rechaza axios de verdad. Los helpers de `api/erroresDeFormulario.ts` solo
+ * se fían de un `AxiosError`: un objeto suelto con `response` no llega nunca en
+ * la aplicación, y con él el test probaba un caso imposible (UI-15).
+ */
+const errorDelServidor = (status: number, data: unknown) => {
+  const config = { headers: new AxiosHeaders() };
+  const response = { status, data, statusText: '', headers: {}, config } as AxiosResponse;
+  return new AxiosError('fallo', 'ERR_BAD_REQUEST', config, {}, response);
+};
 
 vi.mock('../../api/reports', () => ({ getReport: vi.fn() }));
 vi.mock('../../api/exportaciones', () => ({ exportarReporte: vi.fn() }));
@@ -175,9 +187,9 @@ describe('ReportsPage (MOD-9)', () => {
   });
 
   it('cuando el servidor rechaza el rango enseña su motivo, no un error genérico', async () => {
-    vi.mocked(getReport).mockRejectedValue({
-      response: { data: { message: 'Por día no se pueden pedir más de 366 días seguidos. Agrupa por mes.' } },
-    });
+    vi.mocked(getReport).mockRejectedValue(
+      errorDelServidor(422, { message: 'Por día no se pueden pedir más de 366 días seguidos. Agrupa por mes.' }),
+    );
     abrir();
 
     expect(await screen.findByText(/no se pueden pedir más de 366 días/i)).toBeInTheDocument();

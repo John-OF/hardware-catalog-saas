@@ -34,6 +34,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import ImageSourceField from '../../components/ui/ImageSourceField';
 import { CURRENCIES, DEFAULT_CURRENCY, formatMoney } from '../../utils/money';
 import { TIMEZONES, DEFAULT_TIMEZONE, etiquetaDeZona } from '../../utils/timezones';
@@ -428,8 +429,7 @@ export default function SettingsPage() {
       toast.success('Configuración de diseño guardada con éxito');
     } catch (err: any) {
       console.error(err);
-      const msg = err?.response?.data?.message ?? 'No se pudo guardar la configuración.';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'No se pudo guardar la configuración.');
     } finally {
       setIsSaving(false);
     }
@@ -450,8 +450,7 @@ export default function SettingsPage() {
       if (res.tenant) setTenant(res.tenant);
       toast.success(res.message);
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'No se pudo comprobar el dominio.';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'No se pudo comprobar el dominio.');
     } finally {
       setIsVerifyingDomain(false);
     }
@@ -534,7 +533,7 @@ export default function SettingsPage() {
               onUrlChange={setLogoUrl}
               file={logoFile}
               onFileChange={setLogoFile}
-              accept="image/jpeg,image/png,image/webp"
+              tipo="logo"
             />
           </div>
         </div>
@@ -1354,7 +1353,7 @@ export default function SettingsPage() {
               onUrlChange={setBannerUrl}
               file={bannerFile}
               onFileChange={setBannerFile}
-              accept="image/jpeg,image/png,image/webp"
+              tipo="banner"
             />
           </div>
         </div>
@@ -1491,12 +1490,12 @@ export default function SettingsPage() {
           <div className="form-group full">
             <ImageSourceField
               label="Favicon (opcional)"
-              hint="Imagen cuadrada pequeña en .png o .ico. Máx 512 KB."
+              hint="Imagen cuadrada pequeña."
               url={faviconUrl}
               onUrlChange={setFaviconUrl}
               file={faviconFile}
               onFileChange={setFaviconFile}
-              accept="image/png,image/x-icon"
+              tipo="favicon"
             />
           </div>
         </div>

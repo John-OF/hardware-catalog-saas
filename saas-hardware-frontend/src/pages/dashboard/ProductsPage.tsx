@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
 import { 
   Plus, 
   Edit2, 
@@ -52,6 +53,7 @@ import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
+import { aceptaDe, formatosDe, LIMITES_DE_SUBIDA, pistaDe, problemaDelArchivo, tamanoLegible } from '../../utils/subidas';
 
 /** Un valor como celda de un CSV separado por ';': entre comillas si lo necesita. */
 const comoCeldaCsv = (valor: string) =>
@@ -208,8 +210,7 @@ export default function ProductsPage() {
       toast.success('Orden de productos actualizado');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al reordenar los productos';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al reordenar los productos');
       if (paginatedData?.data) {
         setProducts(paginatedData.data);
       }
@@ -258,8 +259,7 @@ export default function ProductsPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al crear el producto';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al crear el producto');
     }
   });
 
@@ -273,8 +273,7 @@ export default function ProductsPage() {
       closeModal();
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al actualizar el producto';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al actualizar el producto');
     }
   });
 
@@ -287,8 +286,7 @@ export default function ProductsPage() {
       toast.success('Producto eliminado con éxito');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al eliminar el producto';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al eliminar el producto');
     }
   });
 
@@ -301,8 +299,7 @@ export default function ProductsPage() {
       toast.success('Producto clonado con éxito');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al duplicar el producto';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al duplicar el producto');
     }
   });
 
@@ -316,8 +313,7 @@ export default function ProductsPage() {
       toast.success(data.message || 'Acción masiva aplicada con éxito');
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'Error al ejecutar la acción masiva';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al ejecutar la acción masiva');
     }
   });
 
@@ -397,10 +393,19 @@ export default function ProductsPage() {
   // Image change handler
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+    if (!file) return;
+
+    // UI-15: se avisa antes de subir, con el mismo tope que el servidor, y no
+    // al final de una subida de varios MB que iba a rebotar igual.
+    const problema = problemaDelArchivo(file, 'imagen');
+    if (problema) {
+      toast.error(problema);
+      e.target.value = '';
+      return;
     }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   // Specs helpers
@@ -547,8 +552,7 @@ export default function ProductsPage() {
       }
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.message || 'Error al importar los productos.';
-      toast.error(msg);
+      avisarErrorEnSesion(err, 'Error al importar los productos.');
     } finally {
       setIsImporting(false);
     }
@@ -1034,9 +1038,10 @@ export default function ProductsPage() {
                   ) : (
                     <label className="dropzone-label">
                       <ImageIcon size={28} className="dropzone-icon" />
-                      <span>Subir imagen (.png, .jpg, .webp)</span>
-                      <span className="file-limit">Máx 5MB</span>
-                      <input type="file" accept="image/*" onChange={handleImageChange} style={{display: 'none'}} />
+                      <span>Subir imagen ({formatosDe('imagen')})</span>
+                      {/* UI-15: decía "Máx 5MB" mientras el servidor aceptaba 10. */}
+                      <span className="file-limit">Máx. {tamanoLegible(LIMITES_DE_SUBIDA.imagen.kb)}</span>
+                      <input type="file" accept={aceptaDe('imagen')} onChange={handleImageChange} style={{display: 'none'}} />
                     </label>
                   )}
                 </div>
@@ -1088,10 +1093,19 @@ export default function ProductsPage() {
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Agregar</span>
                     <input 
                       type="file" 
-                      accept="image/*" 
+                      accept={aceptaDe('imagen')} 
                       multiple 
+                      title={pistaDe('imagen')}
                       onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
+                        // UI-15: entran las que se pueden subir y se avisa de
+                        // cada una que no, en vez de descartar la selección
+                        // entera por una foto de más.
+                        const files = Array.from(e.target.files || []).filter((file) => {
+                          const problema = problemaDelArchivo(file, 'imagen');
+                          if (problema) toast.error(problema);
+                          return !problema;
+                        });
+                        e.target.value = '';
                         if (files.length > 0) {
                           setGalleryFiles((prev) => [...prev, ...files]);
                           const newUrls = files.map((file) => URL.createObjectURL(file));
@@ -1469,15 +1483,23 @@ export default function ProductsPage() {
               </div>
 
               <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Selecciona el archivo (.csv)</label>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Selecciona el archivo ({pistaDe('csv')})</label>
                 <input
                   key={inputDeArchivo}
                   type="file"
-                  accept=".csv,text/csv"
+                  accept={aceptaDe('csv')}
                   className="premium-input"
                   onChange={(e) => {
                     const files = e.target.files;
                     if (files && files.length > 0) {
+                      // UI-15: antes de subir, con el tope del servidor.
+                      const problema = problemaDelArchivo(files[0], 'csv');
+                      if (problema) {
+                        toast.error(problema);
+                        e.target.value = '';
+                        setImportFile(null);
+                        return;
+                      }
                       setImportFile(files[0]);
                       setImportReport(null);
                     }

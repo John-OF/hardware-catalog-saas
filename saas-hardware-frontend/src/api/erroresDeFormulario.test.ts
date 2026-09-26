@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'react-hot-toast';
-import { avisarError, mensajeDeError } from './erroresDeFormulario';
+import { avisarError, avisarErrorEnSesion, mensajeDeError, mensajeDeErrorEnSesion } from './erroresDeFormulario';
 
 vi.mock('react-hot-toast', () => {
   const toast = { success: vi.fn(), error: vi.fn() };
@@ -80,5 +80,72 @@ describe('mensajeDeError (UI-11)', () => {
 
     expect(vi.mocked(toast.error).mock.calls[0][1]).toEqual({ id: 'rate-limit' });
     expect(vi.mocked(toast.error).mock.calls[1][1]).toEqual({ id: 'form-error' });
+  });
+});
+
+describe('mensajeDeErrorEnSesion (UI-15)', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockReset();
+    // Un caso de arriba deja `navigator.onLine` en false: aquí se fija a mano.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  });
+
+  /**
+   * Lo que distingue a este helper de `mensajeDeError`: con sesión, un 403 es
+   * nuestro y dice algo que hay que leer. Con `mensajeDeError` saldría como un
+   * "El servidor rechazó la petición (403)" genérico.
+   */
+  it('con sesión, un 403 enseña el texto del backend', () => {
+    const soporte = 'Sesión de soporte: solo lectura. Para cambiar algo, entra el dueño de la tienda.';
+
+    expect(mensajeDeErrorEnSesion(conRespuesta(403, { message: soporte }))).toBe(soporte);
+    expect(mensajeDeError(conRespuesta(403, { message: soporte }), { contexto: 'panel' })).not.toBe(soporte);
+  });
+
+  it('en un 422 enseña el primer error de campo; sin campos, el `message` (el tope del plan)', () => {
+    expect(mensajeDeErrorEnSesion(conRespuesta(422, {
+      message: 'El campo imagen no puede pesar más de 10 MB. (y 1 error más)',
+      errors: { image: ['El campo imagen no puede pesar más de 10 MB.'], name: ['El campo nombre es obligatorio.'] },
+    }))).toBe('El campo imagen no puede pesar más de 10 MB.');
+
+    expect(mensajeDeErrorEnSesion(conRespuesta(422, { message: 'Tu plan permite 50 productos.', code: 'plan_limit' })))
+      .toBe('Tu plan permite 50 productos.');
+  });
+
+  it('un 404 enseña el texto del backend, que desde UI-15 llega en español', () => {
+    expect(mensajeDeErrorEnSesion(conRespuesta(404, { message: 'No se encontró: puede que se haya borrado.' })))
+      .toBe('No se encontró: puede que se haya borrado.');
+  });
+
+  it('un 4xx sin texto cae al de la pantalla, y si no hay, a uno genérico', () => {
+    expect(mensajeDeErrorEnSesion(conRespuesta(409), 'Error al crear la categoría')).toBe('Error al crear la categoría');
+    expect(mensajeDeErrorEnSesion(conRespuesta(409))).toBe('No se pudo completar la acción.');
+  });
+
+  it('401, 413 y 429 tienen su texto, diga lo que diga el backend', () => {
+    expect(mensajeDeErrorEnSesion(conRespuesta(401, { message: 'Unauthenticated.' }))).toBe('Tu sesión caducó. Vuelve a entrar.');
+    // El 413 de nginx trae una página HTML, no JSON.
+    expect(mensajeDeErrorEnSesion(conRespuesta(413, '<html><body>413 Request Entity Too Large</body></html>')))
+      .toBe('El archivo pesa más de lo que admite el servidor.');
+    expect(mensajeDeErrorEnSesion(conRespuesta(429, { message: 'Too Many Attempts.' }))).toMatch(/Demasiados intentos/);
+  });
+
+  it('un 500 no enseña el "Server Error" de Laravel', () => {
+    const texto = mensajeDeErrorEnSesion(conRespuesta(500, { message: 'Server Error' }));
+
+    expect(texto).toMatch(/error interno \(500\)/);
+    expect(texto).not.toMatch(/Server Error/);
+  });
+
+  it('sin respuesta dice lo mismo que en los formularios sin sesión', () => {
+    expect(mensajeDeErrorEnSesion(sinRespuesta())).toBe(mensajeDeError(sinRespuesta(), { contexto: 'panel' }));
+  });
+
+  it('avisarErrorEnSesion comparte el aviso del 429 con el interceptor', () => {
+    avisarErrorEnSesion(conRespuesta(429));
+    avisarErrorEnSesion(conRespuesta(422, { message: 'x' }));
+
+    expect(vi.mocked(toast.error).mock.calls[0][1]).toEqual({ id: 'rate-limit' });
+    expect(vi.mocked(toast.error).mock.calls[1][1]).toEqual({ id: 'error-en-sesion' });
   });
 });

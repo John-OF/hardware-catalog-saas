@@ -1,8 +1,10 @@
 import './EditorDeVariantes.css';
 
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { ImagePlus, Layers, Plus, Trash2, X } from 'lucide-react';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
+import { aceptaDe, pistaDe, problemaDelArchivo } from '../../utils/subidas';
 import {
   MAXIMO_DE_EJES,
   MAXIMO_DE_VARIANTES,
@@ -132,16 +134,24 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
                       </button>
                     </>
                   ) : (
-                    <label className="variant-image-pick" title="Foto de esta variante (opcional)">
+                    <label className="variant-image-pick" title={`Foto de esta variante (opcional): ${pistaDe('imagen')}`}>
                       <ImagePlus size={16} />
                       <input
                         type="file"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept={aceptaDe('imagen')}
                         onChange={(e) => {
                           const archivo = e.target.files?.[0];
-                          if (archivo) {
-                            cambiarFila(fila.clave, { imagen: archivo, vistaPrevia: URL.createObjectURL(archivo), quitarImagen: false });
+                          if (!archivo) return;
+
+                          // UI-15: antes de subir, con el tope del servidor.
+                          const problema = problemaDelArchivo(archivo, 'imagen');
+                          if (problema) {
+                            toast.error(problema);
+                            e.target.value = '';
+                            return;
                           }
+
+                          cambiarFila(fila.clave, { imagen: archivo, vistaPrevia: URL.createObjectURL(archivo), quitarImagen: false });
                         }}
                       />
                     </label>
