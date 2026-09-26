@@ -479,13 +479,17 @@ class PublicCatalogController extends Controller
         $specsString = json_encode($product->specs ?? []);
         $productString = strtolower($product->name.' '.$specsString);
 
+        // FUN-22: los dos `\b` de abajo fueron durante dos semanas un byte de
+        // retroceso invisible que dejó una edición automática, y con él el reorden
+        // no encajaba nunca y nadie lo notó. Lo vigilan dos tests de
+        // `CategoryComponentTypeTest` y `SinCaracteresDeControlTest`.
         $socket = null;
-        if (preg_match('/(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)/i', $productString, $matches)) {
+        if (preg_match('/\b(am5|am4|lga1700|1700|lga1200|1200|lga1151|1151)\b/i', $productString, $matches)) {
             $socket = $matches[1];
         }
 
         $ramType = null;
-        if (preg_match('/(ddr5|ddr4)/i', $productString, $matches)) {
+        if (preg_match('/\b(ddr5|ddr4)\b/i', $productString, $matches)) {
             $ramType = $matches[1];
         }
 

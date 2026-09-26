@@ -236,6 +236,48 @@ class CategoryComponentTypeTest extends TestCase
         $this->assertEqualsCanonicalizing([$placa->id, $ram->id], $primeros);
     }
 
+    /**
+     * `FUN-22`. Dentro de los complementarios, primero lo que comparte socket con
+     * el procesador que se mira. Del 2026-09-10 al 2026-09-25 no funcionó: la
+     * expresión que busca el socket llevaba un carácter de retroceso donde iba
+     * `\b`, así que nunca encajaba y la lista salía por visitas.
+     *
+     * La placa equivocada es la MÁS VISTA a propósito: sin el reorden, el orden
+     * por visitas la pone delante y el test se pone rojo.
+     */
+    public function test_la_placa_que_comparte_socket_va_primero(): void
+    {
+        $cpus   = $this->crearCategoria('CPUs', ComponentType::Cpu);
+        $placas = $this->crearCategoria('Tarjetas base', ComponentType::Motherboard);
+
+        $cpu = $this->crearProducto('Ryzen 5 7600', $cpus->id, ['Socket' => 'AM5']);
+
+        $intel = $this->crearProducto('Placa B760', $placas->id, ['Socket' => 'LGA1700']);
+        $intel->views_count = 900;
+        $intel->save();
+
+        $amd = $this->crearProducto('Placa B650', $placas->id, ['Socket' => 'AM5']);
+
+        $this->assertSame([$amd->id, $intel->id], $this->primerosRelacionados($cpu, 2));
+    }
+
+    /** Lo mismo con el tipo de memoria: la DDR5 antes que la DDR4 más vista. */
+    public function test_la_memoria_del_mismo_tipo_va_primero(): void
+    {
+        $cpus     = $this->crearCategoria('CPUs', ComponentType::Cpu);
+        $memorias = $this->crearCategoria('Memorias', ComponentType::Ram);
+
+        $cpu = $this->crearProducto('Ryzen 5 7600', $cpus->id, ['Memoria compatible' => 'DDR5']);
+
+        $ddr4 = $this->crearProducto('Fury 16GB', $memorias->id, ['Tipo' => 'DDR4']);
+        $ddr4->views_count = 900;
+        $ddr4->save();
+
+        $ddr5 = $this->crearProducto('Fury 32GB', $memorias->id, ['Tipo' => 'DDR5']);
+
+        $this->assertSame([$ddr5->id, $ddr4->id], $this->primerosRelacionados($cpu, 2));
+    }
+
     /** Lo que no es pieza de armado no sugiere complementarios de PC. */
     public function test_lo_que_no_es_pieza_no_tiene_complementarios(): void
     {
@@ -273,7 +315,7 @@ class CategoryComponentTypeTest extends TestCase
         return $categoria;
     }
 
-    private function crearProducto(string $nombre, string $categoryId): Product
+    private function crearProducto(string $nombre, string $categoryId, ?array $specs = null): Product
     {
         $producto = new Product([
             'name'      => $nombre,
@@ -281,12 +323,27 @@ class CategoryComponentTypeTest extends TestCase
             'stock'     => 5,
             'status'    => 'published',
             'is_active' => true,
+            'specs'     => $specs,
         ]);
         $producto->tenant_id   = $this->tenant->id;
         $producto->category_id = $categoryId;
         $producto->save();
 
         return $producto;
+    }
+
+    /**
+     * Los ids de los primeros relacionados que ofrece la ficha de `$producto`.
+     *
+     * @return array<int, string>
+     */
+    private function primerosRelacionados(Product $producto, int $cuantos): array
+    {
+        $relacionados = $this->getJson("/api/public/{$this->tenant->slug}/products/{$producto->id}")
+            ->assertOk()
+            ->json('related_products');
+
+        return array_slice(array_column($relacionados, 'id'), 0, $cuantos);
     }
 
     /** @return array<int, string> */

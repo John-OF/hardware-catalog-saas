@@ -449,7 +449,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 832 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 836 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -721,6 +721,10 @@ tienen tests.
   la plataforma, `mensajeDeError`/`avisarError` sin sesión. Con sesión, un 4xx enseña el texto del
   backend, que siempre llega en español —los 404 y 405 de Laravel se reescriben en
   `bootstrap/app.php`—; `erroresDeFormulario.guardia.test.ts` falla si el patrón vuelve (`UI-15`).
+- **Ningún archivo de código lleva caracteres de control invisibles** (`FUN-22`): un `\b` escrito
+  desde un script puede llegar como el byte de retroceso, que el editor no enseña y que rompió en
+  silencio el orden de los complementarios. `SinCaracteresDeControlTest` revisa el backend y el
+  frontend.
 - **Un id de una tabla con `tenant_id` se valida con `DeLaTienda::existe('tabla')`**, nunca con
   `exists:tabla,id` a secas (`ACC-5`): la regla del validador consulta la tabla directamente, **no
   pasa por el scope de `BelongsToTenant`**, y un id de otra tienda la supera. Sin tienda resuelta,
