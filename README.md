@@ -470,7 +470,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 866 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 868 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -504,6 +504,7 @@ react-hot-toast. CSS propio, sin framework.
 |---|---|
 | `/login` · `/register` | Acceso y alta de tienda |
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
+| `/terminos` · `/privacidad` · `/reembolsos` | Páginas legales de la plataforma, las que Paddle revisa antes de aprobar la cuenta (`INF-15`). Enlazadas desde el pie de la landing y el alta de tienda; sus tres nombres son slugs reservados |
 | `/dashboard` | Resumen con métricas |
 | `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
 | `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
@@ -525,6 +526,7 @@ src/
 ├── router/         # Rutas, PrivateRoute, SoloAdmin (pantallas de admin), Suspense y errorElement
 ├── pages/
 │   ├── auth/       # Login, RegisterStore, ForgotPassword, ResetPassword
+│   ├── legal/      # Terminos, Privacidad, Reembolsos (INF-15) y su marco común, PaginaLegal
 │   ├── dashboard/  # Overview, Products, Categories, Orders, Pages, Reviews,
 │   │               # Waitlist, Users, Activity, Settings (layout en DashboardPage)
 │   ├── platform/   # PlatformLogin, PlatformLayout, PlatformOverview, Platform (tiendas),
@@ -598,13 +600,14 @@ que aquí sólo van valores públicos; una clave secreta nunca va en el frontend
 | `VITE_API_URL` | URL base de la API | `http://localhost:8000/api` |
 | `VITE_TURNSTILE_SITEKEY` | Site key del widget Turnstile | sin ella, el formulario de reseñas queda deshabilitado |
 | `VITE_PLATFORM_HOSTS` | Hosts de la propia plataforma, separados por comas (`plataforma.com,www.plataforma.com`). En ellos `/` es la landing; en cualquier otro host, `/` resuelve la tienda por dominio propio (INF-9). **En producción hay que ponerlo al hacer el build**, o la landing no sale nunca | `localhost,127.0.0.1` |
+| `VITE_LEGAL_TITULAR` · `VITE_LEGAL_CORREO` | Nombre del titular y correo de contacto que salen en las páginas legales (`INF-15`). Son datos personales del dueño, por eso no van en el código | sin ellas, las páginas avisan en pantalla de que no están listas para publicarse |
 
 ```bash
 npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 233 tests (Vitest + Testing Library, jsdom)
+npm test          # 241 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 

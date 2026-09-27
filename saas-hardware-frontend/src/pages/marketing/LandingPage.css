@@ -289,6 +289,25 @@
   color: var(--text-secondary);
 }
 
+:where(.page-landing) .landing-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem 1.25rem;
+}
+
+@media (max-width: 640px) {
+  :where(.page-landing) .landing-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  :where(.page-landing) .landing-footer-links {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 640px) {
   :where(.page-landing) .landing-nav-links {
     gap: 1rem;

@@ -41,6 +41,10 @@ const RegisterStorePage = lazy(() => import('../pages/auth/RegisterStorePage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 
+const TerminosPage = lazy(() => import('../pages/legal/TerminosPage'));
+const PrivacidadPage = lazy(() => import('../pages/legal/PrivacidadPage'));
+const ReembolsosPage = lazy(() => import('../pages/legal/ReembolsosPage'));
+
 const PlatformLoginPage = lazy(() => import('../pages/platform/PlatformLoginPage'));
 const PlatformLayout = lazy(() => import('../pages/platform/PlatformLayout'));
 const PlatformOverviewPage = lazy(() => import('../pages/platform/PlatformOverviewPage'));
@@ -92,6 +96,12 @@ export const router = createBrowserRouter([
   // reservados en el backend, así que ningún catálogo puede ocupar la ruta.
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Páginas legales de la plataforma (INF-15), las que Paddle revisa antes de
+  // aprobar la cuenta. Como '/register', van antes que '/:slug' y sus tres
+  // nombres son slugs reservados en el backend.
+  { path: '/terminos', element: <TerminosPage /> },
+  { path: '/privacidad', element: <PrivacidadPage /> },
+  { path: '/reembolsos', element: <ReembolsosPage /> },
   // Panel del operador del SaaS. 'platform' es slug reservado en el backend,
   // asi que ninguna tienda puede ocupar estas rutas.
   //

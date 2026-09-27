@@ -287,6 +287,13 @@ export default function RegisterStorePage() {
             )}
           </button>
 
+          {/* INF-15: lo que se acepta al crear la tienda, a la vista antes de
+              pulsar el botón. */}
+          <p className="register-legal">
+            Al crear tu tienda aceptas los <Link to="/terminos">términos y condiciones</Link> y
+            la <Link to="/privacidad">política de privacidad</Link>.
+          </p>
+
           <p className="register-footer">
             ¿Ya tienes una tienda? <Link to="/login">Inicia sesión</Link>
           </p>

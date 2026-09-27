@@ -175,6 +175,18 @@
   font-weight: 500;
 }
 
+:where(.page-register-store) .register-legal {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+:where(.page-register-store) .register-legal a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
 :where(.page-register-store) .spinner {
   animation: spin 1s linear infinite;
 }

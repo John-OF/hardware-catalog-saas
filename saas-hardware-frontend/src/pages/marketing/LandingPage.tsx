@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { getPublicPlans } from '../../api/public';
 import type { PublicPlan } from '../../api/public';
+import { PAGINAS_LEGALES } from '../../utils/legal';
 
 /**
  * Landing del SaaS (INF-1).
@@ -193,7 +194,13 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <span>Catálogo de Componentes PC</span>
-        <Link to="/login">Iniciar sesión</Link>
+        {/* INF-15: Paddle revisa que la web enlace estas tres páginas. */}
+        <nav className="landing-footer-links" aria-label="Legal">
+          {PAGINAS_LEGALES.map(({ ruta, titulo }) => (
+            <Link key={ruta} to={ruta}>{titulo}</Link>
+          ))}
+          <Link to="/login">Iniciar sesión</Link>
+        </nav>
       </footer>
     </div>
   );
