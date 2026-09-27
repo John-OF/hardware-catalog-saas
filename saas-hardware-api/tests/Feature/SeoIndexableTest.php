@@ -68,8 +68,9 @@ class SeoIndexableTest extends TestCase
         $this->assertStringContainsString('https://tienda.example/tiendaseo/product/'.$uno->id, $html);
         $this->assertStringContainsString('RTX 4070', $html);
         $this->assertStringContainsString('Ryzen 7 7800X3D', $html);
-        // Y el precio en la moneda de la tienda (OWN-1), no un $ fijo.
-        $this->assertStringContainsString('S/2,800.00', $html);
+        // Y el precio en la moneda de la tienda (OWN-1), no un $ fijo, escrito
+        // como en el catálogo: con el espacio que no se parte (FUN-23).
+        $this->assertStringContainsString("S/\u{A0}2,800.00", $html);
     }
 
     public function test_el_catalogo_no_enseña_borradores_ni_desactivados(): void

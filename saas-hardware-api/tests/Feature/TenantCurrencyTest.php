@@ -99,10 +99,12 @@ class TenantCurrencyTest extends TestCase
     public function test_el_formato_respeta_los_decimales_de_cada_moneda(): void
     {
         // El peso chileno no usa decimales: mostrar "$1.028,98" delata que el
-        // sistema no es de por alli.
-        $this->assertSame('S/1,028.98', Money::format(1028.98, 'PEN'));
-        $this->assertSame('$1,029', Money::format(1028.98, 'CLP'));
-        $this->assertSame('₲1,029', Money::format(1028.98, 'PYG'));
+        // sistema no es de por alli. Y desde FUN-23, cada moneda con sus
+        // separadores y el espacio que no se parte (el resto de casos, en
+        // FormatoDeMonedaTest).
+        $this->assertSame("S/\u{A0}1,028.98", Money::format(1028.98, 'PEN'));
+        $this->assertSame('$1.029', Money::format(1028.98, 'CLP'));
+        $this->assertSame("₲\u{A0}1.029", Money::format(1028.98, 'PYG'));
 
         // Sin moneda o con una desconocida no se inventa un simbolo.
         $this->assertSame('$1,028.98', Money::format(1028.98, null));
@@ -130,8 +132,8 @@ class TenantCurrencyTest extends TestCase
         $mail = (new NewOrderNotification($order->fresh()->load('items')))->toMail($this->admin);
         $texto = implode("\n", array_merge($mail->introLines, $mail->outroLines));
 
-        $this->assertStringContainsString('S/45.50', $mail->subject);
-        $this->assertStringContainsString('S/45.50', $texto);
+        $this->assertStringContainsString("S/\u{A0}45.50", $mail->subject);
+        $this->assertStringContainsString("S/\u{A0}45.50", $texto);
         $this->assertStringNotContainsString('$45.50', $texto);
     }
 }

@@ -314,7 +314,7 @@ app/
     ├── Seo.php            # Lo que ve un buscador (INF-4): contenido, canonico, JSON-LD y sitemap
     ├── Copias.php        # Volcado y comprobacion de la copia de seguridad (INF-7)
     ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
-    ├── Money.php           # Formato de moneda por tienda
+    ├── Money.php           # Formato de moneda por tienda, igual que el panel (FUN-23)
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
     ├── TextoDeCorreo.php   # Escapa el Markdown de un dato antes de meterlo en una linea de correo (SEC-8)
     ├── CeldaCsv.php        # Neutraliza las formulas de una celda del CSV (SEC-7), y las desneutraliza al importar
@@ -322,6 +322,9 @@ app/
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
 config/plans.php       # La matriz de planes y límites
+config/currencies.php  # Monedas que puede elegir una tienda y cómo se escribe cada una:
+                       # separadores y patrón (FUN-23). Copia en utils/money.ts, y un
+                       # test comprueba que no se separen.
 config/subidas.php     # Qué se puede subir y cuánto (UI-15). Copia en utils/subidas.ts,
                        # y un test comprueba que no se separen.
 config/timezones.php   # Zonas horarias que puede elegir una tienda (MOD-13).
@@ -467,7 +470,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 862 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 866 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -601,7 +604,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 230 tests (Vitest + Testing Library, jsdom)
+npm test          # 233 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -661,6 +664,12 @@ tienen tests.
   quien compare lo guardado tiene que mirar las dos formas, como `ImageService::borrarSiNadieLasUsa()`,
   o dará por libre una foto en uso. Cambiar de disco o de CDN ya no rompe las fotos, pero sigue
   pidiendo copiar los archivos con las mismas rutas.
+- **Un precio se escribe con `Money::format()` en el servidor y `formatMoney()` en el navegador,
+  y los dos leen la misma tabla** (`config/currencies.php` y su copia en `utils/money.ts`, `FUN-23`):
+  separadores y patrón escritos por moneda, nunca `Intl` ni `number_format()` a secas. Con cada uno
+  a su aire, la cotización y los correos escribían el precio distinto que el panel en 10 de las 15
+  monedas. `FormatoDeMonedaTest` compara las dos copias, y los mismos casos se prueban en
+  `utils/money.test.ts`.
 - **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
   igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.
