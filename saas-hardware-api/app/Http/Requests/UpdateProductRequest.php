@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\CompruebaArchivosRecibidos;
 use App\Http\Requests\Concerns\ValidaVariantes;
 use App\Support\DeLaTienda;
 use App\Support\Subidas;
@@ -10,6 +11,7 @@ use Illuminate\Validation\Validator;
 
 class UpdateProductRequest extends FormRequest
 {
+    use CompruebaArchivosRecibidos;
     use ValidaVariantes;
 
     public function authorize(): bool
@@ -57,6 +59,8 @@ class UpdateProductRequest extends FormRequest
             'image'               => ['nullable', 'image', ...Subidas::reglas('imagen')],
             'gallery'             => 'nullable|array',
             'gallery.*'           => ['image', ...Subidas::reglas('imagen')],
+            // INF-12: ver StoreProductRequest.
+            ...$this->reglasDeArchivosRecibidos(),
             'deleted_image_ids'   => 'nullable',
             'is_active'           => 'nullable|boolean',
             'status'              => 'nullable|string|in:draft,published',
@@ -76,6 +80,7 @@ class UpdateProductRequest extends FormRequest
         $validator->after(function (Validator $v) {
             $this->comprobarVariantesRepetidas($v);
             $this->comprobarTramos($v);
+            $this->comprobarArchivosRecibidos($v);
         });
     }
 }

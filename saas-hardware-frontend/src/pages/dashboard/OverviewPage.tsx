@@ -11,6 +11,7 @@ import {
   Calendar,
   ArrowRight
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { Link } from 'react-router-dom';
 import { getDashboardStats } from '../../api/dashboard';
 import type { DashboardStats } from '../../api/dashboard';
@@ -136,11 +137,10 @@ export default function OverviewPage() {
                 <div key={product.id} className="list-item-row">
                   <div className="item-left">
                     <div className="product-thumb">
-                      {product.thumbnail_url ? (
-                        <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
-                      ) : (
-                        <Package size={16} className="text-muted" />
-                      )}
+                      <Imagen
+                        loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name}
+                        respaldo={<Package size={16} className="text-muted" />}
+                      />
                     </div>
                     <div className="product-info-text">
                       <h5>{product.name}</h5>

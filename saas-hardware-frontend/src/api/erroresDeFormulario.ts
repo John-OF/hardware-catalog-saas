@@ -171,8 +171,11 @@ export function mensajeDeErrorEnSesion(error: unknown, siNoHayTexto = 'No se pud
     return 'Tu sesión caducó. Vuelve a entrar.';
   }
 
+  // INF-12: el tope de PHP (`post_max_size`) es de la petición entera, no de
+  // cada archivo, y un guardado de producto lleva todas sus fotos juntas: cada
+  // una puede estar por debajo del máximo y la suma no.
   if (status === 413) {
-    return 'El archivo pesa más de lo que admite el servidor.';
+    return 'Lo enviado pesa más de lo que admite el servidor. Si eran varias fotos, guarda con menos y añade el resto después.';
   }
 
   if (status === 429) {

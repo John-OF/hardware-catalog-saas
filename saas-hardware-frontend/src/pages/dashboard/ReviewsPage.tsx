@@ -13,6 +13,7 @@ import {
   ChevronRight,
   MessageSquare
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { getReviews, updateReviewApproval, deleteReview } from '../../api/reviews';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFecha } from '../../utils/fechas';
@@ -156,17 +157,17 @@ export default function ReviewsPage() {
                   <tr key={review.id}>
                     <td>
                       <div className="product-cell">
-                        {review.product?.image_url ? (
-                          <img loading="lazy" decoding="async"
-                            className="product-thumb"
-                            src={review.product.image_url}
-                            alt={review.product.name}
-                          />
-                        ) : (
-                          <div className="product-thumb product-thumb-empty">
-                            <Star size={16} />
-                          </div>
-                        )}
+                        <Imagen
+                          loading="lazy" decoding="async"
+                          className="product-thumb"
+                          src={review.product?.image_url}
+                          alt={review.product?.name}
+                          respaldo={
+                            <div className="product-thumb product-thumb-empty">
+                              <Star size={16} />
+                            </div>
+                          }
+                        />
                         <span className="product-name" title={review.product?.name}>
                           {review.product?.name || 'Producto Eliminado'}
                         </span>

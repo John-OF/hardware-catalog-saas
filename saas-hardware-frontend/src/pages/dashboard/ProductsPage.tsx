@@ -26,6 +26,7 @@ import {
   Bell,
   Download
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { getProducts, createProduct, updateProduct, deleteProduct, importProductsCsv, duplicateProduct, bulkActionProducts, reorderProducts } from '../../api/products';
 import type { ImportReport, ModoDeImport } from '../../api/products';
 import { getCategories } from '../../api/categories';
@@ -53,7 +54,7 @@ import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useEsAdmin } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
-import { aceptaDe, formatosDe, LIMITES_DE_SUBIDA, pistaDe, problemaDelArchivo, tamanoLegible } from '../../utils/subidas';
+import { aceptaDe, conRecuentoDeArchivos, formatosDe, LIMITES_DE_SUBIDA, pistaDe, problemaDelArchivo, tamanoLegible } from '../../utils/subidas';
 
 /** Un valor como celda de un CSV separado por ';': entre comillas si lo necesita. */
 const comoCeldaCsv = (valor: string) =>
@@ -513,6 +514,10 @@ export default function ProductsPage() {
     // quite las variantes de un producto que las tenía.
     agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes, puedeVerCostos);
 
+    // INF-12: lo último, cuando ya están todas las fotos. Si PHP descarta alguna
+    // por `max_file_uploads`, el servidor lo ve y rechaza el guardado.
+    conRecuentoDeArchivos(formData);
+
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, formData });
     } else {
@@ -866,11 +871,10 @@ export default function ProductsPage() {
                       )}
                       <td>
                         <div className="table-img-wrapper">
-                          {product.thumbnail_url ? (
-                            <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
-                          ) : (
-                            <ImageIcon size={18} className="placeholder-icon" />
-                          )}
+                          <Imagen
+                            loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name}
+                            respaldo={<ImageIcon size={18} className="placeholder-icon" />}
+                          />
                         </div>
                       </td>
                       <td>
@@ -1030,7 +1034,7 @@ export default function ProductsPage() {
                 <div className="image-dropzone">
                   {imagePreview ? (
                     <div className="preview-container">
-                      <img loading="lazy" decoding="async" src={imagePreview} alt="Vista previa" />
+                      <Imagen loading="lazy" decoding="async" src={imagePreview} alt="Vista previa" />
                       <button type="button" className="remove-preview" onClick={() => { setImageFile(null); setImagePreview(null); }}>
                         <X size={14} />
                       </button>
@@ -1054,7 +1058,7 @@ export default function ProductsPage() {
                   {/* Existing gallery images */}
                   {existingGallery.map((img) => (
                     <div key={img.id} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                      <img loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Imagen loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button 
                         type="button" 
                         className="remove-preview" 
@@ -1072,7 +1076,7 @@ export default function ProductsPage() {
                   {/* New gallery previews */}
                   {galleryPreviews.map((url, idx) => (
                     <div key={idx} className="preview-container" style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                      <img loading="lazy" decoding="async" src={url} alt="New preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Imagen loading="lazy" decoding="async" src={url} alt="New preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button 
                         type="button" 
                         className="remove-preview" 

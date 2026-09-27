@@ -31,6 +31,7 @@ import {
   User,
   Heart
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import { getPublicFacets, getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
@@ -709,13 +710,14 @@ export default function CatalogPage() {
                                     {comparedProducts.some(p => p.id === product.id) ? '✓ Comparando' : '+ Comparar'}
                                   </button>
                                 )}
-                                {product.thumbnail_url ? (
-                                  <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
-                                ) : (
-                                  <div className="image-placeholder">
-                                    <ShoppingBag size={32} />
-                                  </div>
-                                )}
+                                <Imagen
+                                  loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name}
+                                  respaldo={
+                                    <div className="image-placeholder">
+                                      <ShoppingBag size={32} />
+                                    </div>
+                                  }
+                                />
                                 {product.stock === 0 && (
                                   <span className="card-badge sold-out">Agotado</span>
                                 )}
@@ -841,13 +843,14 @@ export default function CatalogPage() {
               <div className="compare-thumbs">
                 {comparedProducts.map((p) => (
                   <div key={p.id} className="compare-thumb-wrapper">
-                    {p.thumbnail_url ? (
-                      <img loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name} />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                        <ShoppingBag size={16} />
-                      </div>
-                    )}
+                    <Imagen
+                      loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name}
+                      respaldo={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                          <ShoppingBag size={16} />
+                        </div>
+                      }
+                    />
                     <button type="button" onClick={(e) => handleToggleCompare(e, p)} className="remove-thumb-btn">
                       <X size={10} />
                     </button>
@@ -896,13 +899,14 @@ export default function CatalogPage() {
                       {comparedProducts.map((p) => (
                         <th key={p.id} style={{ width: `${80 / comparedProducts.length}%` }}>
                           <div className="compare-header-item">
-                            {p.thumbnail_url ? (
-                              <img loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name} className="compare-header-img" />
-                            ) : (
-                              <div className="compare-header-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                <ShoppingBag size={24} />
-                              </div>
-                            )}
+                            <Imagen
+                              loading="lazy" decoding="async" src={p.thumbnail_url} alt={p.name} className="compare-header-img"
+                              respaldo={
+                                <div className="compare-header-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                  <ShoppingBag size={24} />
+                                </div>
+                              }
+                            />
                             <span className="compare-header-brand">{p.brand || 'Genérico'}</span>
                             <h4 className="compare-header-title">{p.name}</h4>
                             <span className="compare-header-price">

@@ -107,3 +107,21 @@ export function problemaDelArchivo(archivo: File, tipo: TipoDeSubida): string | 
 
   return null;
 }
+
+/**
+ * Apunta en el formulario cuántos archivos lleva (`archivos_enviados`, INF-12).
+ *
+ * PHP descarta en silencio los archivos de una petición que pasan de
+ * `max_file_uploads`, y un guardado de producto puede llevar la foto principal,
+ * la galería y una por variante. Con el recuento, el servidor ve que faltan y
+ * rechaza el guardado diciendo cuántas llegaron, en vez de guardar el producto
+ * con menos fotos. Se llama la última: cuenta lo que ya se añadió.
+ */
+export function conRecuentoDeArchivos(formData: FormData): FormData {
+  let archivos = 0;
+  formData.forEach((valor) => {
+    if (valor instanceof File) archivos += 1;
+  });
+  formData.set('archivos_enviados', String(archivos));
+  return formData;
+}

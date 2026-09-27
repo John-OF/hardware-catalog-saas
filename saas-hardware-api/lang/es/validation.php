@@ -207,6 +207,7 @@ return [
         'gallery' => 'galería',
         'gallery.*' => 'foto :position de la galería',
         'deleted_image_ids' => 'fotos a quitar',
+        'archivos_enviados' => 'fotos enviadas',
         'price_tiers' => 'precio por mayor',
         'variants' => 'variantes',
         'variants.*.sku' => 'SKU de la variante :position',

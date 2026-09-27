@@ -32,6 +32,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { getMe, logoutUser } from '../../api/auth';
 import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
 import SupportBanner from '../../components/dashboard/SupportBanner';
@@ -184,11 +185,12 @@ export default function DashboardPage() {
       <aside className={`dashboard-sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="tenant-logo-placeholder">
-            {tenant?.logo_url ? (
-              <img src={tenant.logo_url} alt={tenant.name} className="tenant-logo-img" />
-            ) : (
-              <Store size={22} className="tenant-logo-icon" />
-            )}
+            <Imagen
+              src={tenant?.logo_url}
+              alt={tenant?.name}
+              className="tenant-logo-img"
+              respaldo={<Store size={22} className="tenant-logo-icon" />}
+            />
           </div>
           <div className="tenant-info">
             <h3>{tenant?.name || 'Cargando...'}</h3>

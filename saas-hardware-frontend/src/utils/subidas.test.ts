@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aceptaDe, formatosDe, pistaDe, problemaDelArchivo, tamanoLegible } from './subidas';
+import { aceptaDe, conRecuentoDeArchivos, formatosDe, pistaDe, problemaDelArchivo, tamanoLegible } from './subidas';
 
 /** Un archivo que dice pesar `bytes` sin reservar esa memoria. */
 const archivo = (nombre: string, bytes: number, type = '') => {
@@ -68,5 +68,29 @@ describe('subidas (UI-15)', () => {
     expect(problemaDelArchivo(archivo('descargada.jfif', 1024, 'image/jpeg'), 'imagen')).toBeNull();
     expect(problemaDelArchivo(archivo('catalogo.csv', 1024, 'application/vnd.ms-excel'), 'csv')).toBeNull();
     expect(problemaDelArchivo(archivo('FOTO.PNG', 1024, ''), 'imagen')).toBeNull();
+  });
+});
+
+describe('conRecuentoDeArchivos (INF-12)', () => {
+  it('cuenta todos los archivos del formulario, estén en el campo que estén', () => {
+    const formData = new FormData();
+    formData.append('name', 'Placa madre');
+    formData.append('image', archivo('principal.jpg', 10));
+    formData.append('gallery[]', archivo('a.jpg', 10));
+    formData.append('gallery[]', archivo('b.jpg', 10));
+    formData.append('variant_images[3]', archivo('negro.jpg', 10));
+    formData.append('specs', '{}');
+
+    expect(conRecuentoDeArchivos(formData).get('archivos_enviados')).toBe('4');
+  });
+
+  it('sin archivos manda 0, y llamarla dos veces no se cuenta a sí misma', () => {
+    const formData = new FormData();
+    formData.append('name', 'Placa madre');
+
+    conRecuentoDeArchivos(formData);
+    conRecuentoDeArchivos(formData);
+
+    expect(formData.getAll('archivos_enviados')).toEqual(['0']);
   });
 });

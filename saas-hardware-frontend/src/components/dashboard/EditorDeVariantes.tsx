@@ -3,6 +3,7 @@ import './EditorDeVariantes.css';
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { ImagePlus, Layers, Plus, Trash2, X } from 'lucide-react';
+import Imagen from '../ui/Imagen';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { aceptaDe, pistaDe, problemaDelArchivo } from '../../utils/subidas';
 import {
@@ -123,7 +124,7 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
                 <div className="variant-row-image">
                   {fila.vistaPrevia && !fila.quitarImagen ? (
                     <>
-                      <img src={fila.vistaPrevia} alt={`Foto de la variante ${n + 1}`} />
+                      <Imagen src={fila.vistaPrevia} alt={`Foto de la variante ${n + 1}`} />
                       <button
                         type="button"
                         className="variant-image-remove"

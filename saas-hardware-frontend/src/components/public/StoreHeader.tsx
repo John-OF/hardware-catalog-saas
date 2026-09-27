@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Store } from 'lucide-react';
+import Imagen from '../ui/Imagen';
 import type { Tenant } from '../../types';
 import './StoreHeader.css';
 
@@ -31,11 +32,7 @@ export default function StoreHeader({ tenant, start, children }: StoreHeaderProp
       {start ?? (tenant && (
         <div className="header-logo-area">
           <div className="store-logo">
-            {tenant.logo_url ? (
-              <img src={tenant.logo_url} alt={tenant.name} />
-            ) : (
-              <Store size={28} />
-            )}
+            <Imagen src={tenant.logo_url} alt={tenant.name} respaldo={<Store size={28} />} />
           </div>
           <h2>{tenant.name}</h2>
         </div>

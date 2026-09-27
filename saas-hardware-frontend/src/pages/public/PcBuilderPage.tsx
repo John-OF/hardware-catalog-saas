@@ -20,6 +20,7 @@ import {
   HelpCircle,
   X
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
@@ -553,11 +554,10 @@ export default function PcBuilderPage() {
                   {selectedProduct ? (
                     <div className="selected-product-preview animate-fade-in">
                       <div className="prod-img">
-                        {selectedProduct.thumbnail_url ? (
-                          <img loading="lazy" decoding="async" src={selectedProduct.thumbnail_url} alt={selectedProduct.name} />
-                        ) : (
-                          <ShoppingBag size={24} />
-                        )}
+                        <Imagen
+                          loading="lazy" decoding="async" src={selectedProduct.thumbnail_url} alt={selectedProduct.name}
+                          respaldo={<ShoppingBag size={24} />}
+                        />
                       </div>
                       <div className="prod-info">
                         <h5>{selectedProduct.name}</h5>
@@ -777,11 +777,10 @@ export default function PcBuilderPage() {
                     return (
                       <div key={product.id} className="drawer-product-card glass-card">
                         <div className="dp-img">
-                          {product.thumbnail_url ? (
-                            <img loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name} />
-                          ) : (
-                            <ShoppingBag size={20} />
-                          )}
+                          <Imagen
+                            loading="lazy" decoding="async" src={product.thumbnail_url} alt={product.name}
+                            respaldo={<ShoppingBag size={20} />}
+                          />
                         </div>
                         <div className="dp-info">
                           <span className="dp-brand">{product.brand || 'Genérico'}</span>

@@ -3,6 +3,7 @@ import './ImageSourceField.css';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Link2, Upload, Image as ImageIcon } from 'lucide-react';
+import Imagen from './Imagen';
 import { aceptaDe, pistaDe, problemaDelArchivo, type TipoDeSubida } from '../../utils/subidas';
 
 interface ImageSourceFieldProps {
@@ -69,8 +70,11 @@ export default function ImageSourceField({
       </div>
 
       <div className="img-source-body">
+        {/* Sin URL, el hueco de siempre; con una que no carga (un logo pegado
+            de una web que ya no existe), el icono de imagen rota de <Imagen>
+            en la misma caja, para que se note antes de guardar (UI-16). */}
         {preview ? (
-          <img loading="lazy" decoding="async" className="img-source-preview" src={preview} alt="" />
+          <Imagen loading="lazy" decoding="async" className="img-source-preview" src={preview} alt="" />
         ) : (
           <span className="img-source-preview placeholder"><ImageIcon size={16} /></span>
         )}

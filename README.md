@@ -76,6 +76,20 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 - **`mysqldump` accesible** para el usuario que corre el cron (`BACKUP_BIN_PATH` si no está en su
   PATH), y `BACKUP_DISK` apuntando a almacenamiento **fuera de este servidor** (`r2`/`s3`): una copia
   en el mismo disco que la base no es una copia
+- **Los topes de PHP y del servidor web, a la altura de los de la aplicación** (`INF-12`). Los de
+  `config/subidas.php` (10 MB por foto) solo valen si la petición llega a Laravel, y un guardado de
+  producto manda **todas** sus fotos juntas: la principal, la galería y una por variante. Valores de
+  partida: `upload_max_filesize = 12M` (cada archivo), `post_max_size = 100M` (la petición entera),
+  `max_file_uploads = 50` (en Pro un guardado puede llevar 39: 1 + 8 de galería + 30 variantes) y, en
+  nginx, `client_max_body_size` **por encima** de `post_max_size` (`110m`): así el que corta es PHP,
+  Laravel responde un 413 y el panel lo traduce; el 413 de nginx sale sin cabeceras CORS y el panel
+  solo ve «no se pudo contactar con el servidor». Pasarse de `max_file_uploads` ya no pierde fotos en
+  silencio: el guardado se rechaza diciendo cuántas llegaron. En local (Laragon) todos son enormes y
+  nada de esto se ve
+- **`memory_limit = 256M` o más** (`INF-14`): cada foto se decodifica entera, y lo que pide depende de
+  sus píxeles, no de lo que pesa (una de 24 MP pesa 4 MB y no cabe en los 128M de fábrica). La
+  aplicación rechaza con un mensaje la foto que no cabría —13 MP con 128M, 40 con 256M— en vez de
+  morir a mitad, así que con poca memoria no se rompe nada: se admiten fotos más pequeñas
 - Opcional en local, **obligatorio en producción**: almacenamiento compatible con S3 (Cloudflare R2)
   para las imágenes
 - Opcional en local, **obligatorio en producción**: claves de
@@ -236,6 +250,8 @@ Flysystem S3 (compatible con Cloudflare R2).
 ```
 app/
 ├── Casts/SanitizedHtml.php        # Limpia el HTML al guardar
+├── Casts/ImagenDelDisco.php       # Columna de imagen: ruta del disco en la base, URL al leer (TEC-15)
+├── Casts/TemaDeTienda.php         # tenants.theme, con portada y favicon como ImagenDelDisco
 ├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8) y
 │                                  # CreateBackup (INF-7), los tres desde el scheduler;
 │                                  # CreateSuperAdmin, a mano
@@ -288,7 +304,9 @@ app/
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
     ├── DeLaTienda.php      # La regla `exists` acotada a la tienda resuelta (ACC-5)
-    ├── Subidas.php         # Topes de subida (UI-15): sus reglas `mimes`/`max` y el tope en MB
+    ├── Subidas.php         # Topes de subida (UI-15): sus reglas `mimes`/`max`, el tope en MB y
+    │                       # los megapíxeles que caben en `memory_limit` (INF-14)
+    ├── ImagenesDelDisco.php  # Ruta del disco <-> URL de una imagen, y el disco de imágenes (TEC-15)
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
@@ -372,7 +390,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET | `/api/plan` | Plan, límites y consumo | Sí |
 | GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | Solo `GET` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
-| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6) | Todo menos `DELETE` |
+| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6). `archivos_enviados`: cuántas fotos manda el formulario; si llegan menos —PHP descarta en silencio las que pasan de `max_file_uploads`—, 422 y no se guarda nada (INF-12). Una foto que no cabría en la memoria de PHP al procesarla, 422 con sus medidas (INF-14) | Todo menos `DELETE` |
 | POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
@@ -449,7 +467,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 841 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 862 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -515,7 +533,8 @@ src/
 │   │               # SupportBanner, InformeDeImport (resultado del import CSV)
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
-│   └── ui/         # Dialogo (ventana flotante del panel), CategoryIcon, ImageSourceField,
+│   └── ui/         # Dialogo (ventana flotante del panel), Imagen (toda imagen,
+│                   # con respaldo si no carga), CategoryIcon, ImageSourceField,
 │                   # ErrorBoundary, fallbacks
 ├── stores/         # Zustand: authStore (admin), customerAuthStore (cliente),
 │                   # platformAuthStore, cartStore (por tienda), tenantStore
@@ -550,6 +569,10 @@ Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartSt
   encima del velo), bloquea el scroll y cierra con Escape. Recibe en `className` la clase de la
   página (`page-products`…) para que sus reglas `:where(.page-x)` sigan llegando al contenido, que es
   `<form className="dialogo-cuerpo">` terminado en `<div className="dialogo-acciones">`.
+- **Toda imagen es `<Imagen>`** (`components/ui/Imagen.tsx`, UI-16), nunca un `<img>` suelto: se le
+  pasa en `respaldo` el hueco que la pantalla pinta sin foto, y lo pinta tanto sin URL como cuando la
+  que hay no carga. Sin `respaldo`, un icono de imagen rota en la misma caja. Lo vigila
+  `Imagen.guardia.test.ts`.
 - El **branding por tienda** se aplica en tiempo de ejecución (`useTenantBranding`, `useTenantTheme`)
   a partir de lo que devuelve la API: variables CSS, modo claro/oscuro, título y favicon.
 - **Los filtros del catálogo viven en la URL**, no en estado local: un enlace compartido reproduce
@@ -578,7 +601,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 218 tests (Vitest + Testing Library, jsdom)
+npm test          # 230 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -628,6 +651,16 @@ tienen tests.
   la respuesta salga con la fila entera de la tienda. Quien necesite la tienda en una respuesta la
   manda en una clave propia. Al añadir una ruta pública, se suma al barrido de
   `RutasPublicasNoExponenDatosInternosTest`.
+- **Las columnas de imagen guardan la ruta dentro del disco, no la URL** (`TEC-15`):
+  `products`, `product_images` y `product_variants` (`image_url`, `thumbnail_url`), `tenants.logo_url`
+  y `banner_url`/`favicon_url` dentro de `tenants.theme`. Los casts `ImagenDelDisco` y `TemaDeTienda`
+  guardan `products/<tienda>/<uuid>.webp` y devuelven la URL completa con el disco de ese momento
+  (`App\Support\ImagenesDelDisco`), así que en PHP y en la API se trabaja siempre con URL. Lo que no
+  es del disco —un logo pegado de otra web, las URL de antes de migrar— se guarda y se lee tal cual.
+  Dos consecuencias: **una consulta con `DB::table` sobre esas columnas ve la ruta, no la URL**, y
+  quien compare lo guardado tiene que mirar las dos formas, como `ImageService::borrarSiNadieLasUsa()`,
+  o dará por libre una foto en uso. Cambiar de disco o de CDN ya no rompe las fotos, pero sigue
+  pidiendo copiar los archivos con las mismas rutas.
 - **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
   igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.

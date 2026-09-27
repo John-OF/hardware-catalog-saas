@@ -33,7 +33,10 @@ class Tenant extends Model implements IsTenant
     protected $casts = [
         'is_active' => 'boolean',
         'is_published' => 'boolean',
-        'theme' => 'array',
+        // TEC-15: el logo, y la portada y el favicon dentro del tema, se guardan
+        // como ruta del disco y se leen como URL completa.
+        'logo_url' => \App\Casts\ImagenDelDisco::class,
+        'theme' => \App\Casts\TemaDeTienda::class,
         'payment_methods' => 'array',
         'delivery_enabled' => 'boolean',
         'delivery_cost' => 'decimal:2',

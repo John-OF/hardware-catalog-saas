@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import {
   getStockNotifications,
   setStockNotificationNotified,
@@ -185,19 +186,18 @@ export default function WaitlistPage() {
                     <tr key={espera.id}>
                       <td>
                         <div className="product-cell">
-                          {espera.product?.thumbnail_url ? (
-                            <img
-                              loading="lazy"
-                              decoding="async"
-                              className="product-thumb"
-                              src={espera.product.thumbnail_url}
-                              alt={espera.product.name}
-                            />
-                          ) : (
-                            <div className="product-thumb product-thumb-empty">
-                              <Package size={16} />
-                            </div>
-                          )}
+                          <Imagen
+                            loading="lazy"
+                            decoding="async"
+                            className="product-thumb"
+                            src={espera.product?.thumbnail_url}
+                            alt={espera.product?.name}
+                            respaldo={
+                              <div className="product-thumb product-thumb-empty">
+                                <Package size={16} />
+                              </div>
+                            }
+                          />
                           <div className="product-info">
                             <span className="product-name" title={espera.product?.name}>
                               {espera.product?.name || 'Producto eliminado'}

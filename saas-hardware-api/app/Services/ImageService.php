@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Tenant;
+use App\Support\ImagenesDelDisco;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -120,11 +121,20 @@ class ImageService
 
     public function borrarSiNadieLasUsa(array $urls): void
     {
-        $urls = array_values(array_unique(array_filter($urls)));
+        // Como URL completa, que es lo que da el cast al leer; si alguien pasa
+        // una ruta, también.
+        $urls = array_values(array_unique(array_map(ImagenesDelDisco::url(...), array_filter($urls))));
 
         if ($urls === []) {
             return;
         }
+
+        // TEC-15: en la base cada foto puede estar como ruta del disco (lo nuevo)
+        // o como URL completa (lo de antes de migrar, o si la migración no ha
+        // corrido). Se busca por las dos formas y lo encontrado se compara como
+        // URL: buscar solo por una daría "nadie la usa" con la foto en uso, y
+        // aquí eso es borrarla.
+        $buscar = array_values(array_unique([...$urls, ...array_map(ImagenesDelDisco::ruta(...), $urls)]));
 
         $enUso = collect();
 
@@ -132,10 +142,10 @@ class ImageService
         // lote de cincuenta productos cuesta lo mismo que uno (AUD-23).
         foreach (['products', 'product_images', 'product_variants'] as $tabla) {
             DB::table($tabla)
-                ->where(fn ($q) => $q->whereIn('image_url', $urls)->orWhereIn('thumbnail_url', $urls))
+                ->where(fn ($q) => $q->whereIn('image_url', $buscar)->orWhereIn('thumbnail_url', $buscar))
                 ->get(['image_url', 'thumbnail_url'])
                 ->each(function ($fila) use (&$enUso) {
-                    $enUso->push($fila->image_url, $fila->thumbnail_url);
+                    $enUso->push(ImagenesDelDisco::url($fila->image_url), ImagenesDelDisco::url($fila->thumbnail_url));
                 });
         }
 
@@ -146,14 +156,18 @@ class ImageService
 
     private function borrarArchivo(string $url): void
     {
-        $path = parse_url($url, PHP_URL_PATH);
-        // Si la URL es local, quitar /storage/ para obtener el path correcto
-        $relativePath = ltrim((string) $path, '/');
-        if (str_starts_with($relativePath, 'storage/')) {
-            $relativePath = substr($relativePath, 8);
+        $ruta = ImagenesDelDisco::ruta($url);
+
+        if (! ImagenesDelDisco::esRutaDelDisco($ruta)) {
+            // Una URL de este disco con otro dominio (de antes de TEC-15, si el
+            // dominio cambió): lo que va detrás de `/storage/` o del dominio.
+            $ruta = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+            if (str_starts_with($ruta, 'storage/')) {
+                $ruta = substr($ruta, 8);
+            }
         }
 
-        Storage::disk($this->disco())->delete($relativePath);
+        Storage::disk($this->disco())->delete($ruta);
     }
 
     /**
@@ -178,9 +192,14 @@ class ImageService
      */
     public function logoEmpotrable(Tenant $tenant): ?string
     {
-        $ruta = $this->rutaEnElDisco($tenant->logo_url);
+        // La inversa exacta de la URL del disco (`ImagenesDelDisco::ruta()`), no
+        // lo que venga detrás de cualquier dominio: para LEER algo a partir de una
+        // URL que escribe el dueño, un logo de otra web no se convierte en una
+        // ruta nuestra. Desde TEC-15 el logo subido se guarda como ruta, así que
+        // un cambio de dominio del disco ya no lo deja fuera.
+        $ruta = ImagenesDelDisco::ruta($tenant->logo_url);
 
-        if ($ruta === null || ! str_starts_with($ruta, "products/{$tenant->slug}/logo/")) {
+        if (! ImagenesDelDisco::esRutaDelDisco($ruta) || ! str_starts_with($ruta, "products/{$tenant->slug}/logo/")) {
             return null;
         }
 
@@ -208,41 +227,12 @@ class ImageService
     }
 
     /**
-     * La ruta dentro del disco de imágenes de una URL que generó ese mismo disco
-     * con `url()`, o `null` si la URL es de otro sitio.
-     *
-     * Es la operación inversa exacta de cómo se guardaron (`Storage::url()`), y
-     * no la de `borrarArchivo()`, que se queda con lo que venga detrás de
-     * cualquier dominio: para borrar un archivo propio da igual, pero para LEER
-     * algo a partir de una URL que escribe el dueño, no. Si el dominio del disco
-     * cambió desde que se subió la imagen (`TEC-15`), no la reconoce: mejor sin
-     * logo que leer por aproximación.
-     */
-    private function rutaEnElDisco(?string $url): ?string
-    {
-        if (blank($url)) {
-            return null;
-        }
-
-        $base = Storage::disk($this->disco())->url('');
-
-        if ($base === '' || ! str_starts_with($url, $base)) {
-            return null;
-        }
-
-        $ruta = substr($url, strlen($base));
-
-        return $ruta === '' || str_contains($ruta, '..') ? null : $ruta;
-    }
-
-    /**
-     * Disco donde viven las imagenes. Estaba repetido en cada metodo; con la
-     * guarda de TEC-10 el valor ya no puede ser una sorpresa en produccion,
-     * pero en local sigue cayendo al disco publico a proposito.
+     * Disco donde viven las imagenes. Vive en `ImagenesDelDisco` desde TEC-15,
+     * porque lo necesita también el cast que arma la URL al leer.
      */
     private function disco(): string
     {
-        return config('filesystems.default') === 'r2' ? 'r2' : 'public';
+        return ImagenesDelDisco::disco();
     }
 
     /**

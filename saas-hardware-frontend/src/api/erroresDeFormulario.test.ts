@@ -126,7 +126,7 @@ describe('mensajeDeErrorEnSesion (UI-15)', () => {
     expect(mensajeDeErrorEnSesion(conRespuesta(401, { message: 'Unauthenticated.' }))).toBe('Tu sesión caducó. Vuelve a entrar.');
     // El 413 de nginx trae una página HTML, no JSON.
     expect(mensajeDeErrorEnSesion(conRespuesta(413, '<html><body>413 Request Entity Too Large</body></html>')))
-      .toBe('El archivo pesa más de lo que admite el servidor.');
+      .toBe('Lo enviado pesa más de lo que admite el servidor. Si eran varias fotos, guarda con menos y añade el resto después.');
     expect(mensajeDeErrorEnSesion(conRespuesta(429, { message: 'Too Many Attempts.' }))).toMatch(/Demasiados intentos/);
   });
 

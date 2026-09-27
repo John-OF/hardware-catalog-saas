@@ -68,6 +68,9 @@ class Product extends Model
         'low_stock_threshold'  => 'integer',
         'is_active'            => 'boolean',
         'sort_order'           => 'integer',
+        // TEC-15: en la base, la ruta dentro del disco; al leer, la URL completa.
+        'image_url'            => \App\Casts\ImagenDelDisco::class,
+        'thumbnail_url'        => \App\Casts\ImagenDelDisco::class,
     ];
 
     protected static function booted()

@@ -56,6 +56,9 @@ class ProductVariant extends Model
         'stock' => 'integer',
         'low_stock_threshold' => 'integer',
         'sort_order' => 'integer',
+        // TEC-15: en la base, la ruta dentro del disco; al leer, la URL completa.
+        'image_url' => \App\Casts\ImagenDelDisco::class,
+        'thumbnail_url' => \App\Casts\ImagenDelDisco::class,
     ];
 
     protected $appends = ['nombre'];

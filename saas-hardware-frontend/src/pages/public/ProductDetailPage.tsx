@@ -18,6 +18,7 @@ import {
   Heart,
   Bell
 } from 'lucide-react';
+import Imagen from '../../components/ui/Imagen';
 import { toast } from 'react-hot-toast';
 import { mensajeDeError } from '../../api/erroresDeFormulario';
 import api from '../../api/axios';
@@ -449,13 +450,17 @@ export default function ProductDetailPage() {
                 que decide la sensacion de rapidez-, asi que aplazarla empeoraria
                 justo lo que el punto quiere mejorar. Igual que los logos de
                 cabecera. */}
-            {activeImage ? (
-              <img src={activeImage} alt={product.name} className="product-main-img" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            ) : (
-              <div className="product-placeholder-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                <ShoppingBag size={64} />
-              </div>
-            )}
+            <Imagen
+              src={activeImage}
+              alt={product.name}
+              className="product-main-img"
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              respaldo={
+                <div className="product-placeholder-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  <ShoppingBag size={64} />
+                </div>
+              }
+            />
           </div>
 
           {/* Gallery thumbnails */}
@@ -482,7 +487,7 @@ export default function ProductDetailPage() {
                     transition: 'var(--transition)',
                   }}
                 >
-                  <img loading="lazy" decoding="async" src={product.thumbnail_url || product.image_url} alt="Main thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                  <Imagen loading="lazy" decoding="async" src={product.thumbnail_url || product.image_url} alt="Main thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
                 </button>
               )}
               {/* Gallery images thumbnails */}
@@ -507,7 +512,7 @@ export default function ProductDetailPage() {
                     transition: 'var(--transition)',
                   }}
                 >
-                  <img loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
+                  <Imagen loading="lazy" decoding="async" src={img.thumbnail_url || img.image_url} alt="Gallery thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }} />
                 </button>
               ))}
             </div>
@@ -833,15 +838,13 @@ export default function ProductDetailPage() {
                   onClick={irALaFicha}
                 >
                   <div style={{ position: 'relative', width: '100%', height: '140px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius-md)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {displayImageUrl ? (
-                      <img loading="lazy" decoding="async" 
-                        src={displayImageUrl} 
-                        alt={p.name} 
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                      />
-                    ) : (
-                      <ShoppingBag size={32} style={{ color: 'var(--text-muted)' }} />
-                    )}
+                    <Imagen
+                      loading="lazy" decoding="async"
+                      src={displayImageUrl}
+                      alt={p.name}
+                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                      respaldo={<ShoppingBag size={32} style={{ color: 'var(--text-muted)' }} />}
+                    />
                     {p.stock === 0 && (
                       <span className="card-badge sold-out" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--danger)', color: 'var(--text-on-primary)', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
                         Agotado
@@ -1269,9 +1272,10 @@ export default function ProductDetailPage() {
             </>
           )}
 
-          <img loading="lazy" decoding="async" 
-            src={activeImage} 
-            alt={product.name} 
+          <Imagen
+            loading="lazy" decoding="async"
+            src={activeImage}
+            alt={product.name}
             onClick={(e) => e.stopPropagation()}
             style={{
               maxWidth: '90vw',

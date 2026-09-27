@@ -78,7 +78,14 @@ class QuoteController extends Controller
             'color'     => $tenant->primary_color ?: '#111827',
             'urlTienda' => StoreUrl::forTenant($tenant),
             'importes'  => $importes,
-        ]);
+        ])
+            // TEC-17: solo los glifos que se usan. El paquete trae el recorte
+            // apagado y empotraba DejaVu Sans y su negrita enteras (unos 730 KB
+            // de los 860 que pesaba el PDF), y esto es lo que el dueño manda por
+            // WhatsApp. Se enciende aquí y no en un `config/dompdf.php` publicado
+            // porque es el único PDF del sistema y así no se copia la config
+            // entera del paquete para cambiar una línea.
+            ->setOption('enable_font_subsetting', true);
 
         // `download` y no `stream`: lo que el dueño hace con esto es mandarlo por
         // WhatsApp o adjuntarlo a un correo, y para eso necesita el archivo.

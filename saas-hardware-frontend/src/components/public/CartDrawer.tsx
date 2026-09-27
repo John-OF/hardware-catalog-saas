@@ -3,6 +3,7 @@ import './CartDrawer.css';
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { X, Trash2, Plus, Minus, ShoppingCart, Loader2, Send, Store, Truck, Wallet } from 'lucide-react';
+import Imagen from '../ui/Imagen';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
@@ -253,9 +254,10 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                 return (
                 <div className="cart-item" key={claveDeLinea(i.product.id, varianteId)}>
                   <div className="cart-item-img">
-                    {miniatura
-                      ? <img loading="lazy" decoding="async" src={miniatura} alt={i.product.name} />
-                      : <ShoppingCart size={18} />}
+                    <Imagen
+                      loading="lazy" decoding="async" src={miniatura} alt={i.product.name}
+                      respaldo={<ShoppingCart size={18} />}
+                    />
                   </div>
                   <div className="cart-item-info">
                     <p className="cart-item-name">{i.product.name}</p>

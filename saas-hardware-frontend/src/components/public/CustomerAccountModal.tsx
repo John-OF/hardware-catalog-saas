@@ -14,6 +14,7 @@ import {
   EyeOff,
   Phone
 } from 'lucide-react';
+import Imagen from '../ui/Imagen';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
 import { avisarError } from '../../api/erroresDeFormulario';
@@ -400,9 +401,13 @@ export default function CustomerAccountModal({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <img loading="lazy" decoding="async" 
-                                src={fav.images?.[0]?.image_url || fav.image_url || 'https://via.placeholder.com/50'} 
-                                alt={fav.name} 
+                              {/* UI-16: sin foto, el respaldo local de <Imagen> en la
+                                  misma caja de 40 px; antes se pedía un hueco a un
+                                  servicio de terceros. */}
+                              <Imagen
+                                loading="lazy" decoding="async"
+                                src={fav.images?.[0]?.image_url || fav.image_url}
+                                alt={fav.name}
                                 style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }}
                               />
                               <div>
