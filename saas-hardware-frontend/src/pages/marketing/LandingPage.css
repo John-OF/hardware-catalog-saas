@@ -140,6 +140,15 @@
   margin: 0 auto 2.5rem;
 }
 
+/* La nota de impuestos va pegada a la introducción de los planes, como una
+   aclaración suya, y no como un párrafo más: el margen negativo se suma al
+   del párrafo de arriba y deja 1rem entre los dos. */
+:where(.page-landing) .landing-plans-impuestos {
+  margin-top: -1.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 :where(.page-landing) .landing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

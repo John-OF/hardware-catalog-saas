@@ -140,6 +140,9 @@ export default function LandingPage() {
           tarjeta. Sube de plan cuando tu catálogo lo pida — bajar de plan nunca borra lo que ya
           tengas creado.
         </p>
+        <p className="landing-section-lead landing-plans-impuestos">
+          Precios en dólares estadounidenses. Los impuestos dependen de tu país y se suman al pagar.
+        </p>
 
         {isLoading || !planes ? (
           <div className="landing-plans-loading">
@@ -151,8 +154,11 @@ export default function LandingPage() {
               <article key={plan.key} className={`landing-plan-card${plan.key === 'pro' ? ' landing-plan-destacado' : ''}`}>
                 {plan.key === 'pro' && <span className="landing-plan-badge">Más elegido</span>}
                 <h3>{plan.label}</h3>
+                {/* "+ impuestos": el cobro va por Paddle, que añade al pagar el
+                    impuesto del país del cliente (7.7b). Sin avisarlo aquí, el
+                    total del checkout sería mayor que el precio anunciado. */}
                 <p className="landing-plan-precio">
-                  US$ {plan.price_usd}<span> /mes</span>
+                  US$ {plan.price_usd}<span> /mes + impuestos</span>
                 </p>
                 <ul className="landing-plan-limites">
                   {ORDEN_LIMITES.filter((clave) => clave in plan.limits).map((clave) => {
