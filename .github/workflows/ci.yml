@@ -40,13 +40,20 @@ jobs:
           path: saas-hardware-api/vendor
           key: composer-${{ hashFiles('saas-hardware-api/composer.lock') }}
 
+      # TEC-18: el .env va ANTES de composer install. La instalacion termina con
+      # `php artisan package:discover`, que arranca la aplicacion; sin .env,
+      # APP_ENV cae a `production` y la guarda de imagenes de TEC-10 se niega a
+      # arrancar sin R2. Con el .env detras, este job se cayo en "Instalar
+      # dependencias" del 2026-09-06 al 2026-09-27 y ningun test de la API llego
+      # a correr aqui, sin que nadie lo viera.
+      - name: Crear .env
+        run: cp .env.example .env
+
       - name: Instalar dependencias
         run: composer install --prefer-dist --no-interaction --no-progress
 
-      - name: Preparar entorno
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+      - name: Generar APP_KEY
+        run: php artisan key:generate
 
       - name: Tests
         run: php artisan test

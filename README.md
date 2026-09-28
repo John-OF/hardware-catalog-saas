@@ -102,8 +102,8 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 ```bash
 # API
 cd saas-hardware-api
+cp .env.example .env          # ANTES de composer install (ver debajo)
 composer install
-cp .env.example .env
 php artisan key:generate
 # Configurar DB_CONNECTION y DB_* en .env
 php artisan migrate
@@ -122,6 +122,12 @@ npm run dev                   # http://localhost:5173
 - Panel: `http://localhost:5173/login`
 - Catálogo público: `http://localhost:5173/{slug}`
 
+**El `.env` va antes de `composer install`** (`TEC-18`): la instalación termina con
+`php artisan package:discover`, que arranca la aplicación, y sin `.env` Laravel se da por
+**producción** —es el valor por defecto de `APP_ENV`— y la guarda de las imágenes (`TEC-10`) se niega
+a arrancar sin R2. Con el orden al revés, `composer install` acaba en error; es lo que tuvo el CI
+de la API en rojo del 2026-09-06 al 2026-09-27 sin llegar a correr un test.
+
 `composer dev` levanta servidor, cola, logs y Vite a la vez, que es la forma corta de lo anterior.
 
 ### Al desplegar una versión nueva
@@ -138,6 +144,12 @@ migraciones: si sube sin ellas, falla. Hoy hay dos casos con consecuencias grave
 `add_is_published_to_tenants_table` (sin ella, todo el catálogo público da error) y
 `add_origen_to_activity_logs_table` (sin ella fallan suspender una tienda, cambiarle el plan o entrar
 como soporte). `php artisan migrate:status` dice cuáles faltan.
+
+**Si el despliegue construye una imagen** (un `RUN composer install` en un Dockerfile, o la fase de
+build de un PaaS) **sin las variables de entorno** del servidor, `composer install` falla por lo
+mismo que en la puesta en marcha (`TEC-18`): arranca la aplicación sin entorno y la guarda de
+`TEC-10` la para. Ahí se instala con `--no-scripts`; el manifiesto de paquetes lo genera Laravel en
+el primer arranque, ya con el entorno puesto.
 
 Y **reiniciar el worker de colas** (`INF-13`):
 

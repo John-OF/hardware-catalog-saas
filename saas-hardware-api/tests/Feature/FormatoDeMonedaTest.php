@@ -88,8 +88,11 @@ class FormatoDeMonedaTest extends TestCase
         preg_match('/export const CURRENCIES[^{]*\{(.*?)\n\};/s', file_get_contents($archivo), $bloque);
         $this->assertNotEmpty($bloque, 'No se encontró CURRENCIES en utils/money.ts.');
 
+        // `\r?` antes del fin de línea (TEC-18): el frontend no tiene .gitattributes,
+        // así que un clon en Windows (autocrlf) lo trae con CRLF y, sin él, el test
+        // no lee ninguna moneda.
         preg_match_all(
-            "/^\s*([A-Z]{3}): \{ label: '[^']*', simbolo: '([^']*)', decimales: (\d+), miles: '([^']*)', decimal: '([^']*)', patron: '([^']*)' \},$/m",
+            "/^\s*([A-Z]{3}): \{ label: '[^']*', simbolo: '([^']*)', decimales: (\d+), miles: '([^']*)', decimal: '([^']*)', patron: '([^']*)' \},\r?$/m",
             $bloque[1], $filas, PREG_SET_ORDER,
         );
 
