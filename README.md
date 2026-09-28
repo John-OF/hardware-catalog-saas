@@ -351,7 +351,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 66 archivos, 697 tests (+1 en tests/Unit)
+tests/Feature/         # 84 archivos, 867 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
