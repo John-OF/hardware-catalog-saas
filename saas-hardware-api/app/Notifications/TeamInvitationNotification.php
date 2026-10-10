@@ -10,7 +10,7 @@ use Illuminate\Notifications\Notification;
 use Spatie\Multitenancy\Jobs\NotTenantAware;
 
 /**
- * Invitacion a administrar una tienda (FUN-4).
+ * Invitacion al equipo de una tienda (FUN-4), con el texto de su rol (FUN-24).
  *
  * **Reutiliza el token del broker de recuperacion de contrasenia**, no inventa
  * uno propio. El invitado no tiene contrasenia todavia, asi que lo que necesita
@@ -71,14 +71,31 @@ class TeamInvitationNotification extends Notification implements ShouldQueue, No
         $invitadoPor = TextoDeCorreo::enLinea($this->invitadoPor);
         $tienda = TextoDeCorreo::enLinea($this->tienda);
 
+        // FUN-24: el texto dice el rol de verdad. Antes decia "administrar" a
+        // todos, tambien al colaborador, que al entrar veia menos de lo prometido.
+        // Se lee del usuario y no se pasa al construir: encolada, la notificacion
+        // vuelve a cargarlo de la base al enviarse, asi que un reenvio despues
+        // de cambiarle el rol ya sale con el rol nuevo. Cualquier cosa que no sea
+        // `admin` se trata como colaborador: si hay que equivocarse, que sea
+        // prometiendo menos.
+        $esAdmin = $notifiable->role === 'admin';
+
+        $asunto = $esAdmin
+            ? "{$this->invitadoPor} te invitó a administrar {$this->tienda}"
+            : "{$this->invitadoPor} te invitó a colaborar en {$this->tienda}";
+
+        $acceso = $esAdmin
+            ? "{$invitadoPor} te dio acceso al panel de **{$tienda}** como **administrador**: puedes gestionarlo todo, también la configuración de la tienda y el equipo."
+            : "{$invitadoPor} te dio acceso al panel de **{$tienda}** como **colaborador**, para el día a día: pedidos, productos, reseñas y la lista de espera.";
+
         return (new MailMessage)
-            ->subject("{$this->invitadoPor} te invito a administrar {$this->tienda}")
+            ->subject($asunto)
             ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
-            ->line("{$invitadoPor} te dio acceso al panel de administracion de **{$tienda}**.")
-            ->line('Para entrar solo falta que elijas tu contrasenia.')
-            ->action('Elegir mi contrasenia', $url)
-            ->line("Este enlace caduca en {$minutos} minutos. Si se te pasa, pide una nueva invitacion o usa la opcion de recuperar contrasenia con este mismo correo.")
-            ->line('Si no esperabas esta invitacion, puedes ignorar este correo: sin elegir contrasenia no se puede entrar.')
+            ->line($acceso)
+            ->line('Para entrar solo falta que elijas tu contraseña.')
+            ->action('Elegir mi contraseña', $url)
+            ->line("Este enlace caduca en {$minutos} minutos. Si se te pasa, pide una nueva invitación o usa la opción de recuperar la contraseña con este mismo correo.")
+            ->line('Si no esperabas esta invitación, puedes ignorar este correo: sin elegir contraseña no se puede entrar.')
             ->salutation('Un saludo, el equipo de '.config('app.name'));
     }
 }

@@ -250,8 +250,11 @@ class QueuedMailWithRealQueueTest extends TestCase
             'vendedor@tienda-cola.com',
             $mensajes[0]->getEnvelope()->getRecipients()[0]->getAddress(),
         );
+        // Sin decir rol se invita como colaborador, y desde FUN-24 el asunto lo
+        // dice: antes esta linea esperaba "te invito a administrar", o sea que
+        // daba por bueno justo el fallo.
         $this->assertStringContainsString(
-            'te invito a administrar Tienda Cola',
+            'te invitó a colaborar en Tienda Cola',
             $mensajes[0]->getOriginalMessage()->getSubject(),
         );
     }

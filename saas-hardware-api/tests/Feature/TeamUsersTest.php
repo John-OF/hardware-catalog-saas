@@ -211,6 +211,64 @@ class TeamUsersTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('role');
     }
 
+    // ------------------------------------------- el texto de la invitación
+
+    /**
+     * FUN-24: el correo decía "te invitó a administrar" a todos, también al
+     * colaborador, que al entrar veía bastante menos de lo prometido.
+     */
+    public function test_la_invitacion_de_un_colaborador_no_promete_administrar(): void
+    {
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Vendedor Nuevo',
+            'email' => 'vendedor@equipo.test',
+        ])->assertCreated();
+
+        [$asunto, $html] = $this->correoDeLaInvitacion('vendedor@equipo.test');
+
+        $this->assertSame("{$this->duenio->name} te invitó a colaborar en Tienda Equipo", $asunto);
+        // El HTML del correo lleva estilos en linea: `<strong style="...">`.
+        $this->assertMatchesRegularExpression('/<strong[^>]*>colaborador<\/strong>/', $html);
+        $this->assertStringNotContainsString('administr', $asunto.$html);
+    }
+
+    public function test_la_invitacion_de_un_administrador_lo_dice(): void
+    {
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Socia',
+            'email' => 'socia@equipo.test',
+            'role'  => 'admin',
+        ])->assertCreated();
+
+        [$asunto, $html] = $this->correoDeLaInvitacion('socia@equipo.test');
+
+        $this->assertSame("{$this->duenio->name} te invitó a administrar Tienda Equipo", $asunto);
+        $this->assertMatchesRegularExpression('/<strong[^>]*>administrador<\/strong>/', $html);
+    }
+
+    /**
+     * El reenvío dice el rol de AHORA. Si al invitado lo hicieron administrador
+     * antes de entrar, el correo nuevo no puede seguir llamándole colaborador.
+     */
+    public function test_el_reenvio_dice_el_rol_que_tiene_ahora(): void
+    {
+        $this->comoDuenio()->postJson('/api/users', [
+            'name'  => 'Vendedor Nuevo',
+            'email' => 'vendedor@equipo.test',
+        ])->assertCreated();
+
+        $invitado = User::where('email', 'vendedor@equipo.test')->firstOrFail();
+        $this->comoDuenio()->putJson("/api/users/{$invitado->id}", ['role' => 'admin'])->assertOk();
+
+        // Se olvida la primera invitación: solo cuenta el reenvío.
+        Notification::fake();
+        $this->comoDuenio()->postJson("/api/users/{$invitado->id}/resend-invitation")->assertOk();
+
+        [$asunto] = $this->correoDeLaInvitacion('vendedor@equipo.test');
+
+        $this->assertSame("{$this->duenio->name} te invitó a administrar Tienda Equipo", $asunto);
+    }
+
     public function test_el_correo_no_se_repite_dentro_de_la_tienda(): void
     {
         $this->comoDuenio()->postJson('/api/users', [
@@ -493,6 +551,26 @@ class TeamUsersTest extends TestCase
         $usuario->save();
 
         return $usuario;
+    }
+
+    /**
+     * Asunto y HTML de la invitación que recibió ese correo, renderizada con el
+     * usuario tal como está en la base: es lo que hace la cola al enviarla.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function correoDeLaInvitacion(string $email): array
+    {
+        $invitado = User::where('email', $email)->firstOrFail();
+        $correo = null;
+
+        Notification::assertSentTo($invitado, TeamInvitationNotification::class, function ($notificacion) use ($invitado, &$correo) {
+            $correo = $notificacion->toMail($invitado->fresh());
+
+            return true;
+        });
+
+        return [$correo->subject, (string) $correo->render()];
     }
 
     /** El token que viajó en el correo de invitación. */
