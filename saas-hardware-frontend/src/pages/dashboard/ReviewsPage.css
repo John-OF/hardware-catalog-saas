@@ -65,18 +65,9 @@
   color: var(--text-muted);
 }
 
-:where(.page-reviews) .search-input,
-:where(.page-reviews) .filter-select {
-  width: 100%;
-  padding: 0.6rem;
-  background: rgba(var(--overlay-mix), 0.03);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  outline: none;
-}
-
+/* Solo medidas: fondo, borde, color y foco los pone `.premium-input`, igual que
+   en Clientes, Pedidos y Actividad (UI-17). Esta barra era la única del panel
+   con un estilo propio, y se veía distinta de todas las demás. */
 :where(.page-reviews) .search-input {
   padding-left: 2.25rem;
 }
@@ -86,11 +77,14 @@
 }
 
 :where(.page-reviews) .filter-select option {
-  background: var(--bg-select-option);
+  background-color: var(--bg-select-option);
+  color: var(--text-primary);
 }
 
-:where(.page-reviews) .filter-estado { width: 160px; }
-:where(.page-reviews) .filter-rating { width: 150px; }
+/* Más anchos que antes de UI-17: el relleno de `.premium-input` es mayor que el
+   que tenían, y con 160/150 px el texto de la opción salía cortado. */
+:where(.page-reviews) .filter-estado { width: 220px; }
+:where(.page-reviews) .filter-rating { width: 190px; }
 
 /* Estados de carga y vacio */
 

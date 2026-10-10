@@ -95,7 +95,7 @@ export default function ReviewsPage() {
           <Search size={18} className="search-icon" />
           <input
             type="text"
-            className="search-input"
+            className="premium-input search-input"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Buscar por cliente, comentario o producto..."
@@ -103,7 +103,7 @@ export default function ReviewsPage() {
         </div>
 
         <select
-          className="filter-select filter-estado"
+          className="premium-input filter-select filter-estado"
           value={isApproved}
           onChange={(e) => { setIsApproved(e.target.value); setPage(1); }}
         >
@@ -113,7 +113,7 @@ export default function ReviewsPage() {
         </select>
 
         <select
-          className="filter-select filter-rating"
+          className="premium-input filter-select filter-rating"
           value={rating}
           onChange={(e) => { setRating(e.target.value); setPage(1); }}
         >
