@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agregarVariantesAlFormulario,
+  avisoAlQuitarVariante,
   problemaDeVariantes,
   varianteVacia,
   variantesDesdeProducto,
@@ -116,5 +117,37 @@ describe('variantesDesdeProducto', () => {
     expect(filas[1].sale_price).toBe('55.5');
     // Y al volver a guardar sin tocar, el formulario pide el valor que falta.
     expect(problemaDeVariantes(ejes, filas)).toBe('A la variante 1 le falta el valor de alguna opción.');
+  });
+});
+
+describe('las esperas de cada variante (FUN-25)', () => {
+  it('vienen del listado; una variante nueva no tiene ninguna', () => {
+    const { filas } = variantesDesdeProducto([
+      unaVariante({ id: 'v-16', waitlist_count: 3 }),
+      unaVariante({ id: 'v-32', options: [{ name: 'Capacidad', value: '32 GB' }] }),
+    ]);
+
+    expect(filas.map((f) => f.esperas)).toEqual([3, 0]);
+    expect(varianteVacia(['Capacidad']).esperas).toBe(0);
+  });
+
+  it('no viajan al guardar: son del listado, no de la variante', () => {
+    const formData = new FormData();
+    agregarVariantesAlFormulario(formData, ['Capacidad'], [fila({ esperas: 4 })]);
+
+    expect(formData.get('variants') as string).not.toContain('esperas');
+  });
+
+  it('sin nadie esperando no hay aviso', () => {
+    expect(avisoAlQuitarVariante(fila({ esperas: 0 }))).toBeNull();
+  });
+
+  it('el aviso dice cuántos esperan, qué variante y qué pasa al guardar', () => {
+    const aviso = avisoAlQuitarVariante(fila({ valores: ['32 GB'], esperas: 2 }));
+
+    expect(aviso).toMatch(/^Hay 2 personas esperando a que «32 GB» vuelva a tener stock\./);
+    expect(aviso).toContain('se borran de la lista de espera');
+    expect(aviso).toContain('déjala con stock 0');
+    expect(avisoAlQuitarVariante(fila({ esperas: 1 }))).toMatch(/^Hay 1 persona esperando/);
   });
 });

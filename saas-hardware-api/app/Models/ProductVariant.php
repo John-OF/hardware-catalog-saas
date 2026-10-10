@@ -7,6 +7,7 @@ use App\Notifications\BackInStockNotification;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -80,6 +81,17 @@ class ProductVariant extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Quien espera ESTA variante en la lista de espera. La clave foranea borra
+     * esas filas en cascada al borrar la variante, y por eso el panel las cuenta
+     * (FUN-25): para que el formulario avise antes de quitar una variante con
+     * gente esperando.
+     */
+    public function stockNotifications(): HasMany
+    {
+        return $this->hasMany(StockNotification::class, 'variant_id');
     }
 
     /**

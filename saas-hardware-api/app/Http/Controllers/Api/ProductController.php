@@ -74,8 +74,18 @@ class ProductController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $products = Product::with(['category', 'images', 'variants'])
-            ->withCount(['stockNotifications as waitlist_count' => fn($q) => $q->whereNull('notified_at')])
+        // FUN-25: cada variante trae sus esperas pendientes, como la ficha. El
+        // formulario se abre con lo que devuelve este listado y avisa antes de
+        // quitar una variante con gente esperando, porque al guardar la base
+        // borra esas esperas en cascada.
+        $pendientes = fn ($q) => $q->whereNull('notified_at');
+
+        $products = Product::with([
+            'category',
+            'images',
+            'variants' => fn ($q) => $q->withCount(['stockNotifications as waitlist_count' => $pendientes]),
+        ])
+            ->withCount(['stockNotifications as waitlist_count' => $pendientes])
             ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
             // INF-6: la misma busqueda que el catalogo publico y que la
             // exportacion. Antes esta no miraba la marca, asi que buscar

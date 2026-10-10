@@ -40,6 +40,11 @@ export interface VarianteEnFormulario {
   vistaPrevia: string | null;
   /** Marcar para borrar la foto guardada. */
   quitarImagen: boolean;
+  /**
+   * Cuántos esperan esta variante (FUN-25): viene del listado y no se guarda.
+   * 0 en una variante nueva.
+   */
+  esperas: number;
 }
 
 const nuevaClave = () => `nueva-${Math.random().toString(36).slice(2, 10)}`;
@@ -57,6 +62,7 @@ export const varianteVacia = (ejes: string[]): VarianteEnFormulario => ({
   imagen: null,
   vistaPrevia: null,
   quitarImagen: false,
+  esperas: 0,
 });
 
 /**
@@ -84,9 +90,26 @@ export const variantesDesdeProducto = (variantes: ProductVariant[] = []) => {
     imagen: null,
     vistaPrevia: v.thumbnail_url ?? v.image_url,
     quitarImagen: false,
+    esperas: Number(v.waitlist_count ?? 0) || 0,
   }));
 
   return { ejes, filas };
+};
+
+/**
+ * El aviso antes de quitar una variante con gente esperando (FUN-25), o `null`
+ * si no la espera nadie. Al guardar, la base borra esas esperas junto con la
+ * variante, y hasta ahora nada en el formulario lo decía.
+ */
+export const avisoAlQuitarVariante = (fila: VarianteEnFormulario): string | null => {
+  if (fila.esperas <= 0) return null;
+
+  const nombre = fila.valores.filter((v) => v.trim()).join(' / ') || 'esta variante';
+  const quienes = fila.esperas === 1 ? 'Hay 1 persona esperando' : `Hay ${fila.esperas} personas esperando`;
+
+  return `${quienes} a que «${nombre}» vuelva a tener stock. Si quitas la variante y guardas el producto, `
+    + 'se borran de la lista de espera y nadie les avisará.\n\n'
+    + 'Si solo está agotada, mejor déjala con stock 0: al reponerla, la lista de espera sigue sirviendo.';
 };
 
 /**

@@ -2,11 +2,12 @@ import './EditorDeVariantes.css';
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { ImagePlus, Layers, Plus, Trash2, X } from 'lucide-react';
+import { Bell, ImagePlus, Layers, Plus, Trash2, X } from 'lucide-react';
 import Imagen from '../ui/Imagen';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { aceptaDe, pistaDe, problemaDelArchivo } from '../../utils/subidas';
 import {
+  avisoAlQuitarVariante,
   MAXIMO_DE_EJES,
   MAXIMO_DE_VARIANTES,
   varianteVacia,
@@ -73,6 +74,13 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
   };
 
   const quitarFila = (clave: string) => {
+    // FUN-25: al guardar, la base borra en cascada a quien esperaba esta
+    // variante. Se pregunta con el mismo `window.confirm` que el resto de
+    // borrados del panel; sin nadie esperando, se quita sin preguntar.
+    const fila = filas.find((f) => f.clave === clave);
+    const aviso = fila ? avisoAlQuitarVariante(fila) : null;
+    if (aviso && !window.confirm(aviso)) return;
+
     const quedan = filas.filter((f) => f.clave !== clave);
     // Sin variantes no quedan ejes que nombrar.
     onChange(quedan.length === 0 ? [] : ejes, quedan);
@@ -223,6 +231,12 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
                       ? `Precio por mayor (${fila.price_tiers.length})`
                       : 'Precio por mayor'}
                   </button>
+                  {/* FUN-25: a la vista antes de pulsar "Quitar variante". */}
+                  {fila.esperas > 0 && (
+                    <span className="variant-waitlist" title="Personas esperando a que esta variante vuelva a tener stock">
+                      <Bell size={11} /> {fila.esperas} en espera
+                    </span>
+                  )}
                 </div>
 
                 <button type="button" className="variant-icon-btn danger" onClick={() => quitarFila(fila.clave)} title="Quitar variante">

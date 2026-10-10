@@ -204,3 +204,19 @@
   font-size: 0.68rem;
   color: var(--text-muted);
 }
+
+/* Quien espera esta variante (FUN-25). Mismo aspecto que la insignia "en
+   espera" del listado de Productos, para que se lea igual en los dos sitios.
+   `align-self` para que no se estire a lo ancho de la columna. */
+.variant-waitlist {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}

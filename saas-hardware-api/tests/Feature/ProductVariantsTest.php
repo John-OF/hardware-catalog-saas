@@ -216,6 +216,72 @@ class ProductVariantsTest extends TestCase
         $this->assertSame(7, $producto->stock);
     }
 
+    // --- Quitar una variante con gente esperando (FUN-25) --------------------
+
+    /**
+     * El listado del panel dice cuántos esperan CADA variante, sin contar a
+     * quien ya fue avisado. Es lo que usa el formulario para avisar antes de
+     * quitar una.
+     */
+    public function test_el_listado_del_panel_cuenta_las_esperas_de_cada_variante(): void
+    {
+        $producto = $this->crearMemoria();
+        $v32 = $this->varianteDe($producto, '32 GB');
+
+        $this->esperar($producto, $v32, 'uno@correo.com');
+        // Por teléfono también cuenta: esa espera la atiende el dueño a mano.
+        $this->esperar($producto, $v32, '+51 999 111 222');
+        $this->esperar($producto, $v32, 'avisado@correo.com', avisado: true);
+        // Espera la ficha, no una variante.
+        $this->esperar($producto, null, 'ficha@correo.com');
+
+        $variantes = collect($this->comoDuenio()->getJson('/api/products')->assertOk()->json('data.0.variants'))
+            ->keyBy('nombre');
+
+        $this->assertSame(2, $variantes['32 GB']['waitlist_count']);
+        $this->assertSame(0, $variantes['16 GB']['waitlist_count']);
+        $this->assertSame(0, $variantes['8 GB']['waitlist_count']);
+    }
+
+    /**
+     * Lo que promete el aviso del formulario: quitar la variante y guardar se
+     * lleva a quien la esperaba, porque la clave foránea borra en cascada. Se
+     * mira por el contacto y no por `variant_id`: con un `set null` la fila
+     * seguiría ahí, sin variante, y el aviso diría algo falso.
+     */
+    public function test_quitar_una_variante_borra_sus_esperas_y_no_las_de_las_demas(): void
+    {
+        $producto = $this->crearMemoria();
+        $v16 = $this->varianteDe($producto, '16 GB');
+        $v32 = $this->varianteDe($producto, '32 GB');
+        $v8 = $this->varianteDe($producto, '8 GB');
+
+        $this->esperar($producto, $v32, 'treinta@correo.com');
+        $this->esperar($producto, $v8, 'ocho@correo.com');
+
+        $this->comoDuenio()->putJson("/api/products/{$producto->id}", [
+            'variants' => [
+                $this->variante('16 GB', 50, 4, id: $v16->id),
+                $this->variante('8 GB', 30, 2, id: $v8->id),
+            ],
+        ])->assertOk();
+
+        $contactos = StockNotification::withoutTenant()->where('product_id', $producto->id)->pluck('customer_contact')->all();
+        $this->assertSame(['ocho@correo.com'], $contactos);
+    }
+
+    private function esperar(Product $producto, ?ProductVariant $variante, string $contacto, bool $avisado = false): void
+    {
+        StockNotification::create([
+            'tenant_id' => $this->tienda->id,
+            'product_id' => $producto->id,
+            'variant_id' => $variante?->id,
+            'customer_name' => 'Espera '.$contacto,
+            'customer_contact' => $contacto,
+            'notified_at' => $avisado ? now() : null,
+        ]);
+    }
+
     public function test_dos_variantes_con_las_mismas_opciones_se_rechazan(): void
     {
         $this->comoDuenio()->postJson('/api/products', [

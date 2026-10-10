@@ -321,6 +321,11 @@ export interface ProductVariant {
   image_url: string | null;
   thumbnail_url: string | null;
   sort_order: number;
+  /**
+   * Cuántos esperan esta variante en la lista de espera, sin contar a quien ya
+   * se avisó (FUN-25). Solo lo trae el listado del panel.
+   */
+  waitlist_count?: number;
 }
 
 export interface CartItem {
