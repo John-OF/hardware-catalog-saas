@@ -39,6 +39,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // contrasenias, asi que protegerlo solo a partir del token habria
             // dejado abierto justo lo que hay que cerrar.
             'platform.ip' => \App\Http\Middleware\RestrictPlatformIp::class,
+            // En produccion, un operador sin la verificacion en dos pasos solo
+            // puede activarla: el resto del panel de plataforma le dice que no
+            // (SEC-9). Va en el grupo, asi que una ruta nueva nace protegida.
+            'platform.dos-pasos' => \App\Http\Middleware\EnsurePlatformDosPasos::class,
         ]);
 
         // TEC-9: withMiddleware() instala por defecto un redirect de invitados

@@ -20,6 +20,12 @@ const platformApi = axios.create({
 
 export const PLATFORM_TOKEN_KEY = 'platform_token';
 
+/** El `motivo` del 403 de `EnsurePlatformDosPasos` (SEC-9). */
+export const MOTIVO_DOS_PASOS_PENDIENTE = 'dos_pasos_pendiente';
+
+/** La pantalla donde el operador activa la verificación en dos pasos. */
+export const RUTA_DE_SEGURIDAD = '/platform/seguridad';
+
 platformApi.interceptors.request.use((config) => {
   const token = sessionStorage.getItem(PLATFORM_TOKEN_KEY);
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
@@ -35,9 +41,53 @@ platformApi.interceptors.response.use(
       sessionStorage.removeItem(PLATFORM_TOKEN_KEY);
       window.location.href = '/platform/login';
     }
+    // SEC-9: salvo el 403 que dice que falta activar la verificación en dos
+    // pasos (en producción es obligatoria). Ese lleva `motivo`, y la única
+    // pantalla que sirve entonces es la de activarla.
+    if (
+      error.response?.status === 403
+      && error.response?.data?.motivo === MOTIVO_DOS_PASOS_PENDIENTE
+      && window.location.pathname !== RUTA_DE_SEGURIDAD
+    ) {
+      window.location.href = RUTA_DE_SEGURIDAD;
+    }
     return Promise.reject(error);
   },
 );
+
+/** Lo que el panel sabe de la verificación en dos pasos del operador (SEC-9). */
+export interface SeguridadDelOperador {
+  dos_pasos: boolean;
+  /** En producción, sin ella el panel solo deja activarla. */
+  obligatoria: boolean;
+  activada_el: string | null;
+  codigos_restantes: number | null;
+}
+
+/** Sesión abierta: con la contraseña sola, o con ella y el código. */
+export interface SesionDePlataforma {
+  token: string;
+  user: User;
+  seguridad: SeguridadDelOperador;
+}
+
+/**
+ * Lo que devuelve la contraseña: la sesión, o —con el segundo paso activo— un
+ * desafío que hay que completar con el código (SEC-9).
+ */
+export type RespuestaDelLogin = SesionDePlataforma | { requiere_dos_pasos: true; desafio: string };
+
+export const pideSegundoPaso = (
+  respuesta: RespuestaDelLogin,
+): respuesta is { requiere_dos_pasos: true; desafio: string } => 'requiere_dos_pasos' in respuesta;
+
+/** Lo que hace falta para dar de alta la cuenta en la app de autenticación. */
+export interface ActivacionDeDosPasos {
+  /** La clave, por si el QR no se puede escanear. */
+  secreto: string;
+  enlace: string;
+  qr_svg: string;
+}
 
 /** Tienda tal como la lista el panel de plataforma, con sus contadores. */
 export interface PlatformTenant extends Tenant {
@@ -47,8 +97,34 @@ export interface PlatformTenant extends Tenant {
   created_at: string;
 }
 
-export const platformLogin = async (email: string, password: string): Promise<{ token: string; user: User }> => {
-  const { data } = await platformApi.post<{ token: string; user: User }>('/platform/login', { email, password });
+export const platformLogin = async (email: string, password: string): Promise<RespuestaDelLogin> => {
+  const { data } = await platformApi.post<RespuestaDelLogin>('/platform/login', { email, password });
+  return data;
+};
+
+/** El segundo paso del login: el código de la app o uno de recuperación (SEC-9). */
+export const platformLoginConCodigo = async (desafio: string, codigo: string): Promise<SesionDePlataforma> => {
+  const { data } = await platformApi.post<SesionDePlataforma>('/platform/login/dos-pasos', { desafio, codigo });
+  return data;
+};
+
+export const getPlatformMe = async (): Promise<{ user: User; seguridad: SeguridadDelOperador }> => {
+  const { data } = await platformApi.get<{ user: User; seguridad: SeguridadDelOperador }>('/platform/me');
+  return data;
+};
+
+export const iniciarDosPasos = async (): Promise<ActivacionDeDosPasos> => {
+  const { data } = await platformApi.post<ActivacionDeDosPasos>('/platform/dos-pasos');
+  return data;
+};
+
+export const confirmarDosPasos = async (
+  codigo: string,
+): Promise<{ codigos: string[]; seguridad: SeguridadDelOperador }> => {
+  const { data } = await platformApi.post<{ codigos: string[]; seguridad: SeguridadDelOperador }>(
+    '/platform/dos-pasos/confirmar',
+    { codigo },
+  );
   return data;
 };
 

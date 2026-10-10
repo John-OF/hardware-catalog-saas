@@ -79,6 +79,11 @@
   background: var(--bg-card, rgba(127, 127, 127, 0.12));
 }
 
+/* SEC-9: la verificación en dos pasos sin activar se ve desde el menú. */
+:where(.page-platform) .platform-nav-alerta {
+  color: var(--warning);
+}
+
 /* Lo que usan varias pantallas del panel. Vive aquí y no en la hoja de la
    primera que lo estrenó porque las hojas de página viajan en su propio chunk:
    `.platform-filters` definido en PlatformPage.css solo existe con el listado

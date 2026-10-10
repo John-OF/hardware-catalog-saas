@@ -266,7 +266,7 @@ app/
 ├── Casts/TemaDeTienda.php         # tenants.theme, con portada y favicon como ImagenDelDisco
 ├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8) y
 │                                  # CreateBackup (INF-7), los tres desde el scheduler;
-│                                  # CreateSuperAdmin, a mano
+│                                  # CreateSuperAdmin y RemoveOperatorTwoFactor (SEC-9), a mano
 ├── Enums/ComponentType.php        # Qué pieza de PC vende una categoría
 ├── Exceptions/PlanLimitException  # 422 con la clave del límite alcanzado
 ├── Http/
@@ -285,7 +285,8 @@ app/
 │   │   ├── CouponController.php            # Cupones de descuento (MOD-4)
 │   │   ├── DashboardController.php         # Métricas
 │   │   ├── PlanController.php              # Plan, límites y consumo
-│   │   ├── PlatformController.php          # Panel del operador
+│   │   ├── PlatformController.php          # Panel del operador, y su login en dos pasos
+│   │   ├── PlatformDosPasosController.php  # Activar la verificación en dos pasos del operador (SEC-9)
 │   │   └── Public/
 │   │       ├── PublicCatalogController.php # Catálogo, ficha, reseñas, pedidos, avisos
 │   │       ├── PublicAuthController.php    # Cuentas de cliente (incluida su recuperación de contraseña)
@@ -299,6 +300,7 @@ app/
 │   │   ├── EnsureAdmin.php · EnsureSuperAdmin.php
 │   │   ├── EnsureTenantCustomer.php        # El token es de ESTA tienda
 │   │   ├── RestrictPlatformIp.php          # Lista de IPs del panel de plataforma
+│   │   ├── EnsurePlatformDosPasos.php      # En producción, sin 2FA el operador solo puede activarlo (SEC-9)
 │   │   └── RestrictImpersonation.php       # Sesión de soporte: el panel, en solo lectura
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
 ├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
@@ -330,6 +332,7 @@ app/
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
     ├── TextoDeCorreo.php   # Escapa el Markdown de un dato antes de meterlo en una linea de correo (SEC-8)
     ├── CeldaCsv.php        # Neutraliza las formulas de una celda del CSV (SEC-7), y las desneutraliza al importar
+    ├── DosPasos.php        # Verificación en dos pasos del operador (SEC-9): códigos, desafío, recuperación
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
@@ -351,7 +354,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 84 archivos, 867 tests (+1 en tests/Unit)
+tests/Feature/         # 85 archivos, 892 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -426,8 +429,10 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/platform/login` · `/logout` | Sesión del operador |
-| GET | `/api/platform/me` · `/tenants` | Perfil y listado de tiendas |
+| POST | `/api/platform/login` · `/logout` | Sesión del operador. Con la verificación en dos pasos activa, la contraseña no da el token sino `{requiere_dos_pasos, desafio}` |
+| POST | `/api/platform/login/dos-pasos` | Segundo paso del login (SEC-9): `desafio` + `codigo` (el de la app o uno de recuperación). Un desafío dura 5 min y muere al quinto código equivocado; ese fallo va en `errors.desafio` y el del código en `errors.codigo` |
+| POST | `/api/platform/dos-pasos` · `/dos-pasos/confirmar` | Activar la verificación en dos pasos: semilla y QR; y confirmarla con un código, que devuelve los 8 códigos de recuperación una sola vez |
+| GET | `/api/platform/me` · `/tenants` | Perfil (con `seguridad`: si tiene la verificación en dos pasos, si es obligatoria, desde cuándo y cuántos códigos le quedan) y listado de tiendas |
 | GET | `/api/platform/stats` | Resumen del negocio: altas, estados, reparto por plan y totales |
 | GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`); no incluye la actividad de las tiendas |
 | GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora |
@@ -438,6 +443,14 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 
 > El token de soporte lleva la ability `soporte`, y el middleware `soporte` —aplicado al grupo
 > entero del panel— rechaza con 403 cualquier método que no sea GET/HEAD (salvo `/api/auth/logout`).
+
+> **Verificación en dos pasos del operador (`SEC-9`).** En producción es obligatoria: sin ella, todo
+> el panel de plataforma salvo `me`, `logout` y activarla responde 403 con `motivo:
+> dos_pasos_pendiente` (middleware `platform.dos-pasos`), así que **lo primero tras el primer
+> despliegue es activarla** en *Plataforma → Seguridad*. En local es opcional. La semilla va cifrada
+> con la `APP_KEY`: si la clave cambia, deja de poder leerse y el operador se queda fuera. Esa salida,
+> y la de un móvil perdido sin códigos de recuperación, es `php artisan platform:quitar-dos-pasos`.
+> Desde el panel no se puede apagar.
 > `GET /api/auth/me` devuelve `soporte: true` para que el panel avise de que se está en casa ajena.
 
 **Rutas web (no API)** — `routes/web.php`: `/{slug}`, `/{slug}/product/{id}`, `/{slug}/p/{pageSlug}`
@@ -482,10 +495,11 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 868 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 893 tests (PHPUnit, SQLite en memoria)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
+php artisan platform:quitar-dos-pasos {email}  # Quita la verificación en dos pasos a un operador y le cierra las sesiones (SEC-9)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # serve + queue:listen + pail + vite en paralelo
 composer setup          # install + .env + key + migrate + build
@@ -525,6 +539,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 | `/platform/login` | Acceso del operador del SaaS |
 | `/platform` · `/platform/tenants` · `/platform/tenants/:id` · `/platform/logs` | Panel del operador: resumen, tiendas, ficha y bitácora (layout en `PlatformLayout`) |
+| `/platform/seguridad` | Verificación en dos pasos del operador (`SEC-9`). En producción, sin activarla el layout manda aquí desde cualquier sección |
 | `*` | 404 explícito |
 
 **Carga diferida**: todo va con `lazy()` **menos el catálogo**, que se queda estático a propósito por
@@ -619,7 +634,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 241 tests (Vitest + Testing Library, jsdom)
+npm test          # 264 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -638,7 +653,10 @@ la descarga de las exportaciones (`api/exportaciones`: blob, filtros y nombre de
 pantalla de clientes (`CustomersPage`: totales, cliente sin compras y la ficha que solo se pide al
 abrirla), la de reportes (`ReportsPage`: que el rango y la agrupación se le pidan al servidor, que
 sin permiso no se pinte utilidad ni margen, la serie como tabla y el motivo de un rango rechazado),
-y `money`/`phone`. La red se sustituye en cada test; ninguno
+el aviso antes de quitar una variante con gente esperando (`EditorDeVariantes`, `FUN-25`), el login
+de plataforma con su segundo paso y la pantalla de Seguridad del operador (`SEC-9`, con la
+redirección de `PlatformLayout` cuando es obligatoria), de qué tienda es cada línea de la bitácora
+del operador, y `money`/`phone`. La red se sustituye en cada test; ninguno
 necesita la API levantada. Las páginas grandes (ficha, armador, formulario de producto) todavía no
 tienen tests.
 

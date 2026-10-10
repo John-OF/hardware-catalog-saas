@@ -56,6 +56,11 @@ class ActivityLog extends Model
     public const TIENDA_RESCATE_ADMIN = 'tenant.rescate_admin';
     public const TIENDA_PRUEBA_VENCIDA = 'tenant.prueba_vencida';
 
+    /** Lo que pasa con la propia cuenta del operador (SEC-9). */
+    public const OPERADOR_DOS_PASOS_ACTIVADA = 'operador.dos_pasos_activada';
+    public const OPERADOR_DOS_PASOS_QUITADA = 'operador.dos_pasos_quitada';
+    public const OPERADOR_CODIGO_DE_RECUPERACION = 'operador.codigo_de_recuperacion';
+
     /** De dónde sale la línea (ver la cabecera). */
     public const ORIGEN_PLATAFORMA = 'plataforma';
     public const ORIGEN_TIENDA = 'tienda';

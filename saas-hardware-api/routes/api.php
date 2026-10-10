@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\PlatformController;
+use App\Http\Controllers\Api\PlatformDosPasosController;
 use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
 use App\Http\Controllers\Api\Public\PublicFavoritesController;
@@ -152,26 +153,40 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
 Route::post('/platform/login', [PlatformController::class, 'login'])
     ->middleware(['platform.ip', 'throttle:login']);
 
+// SEC-9: el segundo paso del login, con el código de la app o uno de
+// recuperación. Sin sesión todavía: lo que identifica al operador es el
+// desafío que devolvió el primer paso.
+Route::post('/platform/login/dos-pasos', [PlatformController::class, 'loginConCodigo'])
+    ->middleware(['platform.ip', 'throttle:dos_pasos']);
+
 Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platform')->group(function () {
     Route::post('/logout', [PlatformController::class, 'logout']);
     Route::get('/me',      [PlatformController::class, 'me']);
 
-    // Resumen del negocio y bitácora de lo que ha tocado el operador (INF-2).
-    Route::get('/stats', [PlatformController::class, 'stats']);
-    Route::get('/logs',  [PlatformController::class, 'logs']);
+    // SEC-9: activar la verificación en dos pasos. FUERA de 'platform.dos-pasos'
+    // a propósito: en producción es lo único que puede hacer un operador que
+    // todavía no la tiene.
+    Route::post('/dos-pasos',           [PlatformDosPasosController::class, 'iniciar'])->middleware('throttle:dos_pasos');
+    Route::post('/dos-pasos/confirmar', [PlatformDosPasosController::class, 'confirmar'])->middleware('throttle:dos_pasos');
 
-    Route::get('/tenants',            [PlatformController::class, 'tenants']);
-    Route::get('/tenants/{tenant}',   [PlatformController::class, 'show']);
-    Route::put('/tenants/{tenant}',   [PlatformController::class, 'updateTenant']);
-    Route::post('/tenants/{tenant}/password-reset', [PlatformController::class, 'sendAdminPasswordReset']);
-    // Entrar en una tienda como soporte: token de 15 minutos y SOLO LECTURA.
-    // Lo de "solo lectura" no lo impone esta ruta sino el middleware 'soporte'
-    // del panel, al otro lado (App\Support\Suplantacion).
-    Route::post('/tenants/{tenant}/impersonate', [PlatformController::class, 'impersonate']);
-    // Rescate: nombrar admin a un colaborador cuando la tienda se quedó sin
-    // ninguno (carrera de dos admins bajándose a la vez, o un desactivado a
-    // mano). Solo funciona si de verdad no hay ningún admin activo.
-    Route::post('/tenants/{tenant}/rescue-admin', [PlatformController::class, 'rescueAdmin']);
+    Route::middleware('platform.dos-pasos')->group(function () {
+        // Resumen del negocio y bitácora de lo que ha tocado el operador (INF-2).
+        Route::get('/stats', [PlatformController::class, 'stats']);
+        Route::get('/logs',  [PlatformController::class, 'logs']);
+
+        Route::get('/tenants',            [PlatformController::class, 'tenants']);
+        Route::get('/tenants/{tenant}',   [PlatformController::class, 'show']);
+        Route::put('/tenants/{tenant}',   [PlatformController::class, 'updateTenant']);
+        Route::post('/tenants/{tenant}/password-reset', [PlatformController::class, 'sendAdminPasswordReset']);
+        // Entrar en una tienda como soporte: token de 15 minutos y SOLO LECTURA.
+        // Lo de "solo lectura" no lo impone esta ruta sino el middleware 'soporte'
+        // del panel, al otro lado (App\Support\Suplantacion).
+        Route::post('/tenants/{tenant}/impersonate', [PlatformController::class, 'impersonate']);
+        // Rescate: nombrar admin a un colaborador cuando la tienda se quedó sin
+        // ninguno (carrera de dos admins bajándose a la vez, o un desactivado a
+        // mano). Solo funciona si de verdad no hay ningún admin activo.
+        Route::post('/tenants/{tenant}/rescue-admin', [PlatformController::class, 'rescueAdmin']);
+    });
 });
 
 /*

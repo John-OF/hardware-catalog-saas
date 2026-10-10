@@ -131,6 +131,20 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('reenvio_correo', function (Request $request) use ($ruta) {
             return Limit::perMinute(3)->by($ruta($request).'|'.($request->user()?->getAuthIdentifier() ?? $request->ip()));
         });
+
+        // SEC-9: el codigo de la verificacion en dos pasos, al entrar y al
+        // activarla. Seis cifras son un millon de combinaciones y tres valen a la
+        // vez (la ventana de 30 s a cada lado), asi que el techo es bajo. Por
+        // quien lo intenta -el operador con sesion, o el desafio del login si aun
+        // no la tiene- y por IP; el desafio, ademas, muere al quinto fallo.
+        RateLimiter::for('dos_pasos', function (Request $request) use ($ruta) {
+            $quien = $request->user()?->getAuthIdentifier() ?? hash('sha256', (string) $request->input('desafio'));
+
+            return [
+                Limit::perMinute(5)->by('quien|'.$ruta($request).'|'.$quien.'|'.$request->ip()),
+                Limit::perMinute(20)->by('ip|'.$ruta($request).'|'.$request->ip()),
+            ];
+        });
     }
 
     /**

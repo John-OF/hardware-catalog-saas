@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-dompdf": "^3.1",
         "intervention/image-laravel": "^4.0",
         "laravel/framework": "^13.8",
@@ -14,6 +15,7 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.34",
         "mews/purifier": "^3.4",
+        "pragmarx/google2fa": "^9.1",
         "ramsey/uuid": "^4.9",
         "spatie/laravel-multitenancy": "^4.1"
     },

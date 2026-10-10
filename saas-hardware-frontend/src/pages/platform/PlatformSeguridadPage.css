@@ -1,0 +1,137 @@
+/* Seguridad de la cuenta del operador (SEC-9).
+
+   Acotados a `.page-platform`, que pone `PlatformLayout` en la raíz, y con
+   `:where()` para no sumar especificidad (ver `UI-5`), como el resto de
+   pantallas de plataforma. */
+
+:where(.page-platform) .platform-seguridad {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 720px;
+  min-width: 0;
+}
+
+:where(.page-platform) .seguridad-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-platform) .seguridad-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .seguridad-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+:where(.page-platform) .seguridad-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+:where(.page-platform) .seguridad-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+:where(.page-platform) .seguridad-paso {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+:where(.page-platform) .seguridad-paso > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+:where(.page-platform) .seguridad-numero {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+/* El QR necesita fondo claro para leerse, sea cual sea el tema del panel. */
+:where(.page-platform) .seguridad-qr {
+  width: 192px;
+  height: 192px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+:where(.page-platform) .seguridad-clave {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .seguridad-codigo {
+  max-width: 180px;
+  letter-spacing: 0.2em;
+}
+
+:where(.page-platform) .seguridad-codigos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.5rem;
+  padding-left: 1.4rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .seguridad-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+:where(.page-platform) .seguridad-quedan.pocos {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+:where(.page-platform) .seguridad-nota {
+  font-size: 0.85rem;
+}
+
+:where(.page-platform) .seguridad-nota code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  :where(.page-platform) .seguridad-codigos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,8 +1,9 @@
 import './PlatformLayout.css';
 
-import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ListChecks, LogOut, ShieldCheck, Store } from 'lucide-react';
-import { platformLogout } from '../../api/platform';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { KeyRound, LayoutDashboard, ListChecks, LogOut, ShieldAlert, ShieldCheck, Store } from 'lucide-react';
+import { getPlatformMe, platformLogout, RUTA_DE_SEGURIDAD } from '../../api/platform';
 import { usePlatformAuthStore } from '../../stores/platformAuthStore';
 
 /**
@@ -17,10 +18,22 @@ import { usePlatformAuthStore } from '../../stores/platformAuthStore';
  * una ruta nueva colgada de este layout está protegida sin que nadie se acuerde.
  * No es la barrera de verdad —esa es el token, que el backend exige en cada
  * petición—, solo evita pintar un panel que no va a cargar nada.
+ *
+ * Igual con la verificación en dos pasos (SEC-9): en producción, sin ella el
+ * backend responde 403 a todo salvo a activarla, así que aquí se manda directo
+ * a esa pantalla en vez de pintar secciones que no van a cargar.
  */
 export default function PlatformLayout() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { isAuthenticated, user, clearPlatformAuth } = usePlatformAuthStore();
+
+  // Antes del `return` temprano: un hook detrás de él rompe la pantalla (AUD-14).
+  const { data: me } = useQuery({
+    queryKey: ['platformMe'],
+    queryFn: getPlatformMe,
+    enabled: isAuthenticated,
+  });
 
   const handleLogout = async () => {
     try {
@@ -33,6 +46,12 @@ export default function PlatformLayout() {
 
   if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
 
+  const sinDosPasos = me !== undefined && !me.seguridad.dos_pasos;
+
+  if (sinDosPasos && me.seguridad.obligatoria && pathname !== RUTA_DE_SEGURIDAD) {
+    return <Navigate to={RUTA_DE_SEGURIDAD} replace />;
+  }
+
   return (
     <div className="platform-shell page-platform">
       <header className="platform-header">
@@ -40,7 +59,7 @@ export default function PlatformLayout() {
           <ShieldCheck size={20} />
           <div>
             <h1>Administración de plataforma</h1>
-            <p>{user?.email ?? 'Operador del SaaS'}</p>
+            <p>{user?.email ?? me?.user.email ?? 'Operador del SaaS'}</p>
           </div>
         </div>
 
@@ -55,6 +74,14 @@ export default function PlatformLayout() {
           </NavLink>
           <NavLink to="/platform/logs" className="platform-nav-link">
             <ListChecks size={15} /> Bitácora
+          </NavLink>
+          {/* SEC-9: con aviso mientras la verificación en dos pasos no esté activa. */}
+          <NavLink
+            to={RUTA_DE_SEGURIDAD}
+            className="platform-nav-link"
+            title={sinDosPasos ? 'La verificación en dos pasos no está activada' : undefined}
+          >
+            {sinDosPasos ? <ShieldAlert size={15} className="platform-nav-alerta" /> : <KeyRound size={15} />} Seguridad
           </NavLink>
         </nav>
 

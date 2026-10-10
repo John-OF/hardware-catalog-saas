@@ -118,3 +118,31 @@
 :where(.page-platform-login) .spinner {
   animation: spin 1s linear infinite;
 }
+
+/* SEC-9: el segundo paso del login. Los dos enlaces van en una fila: cambiar
+   entre el código de la app y uno de recuperación, y volver a la contraseña. */
+:where(.page-platform-login) .dos-pasos-enlaces {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+:where(.page-platform-login) .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+:where(.page-platform-login) .link-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

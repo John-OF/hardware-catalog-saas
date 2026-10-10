@@ -84,14 +84,30 @@ class User extends Authenticatable implements MustVerifyEmail
         'tenant_id', 'name', 'email', 'phone', 'password', 'role', 'is_active',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    /**
+     * SEC-9: la semilla y los códigos de recuperación no salen nunca en una
+     * respuesta. `UserResource` ya elige los campos a mano, pero cualquier sitio
+     * que serializara el modelo entero los publicaría.
+     */
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at'     => 'datetime',
         'is_active'         => 'boolean',
         'password'          => 'hashed',    // bcrypt automático en Laravel 10+
+        // SEC-9: cifrados con la APP_KEY. Ver App\Support\DosPasos.
+        'two_factor_secret'         => 'encrypted',
+        'two_factor_recovery_codes' => 'encrypted:array',
+        'two_factor_confirmed_at'   => 'datetime',
+        'two_factor_last_step'      => 'integer',
     ];
+
+    /** Si el login le pide, además de la contraseña, el código de su app (SEC-9). */
+    public function tieneDosPasos(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
+    }
 
     /**
      * Enviar el correo de recuperacion de contrasenia (SAAS-2, FUN-11).

@@ -11,6 +11,7 @@ use App\Models\Page;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\DosPasos;
 use App\Support\Paginacion;
 use App\Support\PlanGate;
 use App\Support\Suplantacion;
@@ -65,17 +66,85 @@ class PlatformController extends Controller
             ]);
         }
 
-        // Mismo motivo que en el login de tiendas: `last_login_at` no es
-        // fillable, asi que `update()` lo tiraba sin decir nada.
-        $user->forceFill(['last_login_at' => now()])->save();
-        $user->tokens()->delete();
+        // SEC-9: con el segundo paso activo, la contraseña sola no abre nada.
+        // Devuelve un desafío de cinco minutos y el token llega en
+        // `loginConCodigo`. Ni `last_login_at` ni cerrar las sesiones abiertas
+        // hasta entonces: quien tiene la contraseña pero no el móvil no ha entrado.
+        if ($user->tieneDosPasos()) {
+            return response()->json([
+                'requiere_dos_pasos' => true,
+                'desafio'            => DosPasos::crearDesafio($user),
+            ]);
+        }
 
-        $token = $user->createToken('platform-token', ['superadmin'], now()->addDay());
+        return $this->abrirSesion($user);
+    }
 
-        return response()->json([
-            'token' => $token->plainTextToken,
-            'user'  => new UserResource($user),
+    /**
+     * El segundo paso del login (SEC-9): el código de la app, o uno de los de
+     * recuperación si el móvil no está a mano.
+     *
+     * Los fallos van en `desafio` y no en `codigo` cuando lo que hay que hacer es
+     * volver a la contraseña —el desafío caducó o se agotaron sus intentos—: así
+     * el formulario sabe si pedir otro código o volver al principio.
+     */
+    public function loginConCodigo(Request $request): JsonResponse
+    {
+        $request->validate([
+            'desafio' => 'required|string|max:100',
+            'codigo'  => 'required|string|max:20',
         ]);
+
+        $desafio = (string) $request->input('desafio');
+        $user = DosPasos::usuarioDelDesafio($desafio);
+
+        // Lo mismo que pide el login con contraseña, otra vez: entre un paso y
+        // otro pueden haberlo suspendido.
+        if (! $user || $user->role !== 'superadmin' || ! $user->is_active || ! $user->tieneDosPasos()) {
+            DosPasos::cerrarDesafio($desafio);
+
+            throw ValidationException::withMessages([
+                'desafio' => ['La verificación caducó. Vuelve a escribir tu contraseña.'],
+            ]);
+        }
+
+        $codigo = (string) $request->input('codigo');
+        $conRecuperacion = false;
+
+        if (! DosPasos::gastarCodigo($user, $codigo)) {
+            if (! DosPasos::gastarCodigoDeRecuperacion($user, $codigo)) {
+                if (! DosPasos::anotarFallo($desafio)) {
+                    throw ValidationException::withMessages([
+                        'desafio' => ['Demasiados códigos equivocados. Vuelve a escribir tu contraseña.'],
+                    ]);
+                }
+
+                throw ValidationException::withMessages([
+                    'codigo' => ['El código no es correcto. Si el móvil no tiene la hora en automático, ponla: los códigos dependen de ella.'],
+                ]);
+            }
+
+            $conRecuperacion = true;
+        }
+
+        DosPasos::cerrarDesafio($desafio);
+
+        // Entrar con un código de recuperación es la señal de que el móvil no
+        // estaba, o de que alguien tiene los códigos: se anota, con los que quedan.
+        if ($conRecuperacion) {
+            $quedan = count($user->two_factor_recovery_codes ?? []);
+
+            ActivityLog::registrar(
+                ActivityLog::OPERADOR_CODIGO_DE_RECUPERACION,
+                "Entró con un código de recuperación. Le quedan {$quedan}.",
+                null,
+                $user,
+                ['restantes' => $quedan],
+                $request,
+            );
+        }
+
+        return $this->abrirSesion($user);
     }
 
     public function logout(Request $request): JsonResponse
@@ -87,7 +156,30 @@ class PlatformController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => new UserResource($request->user())]);
+        return response()->json([
+            'user'      => new UserResource($request->user()),
+            'seguridad' => DosPasos::estado($request->user()),
+        ]);
+    }
+
+    /**
+     * Lo que pasa cuando el operador ya ha demostrado quién es: con la
+     * contraseña si no tiene el segundo paso, o con ella y el código si lo tiene.
+     */
+    private function abrirSesion(User $user): JsonResponse
+    {
+        // Mismo motivo que en el login de tiendas: `last_login_at` no es
+        // fillable, asi que `update()` lo tiraba sin decir nada.
+        $user->forceFill(['last_login_at' => now()])->save();
+        $user->tokens()->delete();
+
+        $token = $user->createToken('platform-token', ['superadmin'], now()->addDay());
+
+        return response()->json([
+            'token'     => $token->plainTextToken,
+            'user'      => new UserResource($user),
+            'seguridad' => DosPasos::estado($user),
+        ]);
     }
 
     /**

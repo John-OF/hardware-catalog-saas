@@ -51,6 +51,7 @@ const PlatformOverviewPage = lazy(() => import('../pages/platform/PlatformOvervi
 const PlatformPage = lazy(() => import('../pages/platform/PlatformPage'));
 const PlatformTenantPage = lazy(() => import('../pages/platform/PlatformTenantPage'));
 const PlatformLogsPage = lazy(() => import('../pages/platform/PlatformLogsPage'));
+const PlatformSeguridadPage = lazy(() => import('../pages/platform/PlatformSeguridadPage'));
 
 const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const OverviewPage = lazy(() => import('../pages/dashboard/OverviewPage'));
@@ -118,6 +119,9 @@ export const router = createBrowserRouter([
       { path: 'tenants',      element: <PlatformPage /> },
       { path: 'tenants/:id',  element: <PlatformTenantPage /> },
       { path: 'logs',         element: <PlatformLogsPage /> },
+      // SEC-9: la verificación en dos pasos del operador. En producción, hasta
+      // activarla, es la única pantalla que responde (ver PlatformLayout).
+      { path: 'seguridad',    element: <PlatformSeguridadPage /> },
     ],
   },
   // Rutas públicas (con prefijo de slug para SaaS)

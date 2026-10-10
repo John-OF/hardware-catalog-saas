@@ -15,6 +15,14 @@ const ACCIONES: Record<string, string> = {
   'tenant.plan': 'Cambios de plan',
   'tenant.reset_password': 'Rescates de acceso',
   'tenant.soporte': 'Entradas como soporte',
+  // Faltaban desde que se crearon: la línea salía en la lista, pero no se
+  // podía filtrar por ellas.
+  'tenant.rescate_admin': 'Rescates de administrador',
+  'tenant.prueba_vencida': 'Pruebas cerradas',
+  // SEC-9: lo que pasa con la cuenta del propio operador.
+  'operador.dos_pasos_activada': 'Verificación en dos pasos activada',
+  'operador.codigo_de_recuperacion': 'Entradas con código de recuperación',
+  'operador.dos_pasos_quitada': 'Verificación en dos pasos quitada',
 };
 
 /**
@@ -74,7 +82,10 @@ export default function PlatformLogsPage() {
               <div className="log-main">
                 <span className="log-desc">{log.description}</span>
                 <span className="log-meta">
-                  {log.actor_email ?? 'operador borrado'}
+                  {/* El correo del actor se copia en su columna para que sobreviva
+                      a que se borre la cuenta: vacío solo puede ser el sistema
+                      (una prueba que vence, un comando del servidor). */}
+                  {log.actor_email ?? 'sistema'}
                   {log.ip && <> · {log.ip}</>} · {new Date(log.created_at).toLocaleString()}
                 </span>
               </div>
@@ -84,11 +95,13 @@ export default function PlatformLogsPage() {
                 <Link className="log-tenant" to={`/platform/tenants/${log.tenant.id}`}>
                   {log.tenant.name}
                 </Link>
-              ) : (
+              ) : log.context?.tienda ? (
                 <span className="log-tenant log-tenant-gone">
-                  {(log.context?.tienda as string) ?? '—'} (borrada)
+                  {log.context.tienda as string} (borrada)
                 </span>
-              )}
+              ) : null}
+              {/* Sin tienda y sin su nombre guardado no es una tienda borrada: es
+                  algo de la cuenta del operador (SEC-9), y no lleva nada. */}
             </li>
           ))}
         </ul>
