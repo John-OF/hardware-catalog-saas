@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SaludController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\TenantController;
@@ -60,6 +61,14 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
 Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])
     ->middleware(['signed', 'throttle:verificacion_correo'])
     ->name('verificacion.correo');
+
+// Los topes del PHP que atiende la web, para `salud:comprobar` (INF-19): la
+// consola lee otro php.ini y no puede verlos. Firmada como la de arriba, y por
+// lo mismo: si la firma no cuadra aqui, tampoco cuadra en los enlaces del correo,
+// y el comando lo dice.
+Route::get('/salud/php', [SaludController::class, 'php'])
+    ->middleware('signed')
+    ->name('salud.php');
 
 // Catálogo público (consultado por el frontend sin login)
 //

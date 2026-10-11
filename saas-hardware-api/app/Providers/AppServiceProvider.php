@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Support\HuellaDelCodigo;
 use App\Support\Subidas;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\WorkerStarting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +32,12 @@ class AppServiceProvider extends ServiceProvider
         $this->guardarDeAlmacenamiento();
         $this->politicaDeContrasenias();
         $this->mensajesDeValidacion();
+
+        // INF-19: el worker apunta con qué código arrancó, para que
+        // `salud:comprobar` sepa si sigue en una versión vieja (INF-13). Tiene
+        // que ser al arrancar: calculada más tarde, leería el código nuevo del
+        // disco mientras ejecuta el viejo de memoria.
+        Event::listen(WorkerStarting::class, fn () => HuellaDelCodigo::delProceso());
 
         // AUD-2: el catalogo publico no tenia ningun limite. La auditoria lo
         // comprobo a mano: 70 peticiones seguidas, 70 respuestas 200, ningun 429.

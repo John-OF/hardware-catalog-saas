@@ -107,8 +107,11 @@ class Subidas
         };
     }
 
-    /** `128M` → bytes, como `ValidatePostSize` de Laravel; `-1` → sin límite. */
-    private static function aBytes(string $valor): ?int
+    /**
+     * `128M` → bytes, como `ValidatePostSize` de Laravel; `-1` → sin límite.
+     * También lo usa `Salud` para comparar los topes de PHP con los del README.
+     */
+    public static function aBytes(string $valor): ?int
     {
         $valor = trim($valor);
 

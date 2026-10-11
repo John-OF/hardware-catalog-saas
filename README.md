@@ -72,7 +72,10 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
   cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`), lo que vacía la
   papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`) y lo que hace la
   **copia de seguridad diaria** (`copias:crear`, `INF-7`); sin él, ninguna prueba se cierra aunque la
-  fecha ya haya pasado, la papelera crece sin techo y **no hay ninguna copia de la base**
+  fecha ya haya pasado, la papelera crece sin techo y **no hay ninguna copia de la base**. Como sin él
+  no hay ningún error que leer, cada tarea avisa fuera al terminar (`INF-18`, ver *Vigilancia de las
+  tareas programadas*): si el cron se para, el primero que deja de llegar es el aviso horario de
+  `salud:comprobar` (`INF-19`)
 - **`mysqldump` accesible** para el usuario que corre el cron (`BACKUP_BIN_PATH` si no está en su
   PATH), y `BACKUP_DISK` apuntando a almacenamiento **fuera de este servidor** (`r2`/`s3`): una copia
   en el mismo disco que la base no es una copia
@@ -164,6 +167,33 @@ error y sin nada en `failed_jobs`**, que es lo que lo hace difícil de ver. Se d
 `SEC-8` en local: el primer correo salió todavía vulnerable con el arreglo ya escrito y sus tests en
 verde. `queue:restart` no mata el proceso: le pide terminar el trabajo que tenga y salir, y lo
 vuelve a levantar el supervisor.
+
+Y por último, **comprobar que todo lo anterior se hizo de verdad** (`INF-19`):
+
+```bash
+php artisan salud:comprobar   # sale con código distinto de cero si algo falla
+```
+
+Mira las migraciones pendientes, que haya un worker vivo **y con el código actual** (le manda un
+trabajo de prueba que devuelve la huella del código con el que arrancó: sin `queue:restart`, no
+coincide), que el scheduler haya corrido en los últimos 3 minutos, que haya una copia de menos de
+26 horas en `BACKUP_DISK` (y, en producción, que ese disco no sea de este servidor), que el correo no
+esté en `log`, la lista de IPs de plataforma, que cada operador tenga la verificación en dos pasos y
+los topes de PHP del README. Lo que es obligatorio solo en producción sale como *no aplica* fuera de
+ella. Los topes de PHP se le piden **al PHP que atiende la web**, por HTTP a `APP_URL` con una URL
+firmada (`/api/salud/php`), porque el de consola suele leer otro `php.ini`; de paso comprueba que
+`APP_URL` contesta y que la firma cuadra, que es lo mismo que necesitan los enlaces de verificación
+de correo. No ve `VITE_PLATFORM_HOSTS` (va en el build del frontend), el `client_max_body_size` de
+nginx ni los registros SPF/DKIM, y lo dice al terminar. El scheduler lo lanza además cada hora.
+
+### Vigilancia de las tareas programadas (`INF-18`)
+
+Un cron caído no da errores: se calla, y la copia de esa noche simplemente no existe. Por eso cada
+tarea del scheduler avisa al terminar a una URL de `config/salud.php` (`VIGILANCIA_*_URL`), y es un
+servicio externo —healthchecks.io, Better Stack— el que da la alarma cuando **deja de llegar** el
+aviso. Al fallar se avisa a la misma URL con `/fail`, para enterarse en el momento. Hacen falta
+cuatro comprobaciones en ese servicio: `copias`, `pruebas` y `papelera` cada día, y `salud` cada
+hora, que cubre de paso al propio cron. Sin URL no se avisa a nadie, que es lo que pasa en local.
 
 ### Copias de seguridad y cómo restaurar una (`INF-7`)
 
@@ -264,9 +294,9 @@ app/
 ├── Casts/SanitizedHtml.php        # Limpia el HTML al guardar
 ├── Casts/ImagenDelDisco.php       # Columna de imagen: ruta del disco en la base, URL al leer (TEC-15)
 ├── Casts/TemaDeTienda.php         # tenants.theme, con portada y favicon como ImagenDelDisco
-├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8) y
-│                                  # CreateBackup (INF-7), los tres desde el scheduler;
-│                                  # CreateSuperAdmin y RemoveOperatorTwoFactor (SEC-9), a mano
+├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8),
+│                                  # CreateBackup (INF-7) y CheckDeployment (INF-19), desde el
+│                                  # scheduler; CreateSuperAdmin y RemoveOperatorTwoFactor (SEC-9), a mano
 ├── Enums/ComponentType.php        # Qué pieza de PC vende una categoría
 ├── Exceptions/PlanLimitException  # 422 con la clave del límite alcanzado
 ├── Http/
@@ -287,6 +317,7 @@ app/
 │   │   ├── PlanController.php              # Plan, límites y consumo
 │   │   ├── PlatformController.php          # Panel del operador, y su login en dos pasos
 │   │   ├── PlatformDosPasosController.php  # Activar la verificación en dos pasos del operador (SEC-9)
+│   │   ├── SaludController.php             # Topes del PHP de la web, para salud:comprobar (INF-19)
 │   │   └── Public/
 │   │       ├── PublicCatalogController.php # Catálogo, ficha, reseñas, pedidos, avisos
 │   │       ├── PublicAuthController.php    # Cuentas de cliente (incluida su recuperación de contraseña)
@@ -303,6 +334,7 @@ app/
 │   │   ├── EnsurePlatformDosPasos.php      # En producción, sin 2FA el operador solo puede activarlo (SEC-9)
 │   │   └── RestrictImpersonation.php       # Sesión de soporte: el panel, en solo lectura
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
+├── Jobs/ComprobarCola.php  # El trabajo de prueba de salud:comprobar: ¿hay worker, y con qué código? (INF-19)
 ├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
 │                      # Order, OrderItem, Coupon, Review, StockNotification, Page, ActivityLog
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
@@ -327,6 +359,9 @@ app/
     ├── PreciosPorCantidad.php  # El precio por mayor (MOD-15): un tramo es un PRECIO, no un descuento
     ├── Seo.php            # Lo que ve un buscador (INF-4): contenido, canonico, JSON-LD y sitemap
     ├── Copias.php        # Volcado y comprobacion de la copia de seguridad (INF-7)
+    ├── Salud.php           # Las comprobaciones de salud:comprobar (INF-19)
+    ├── HuellaDelCodigo.php # Huella del código en disco: dice si un worker corre la versión vieja (INF-13)
+    ├── Vigilancia.php      # Cada tarea programada avisa fuera al terminar (INF-18)
     ├── Reportes.php        # Las cuentas de los reportes, compartidas por la pantalla y el CSV
     ├── Money.php           # Formato de moneda por tienda, igual que el panel (FUN-23)
     ├── StoreUrl.php        # URL pública de una tienda, para los correos
@@ -336,6 +371,8 @@ app/
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
+config/salud.php       # URL de aviso de cada tarea programada (INF-18) y los umbrales de
+                       # salud:comprobar (INF-19), incluidos los mínimos de PHP del README
 config/plans.php       # La matriz de planes y límites
 config/currencies.php  # Monedas que puede elegir una tienda y cómo se escribe cada una:
                        # separadores y patrón (FUN-23). Copia en utils/money.ts, y un
@@ -367,6 +404,7 @@ tests/Feature/         # 85 archivos, 892 tests (+1 en tests/Unit)
 | POST | `/api/auth/login` | Login del panel (admin o staff) · 5/min por correo, 20/min por IP |
 | POST | `/api/auth/forgot-password` · `/reset-password` | Recuperación de contraseña · 5/min |
 | GET | `/api/auth/verify-email/{id}/{hash}` | Verificar correo (URL firmada) → redirige al SPA |
+| GET | `/api/salud/php` | Topes del PHP que atiende la web (URL firmada, caduca en 2 min). Solo la llama `salud:comprobar` (INF-19) |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
 | GET | `/api/public/plans` | Catálogo de planes con precio, para la landing (INF-1) |
 | GET | `/{slug}/sitemap.xml` · `/robots.txt` | Sitemap de una tienda y robots del host (INF-4). No son `/api/`: van en `routes/web.php` |
@@ -489,13 +527,15 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 | `MAIL_*` / `RESEND_API_KEY` | Envío de correo |
 | `TURNSTILE_SECRET_KEY` | Anti-bot de reseñas. Fuera de local, sin clave se rechazan con 502 |
 | `PLATFORM_ALLOWED_IPS` | IPs del panel de plataforma. **En producción, vacío = no entra nadie** |
+| `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
 | `PASSWORD_UNCOMPROMISED` | Contrasta contraseñas contra Have I Been Pwned |
 | `APP_DEBUG` | **En producción tiene que ser `false` o la app no arranca** |
 
 ### Comandos
 
 ```bash
-php artisan test        # 893 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 928 tests (PHPUnit, SQLite en memoria)
+php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
