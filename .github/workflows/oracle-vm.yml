@@ -1,0 +1,86 @@
+# TEMPORAL: reintenta crear la VM de Oracle Cloud hasta que haya capacidad.
+#
+# Oracle responde "Out of host capacity" en la region de Bogota para las unidades
+# gratuitas Ampere A1. Este workflow lo reintenta cada 10 minutos sin depender del PC
+# del dueno. Cuando la VM existe, se deshabilita solo.
+#
+# BORRAR este archivo (y los secretos OCI_*) cuando la VM ya este creada.
+# Documentado en docs/oracle_cloud_decisiones.md.
+#
+# Los secretos (Settings > Secrets and variables > Actions) son:
+#   OCI_USER, OCI_FINGERPRINT, OCI_TENANCY, OCI_REGION, OCI_KEY_B64 (clave privada
+#   en base64), OCI_SUBNET_ID, OCI_IMAGE_ID, OCI_SSH_PUBKEY.
+
+name: Oracle VM (temporal)
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: oracle-vm
+  cancel-in-progress: false
+
+jobs:
+  crear:
+    name: Crear gondofy-app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_USER }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY }}
+      OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
+      OCI_CLI_KEY_FILE: /tmp/oci_api_key.pem
+      OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
+      SUPPRESS_LABEL_WARNING: "True"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Instalar la CLI de Oracle
+        run: pip install --quiet oci-cli
+
+      - name: Preparar la clave
+        run: |
+          echo "${{ secrets.OCI_KEY_B64 }}" | base64 -d > "$OCI_CLI_KEY_FILE"
+          chmod 600 "$OCI_CLI_KEY_FILE"
+          echo "${{ secrets.OCI_SSH_PUBKEY }}" > /tmp/key.pub
+
+      - name: Ver si la VM ya existe
+        id: existe
+        run: |
+          n=$(oci compute instance list -c "$OCI_CLI_TENANCY" --display-name gondofy-app \
+            --query 'length(data[?"lifecycle-state"!=`TERMINATED`])' --raw-output)
+          echo "Instancias gondofy-app vivas: $n"
+          echo "n=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Intentar crearla
+        if: steps.existe.outputs.n == '0'
+        run: |
+          AD=$(oci iam availability-domain list -c "$OCI_CLI_TENANCY" --query 'data[0].name' --raw-output)
+          for cfg in "2 12" "1 6"; do
+            set -- $cfg
+            echo "Intento con $1 OCPU / $2 GB"
+            if out=$(oci compute instance launch -c "$OCI_CLI_TENANCY" \
+                --availability-domain "$AD" --shape VM.Standard.A1.Flex \
+                --shape-config "{\"ocpus\":$1,\"memoryInGBs\":$2}" \
+                --image-id "${{ secrets.OCI_IMAGE_ID }}" \
+                --subnet-id "${{ secrets.OCI_SUBNET_ID }}" \
+                --assign-public-ip true --display-name gondofy-app \
+                --ssh-authorized-keys-file /tmp/key.pub \
+                --boot-volume-size-in-gbs 100 2>&1); then
+              echo "CREADA con $1 OCPU / $2 GB"
+              echo "creada=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "$out" | grep -oE '"(code|message)": "[^"]*"' | head -2
+          done
+          echo "Sin capacidad todavia; se reintenta en 10 minutos."
+
+      - name: Apagar este workflow si ya esta la VM
+        if: steps.existe.outputs.n != '0' || env.creada == 'true'
+        run: gh workflow disable "Oracle VM (temporal)" --repo "${{ github.repository }}"
