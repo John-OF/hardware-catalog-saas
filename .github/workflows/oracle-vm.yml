@@ -83,6 +83,8 @@ jobs:
         run: |
           n=$(oci compute instance list -c "$OCI_CLI_TENANCY" --display-name gondofy-app \
             --query 'length(data[?"lifecycle-state"!=`TERMINATED`])' --raw-output)
+          # sin ninguna instancia la CLI no imprime nada: eso es 0, no "ya existe"
+          n=${n//[^0-9]/}; n=${n:-0}
           echo "Instancias gondofy-app vivas: $n"
           echo "n=$n" >> "$GITHUB_OUTPUT"
 
