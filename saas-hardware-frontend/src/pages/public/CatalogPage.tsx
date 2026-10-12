@@ -52,6 +52,8 @@ import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../t
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import { esHostDeLaPlataforma } from '../../utils/plataforma';
+import { etiquetaDeSpec, todosLosCampos, valorDeSpec } from '../../utils/specsFijas';
+import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -284,6 +286,12 @@ export default function CatalogPage() {
   // productos de la página visible, así que las opciones cambiaban al paginar.
   // La queryKey NO incluye specs ni página a propósito: las opciones solo deben
   // cambiar al cambiar de categoría, o el filtro se movería bajo el cursor.
+  // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo, en los
+  // filtros y en el comparador. El filtro sigue viajando con la clave y el valor
+  // guardados: lo que cambia es solo cómo se leen.
+  const { data: definicionDeSpecs } = useSpecsFijas();
+  const camposDeSpecs = useMemo(() => todosLosCampos(definicionDeSpecs), [definicionDeSpecs]);
+
   const { data: facetsData } = useQuery<{ specs: Record<string, string[]> }>({
     queryKey: ['publicFacets', resolvedSlug, selectedCategory],
     queryFn: () => getPublicFacets(resolvedSlug!, { category_id: selectedCategory || undefined }),
@@ -551,7 +559,7 @@ export default function CatalogPage() {
                         {Object.entries(availableSpecs).map(([specKey, specValues]) => (
                           <div key={specKey} className="spec-filter-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                             <span className="spec-filter-title" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {specKey}
+                              {etiquetaDeSpec(specKey, camposDeSpecs)}
                             </span>
                             <div className="spec-filter-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                               {Array.from(specValues).map((val) => {
@@ -576,7 +584,7 @@ export default function CatalogPage() {
                                       fontWeight: isSelected ? 600 : 'normal'
                                     }}
                                   >
-                                    {val}
+                                    {valorDeSpec(specKey, val, camposDeSpecs)}
                                   </button>
                                 );
                               })}
@@ -975,10 +983,10 @@ export default function CatalogPage() {
                       }
                       return allKeys.map((key) => (
                         <tr key={key}>
-                          <td><strong>{key}</strong></td>
+                          <td><strong>{etiquetaDeSpec(key, camposDeSpecs)}</strong></td>
                           {comparedProducts.map((p) => (
                             <td key={p.id}>
-                              {p.specs?.[key] !== undefined && p.specs?.[key] !== '' ? String(p.specs[key]) : '-'}
+                              {p.specs?.[key] !== undefined && p.specs?.[key] !== '' ? valorDeSpec(key, p.specs[key], camposDeSpecs) : '-'}
                             </td>
                           ))}
                         </tr>

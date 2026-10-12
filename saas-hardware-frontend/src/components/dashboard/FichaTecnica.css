@@ -1,0 +1,126 @@
+/* <FichaTecnica>: los campos con nombre fijo del tipo de componente (FUN-8).
+
+   Global, como la hoja de cualquier componente; las clases llevan el prefijo
+   `ficha-` para no chocar con las de ninguna pagina. */
+
+.ficha-tecnica {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--overlay-mix), 0.015);
+}
+
+.ficha-tecnica-titulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ficha-tecnica-pista {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.ficha-tecnica-marca {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--primary);
+  background: var(--primary-glow);
+  vertical-align: middle;
+}
+
+.ficha-tecnica-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+.ficha-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+/* Las casillas de un campo de varios valores necesitan la fila entera. */
+.ficha-campo-ancho {
+  grid-column: 1 / -1;
+}
+
+.ficha-campo-etiqueta {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ficha-campo-ayuda {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.ficha-campo-aviso {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--warning);
+}
+
+.ficha-numero {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ficha-numero .premium-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ficha-numero-unidad {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.ficha-varios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ficha-varios-opcion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.ficha-varios-opcion:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+/* Un valor guardado que no está en la lista: se ve, y se puede desmarcar. */
+.ficha-varios-opcion.ajena {
+  border-color: var(--warning);
+  background: var(--warning-glow);
+}

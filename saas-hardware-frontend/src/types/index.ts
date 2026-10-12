@@ -213,6 +213,30 @@ export type ComponentType =
   | 'peripheral'
   | 'other';
 
+/**
+ * Un campo de la ficha técnica con nombre fijo (FUN-8, Fase 13). La lista sale
+ * de `config/component_specs.php` por `GET /public/component-specs`: el
+ * frontend no tiene copia, así que añadir un campo no obliga a tocar esto.
+ *
+ * Se guarda en `Product.specs` con `clave` de nombre y el valor siempre como
+ * texto: `"105"`, `"si"`, `"AM4, AM5"`.
+ */
+export interface CampoDeSpec {
+  clave: string;
+  etiqueta: string;
+  /** `varios` se guarda como "AM4, AM5", en el orden de `opciones`. */
+  tipo: 'lista' | 'varios' | 'numero' | 'si_no' | 'texto';
+  unidad: string | null;
+  opciones: string[];
+  /** Si alimenta una regla del armador. Que falte nunca impide guardar. */
+  armador: boolean;
+  ayuda: string | null;
+}
+
+export interface DefinicionDeSpecs {
+  tipos: Partial<Record<ComponentType, CampoDeSpec[]>>;
+}
+
 export interface Category {
   id: string;
   tenant_id: string;

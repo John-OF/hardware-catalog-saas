@@ -277,7 +277,8 @@ Hay **tres autenticaciones separadas**, todas con Sanctum (tokens Bearer):
    emitirse. No revoca los tokens del dueño: puede seguir trabajando mientras el operador mira.
 
 El registro de tiendas es **self-service** (`POST /api/auth/register`) con validación de slugs
-reservados; la tienda nace sin publicar y se publica al verificar el correo. Las claves primarias son
+reservados —los nombres de las páginas del frontend que van antes que `/:slug` y de las rutas de la
+API que van antes que `public/{slug}`—; la tienda nace sin publicar y se publica al verificar el correo. Las claves primarias son
 **UUID v7** (cronológicos, para no fragmentar índices en MySQL).
 
 ---
@@ -354,6 +355,8 @@ app/
     │                       # los megapíxeles que caben en `memory_limit` (INF-14)
     ├── ImagenesDelDisco.php  # Ruta del disco <-> URL de una imagen, y el disco de imágenes (TEC-15)
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
+    ├── SpecsFijas.php      # Specs con nombre fijo por tipo de componente (FUN-8): normalizar,
+    │                       # validar y pintar con etiqueta y unidad
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
     ├── PreciosPorCantidad.php  # El precio por mayor (MOD-15): un tramo es un PRECIO, no un descuento
@@ -374,6 +377,8 @@ config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (IN
 config/salud.php       # URL de aviso de cada tarea programada (INF-18) y los umbrales de
                        # salud:comprobar (INF-19), incluidos los mínimos de PHP del README
 config/plans.php       # La matriz de planes y límites
+config/component_specs.php # Las specs con nombre fijo de cada tipo de componente (FUN-8).
+                       # Sin copia en el frontend: la sirve GET /api/public/component-specs
 config/currencies.php  # Monedas que puede elegir una tienda y cómo se escribe cada una:
                        # separadores y patrón (FUN-23). Copia en utils/money.ts, y un
                        # test comprueba que no se separen.
@@ -391,7 +396,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 85 archivos, 892 tests (+1 en tests/Unit)
+tests/Feature/         # 88 archivos, 946 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -407,6 +412,7 @@ tests/Feature/         # 85 archivos, 892 tests (+1 en tests/Unit)
 | GET | `/api/salud/php` | Topes del PHP que atiende la web (URL firmada, caduca en 2 min). Solo la llama `salud:comprobar` (INF-19) |
 | GET | `/api/public/resolve-domain` | Resuelve tenant por dominio propio |
 | GET | `/api/public/plans` | Catálogo de planes con precio, para la landing (INF-1) |
+| GET | `/api/public/component-specs` | Las specs con nombre fijo de cada tipo de componente, para el formulario del panel y para pintarlas en el catálogo (FUN-8) |
 | GET | `/{slug}/sitemap.xml` · `/robots.txt` | Sitemap de una tienda y robots del host (INF-4). No son `/api/`: van en `routes/web.php` |
 
 **Catálogo público** (prefijo `/api/public/{slug}`, throttle de grupo 120/min, tenant por slug):
@@ -534,7 +540,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 928 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 947 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -602,6 +608,7 @@ src/
 ├── components/
 │   ├── dashboard/  # NewOrderModal (venta de mostrador), EditorDeVariantes, VerifyEmailBanner,
 │   │               # EditorDeTramos (precio por mayor, MOD-15),
+│   │               # FichaTecnica (las specs fijas del tipo, FUN-8),
 │   │               # SupportBanner, InformeDeImport (resultado del import CSV)
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
@@ -611,12 +618,13 @@ src/
 ├── stores/         # Zustand: authStore (admin), customerAuthStore (cliente),
 │                   # platformAuthStore, cartStore (por tienda), tenantStore
 ├── hooks/          # useTenantBranding (título, favicon, meta/OG), useTenantTheme,
-│                   # useBloqueoDeScroll
+│                   # useBloqueoDeScroll, useSpecsFijas (la definición de FUN-8)
 ├── utils/          # money, theme, themePresets, neutrals, shape, fonts, hero,
 │                   # branding, phone, sanitizeHtml, componentTypes, variants,
 │                   # variantesEnFormulario, plataforma (¿es el host del SaaS?),
 │                   # paymentMethods (qué mostrarle al comprador), subidas (qué se
-│                   # puede subir y cuánto, copia de config/subidas.php, UI-15)
+│                   # puede subir y cuánto, copia de config/subidas.php, UI-15),
+│                   # specsFijas (repartir y pintar las specs de FUN-8)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -674,7 +682,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 264 tests (Vitest + Testing Library, jsdom)
+npm test          # 278 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -743,6 +751,16 @@ tienen tests.
   a su aire, la cotización y los correos escribían el precio distinto que el panel en 10 de las 15
   monedas. `FormatoDeMonedaTest` compara las dos copias, y los mismos casos se prueban en
   `utils/money.test.ts`.
+- **Las specs con nombre fijo** (`FUN-8`): cada tipo de componente pregunta sus campos, definidos
+  en `config/component_specs.php`. Se guardan **en la misma columna `products.specs`**, con la clave
+  de la config (`socket`, `tdp`) y el valor **siempre como texto** (`"105"`, `"si"`, `"AM4, AM5"`):
+  los filtros del catálogo comparan texto con texto. Lo que se puede escribir en un campo fijo lo
+  normaliza y lo valida `App\Support\SpecsFijas`, y lo usan el formulario y el import CSV; **que
+  falte un campo nunca impide guardar**, un valor que no vale sí. Qué campos son fijos lo decide la
+  **categoría con la que se guarda** el producto. Para pintarlas, `SpecsFijas::paraMostrar()` en el
+  servidor y `specsParaMostrar()` (`utils/specsFijas.ts`) en el navegador, nunca la clave a pelo.
+  **Renombrar una clave deja huérfano lo guardado con la vieja**, como renombrar una columna; la
+  etiqueta se cambia libre.
 - **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
   igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.

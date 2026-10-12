@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
 use App\Http\Controllers\Api\Public\PublicFavoritesController;
 use App\Http\Controllers\Api\Public\PublicOrdersController;
+use App\Http\Controllers\Api\Public\PublicComponentSpecsController;
 use App\Http\Controllers\Api\Public\PublicPlansController;
 use Illuminate\Support\Facades\Route;
 
@@ -86,6 +87,11 @@ Route::get('public/resolve-domain', [PublicCatalogController::class, 'resolveDom
 // Catálogo de planes de la plataforma, para la landing (INF-1). Sin tienda ni
 // sesión: es la pantalla de quien todavía no se ha registrado.
 Route::get('public/plans', [PublicPlansController::class, 'index'])
+    ->middleware('throttle:catalogo_publico');
+
+// Specs con nombre fijo por tipo de componente (FUN-8, 13.2). Sin tienda: la
+// definicion es de la plataforma. La leen el formulario del panel y el catalogo.
+Route::get('public/component-specs', [PublicComponentSpecsController::class, 'index'])
     ->middleware('throttle:catalogo_publico');
 
 //

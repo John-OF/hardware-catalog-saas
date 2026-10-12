@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\CompruebaArchivosRecibidos;
+use App\Http\Requests\Concerns\ValidaSpecsFijas;
 use App\Http\Requests\Concerns\ValidaVariantes;
 use App\Support\DeLaTienda;
 use App\Support\Subidas;
@@ -12,6 +13,7 @@ use Illuminate\Validation\Validator;
 class UpdateProductRequest extends FormRequest
 {
     use CompruebaArchivosRecibidos;
+    use ValidaSpecsFijas;
     use ValidaVariantes;
 
     public function authorize(): bool
@@ -31,8 +33,24 @@ class UpdateProductRequest extends FormRequest
             ]);
         }
 
+        // FUN-8: despues de decodificar y antes de validar. Ver `ValidaSpecsFijas`.
+        $this->normalizarSpecsFijas();
+
         $this->decodificarVariantes();
         $this->decodificarTramos();
+    }
+
+    /**
+     * La que llega si el guardado la trae —también vacía: "Sin categoría"—, y
+     * si no, la que ya tenía el producto.
+     */
+    protected function categoriaConLaQueSeGuarda(): ?string
+    {
+        if ($this->exists('category_id')) {
+            return $this->filled('category_id') ? (string) $this->input('category_id') : null;
+        }
+
+        return $this->route('product')?->category_id;
     }
 
     public function rules(): array
@@ -80,6 +98,7 @@ class UpdateProductRequest extends FormRequest
         $validator->after(function (Validator $v) {
             $this->comprobarVariantesRepetidas($v);
             $this->comprobarTramos($v);
+            $this->comprobarSpecsFijas($v);
             $this->comprobarArchivosRecibidos($v);
         });
     }

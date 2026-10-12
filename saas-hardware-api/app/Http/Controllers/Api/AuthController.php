@@ -37,7 +37,10 @@ class AuthController extends Controller
                 function ($attribute, $value, $fail) {
                     // INF-15: 'terminos', 'privacidad' y 'reembolsos' son las
                     // páginas legales del frontend, que van antes que '/:slug'.
-                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password', 'platform', 'terminos', 'privacidad', 'reembolsos'];
+                    // 'plans', 'resolve-domain' y 'component-specs' (FUN-8) son
+                    // rutas de la API que van antes que 'public/{slug}': una
+                    // tienda con ese slug no llegaría nunca a la suya.
+                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password', 'platform', 'terminos', 'privacidad', 'reembolsos', 'plans', 'resolve-domain', 'component-specs'];
                     if (in_array(strtolower($value), $reserved)) {
                         $fail('El slug elegido está reservado por la plataforma.');
                     }

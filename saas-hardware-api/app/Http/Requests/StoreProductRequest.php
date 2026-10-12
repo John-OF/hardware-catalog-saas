@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\CompruebaArchivosRecibidos;
+use App\Http\Requests\Concerns\ValidaSpecsFijas;
 use App\Http\Requests\Concerns\ValidaVariantes;
 use App\Support\DeLaTienda;
 use App\Support\Subidas;
@@ -12,6 +13,7 @@ use Illuminate\Validation\Validator;
 class StoreProductRequest extends FormRequest
 {
     use CompruebaArchivosRecibidos;
+    use ValidaSpecsFijas;
     use ValidaVariantes;
 
     public function authorize(): bool
@@ -31,8 +33,16 @@ class StoreProductRequest extends FormRequest
             ]);
         }
 
+        // FUN-8: despues de decodificar y antes de validar. Ver `ValidaSpecsFijas`.
+        $this->normalizarSpecsFijas();
+
         $this->decodificarVariantes();
         $this->decodificarTramos();
+    }
+
+    protected function categoriaConLaQueSeGuarda(): ?string
+    {
+        return $this->filled('category_id') ? (string) $this->input('category_id') : null;
     }
 
     public function rules(): array
@@ -85,6 +95,7 @@ class StoreProductRequest extends FormRequest
         $validator->after(function (Validator $v) {
             $this->comprobarVariantesRepetidas($v);
             $this->comprobarTramos($v);
+            $this->comprobarSpecsFijas($v);
             $this->comprobarArchivosRecibidos($v);
         });
     }

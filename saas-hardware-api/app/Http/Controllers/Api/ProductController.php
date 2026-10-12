@@ -16,6 +16,7 @@ use App\Support\CeldaCsv;
 use App\Support\Costos;
 use App\Support\DeLaTienda;
 use App\Support\PlanGate;
+use App\Support\SpecsFijas;
 use App\Support\Subidas;
 use App\Support\PreciosPorCantidad;
 use Illuminate\Http\JsonResponse;
@@ -342,8 +343,10 @@ class ProductController extends Controller
         // Productos nuevos que no cupieron en el plan, por ficha.
         $sinHueco = [];
         // FUN-18: grupos de variantes cuya primera fila se rechazo por la
-        // categoria. Sin esto, la segunda fila del grupo pasaria a describir la
-        // ficha y, con su categoria vacia, el producto entraria sin clasificar.
+        // categoria —o, desde FUN-8, por una spec fija que no vale—. Sin esto,
+        // la segunda fila del grupo pasaria a describir la ficha y, con su
+        // categoria vacia, el producto entraria sin clasificar.
+        // claveDeFicha => [fila, que tenia]
         $gruposRechazados = [];
 
         // Mapear índices
@@ -428,10 +431,13 @@ class ProductController extends Controller
             // Y al reves, para poder decir "categoría Procesadores → Memorias"
             // en el informe de lo que se actualizo.
             $nombresDeCategoria = [];
+            // FUN-8: que specs son fijas lo decide el tipo de la categoria.
+            $tiposDeCategoria = [];
 
-            foreach (Category::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']) as $categoria) {
+            foreach (Category::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'component_type']) as $categoria) {
                 $categorias[$this->claveDeNombre($categoria->name)] ??= $categoria->id;
                 $nombresDeCategoria[$categoria->id] = $categoria->name;
+                $tiposDeCategoria[$categoria->id] = $categoria->component_type;
             }
 
             while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
@@ -546,7 +552,8 @@ class ProductController extends Controller
                 }
 
                 if (isset($gruposRechazados[$claveDeFicha])) {
-                    $errors[] = "Fila {$rowCount}: No se importó porque «{$name}» se describe en la fila {$gruposRechazados[$claveDeFicha]}, que tiene una categoría que no existe.";
+                    [$filaQueDescribe, $queTenia] = $gruposRechazados[$claveDeFicha];
+                    $errors[] = "Fila {$rowCount}: No se importó porque «{$name}» se describe en la fila {$filaQueDescribe}, que tiene {$queTenia}.";
                     continue;
                 }
 
@@ -631,7 +638,7 @@ class ProductController extends Controller
                         $errors[] = "Fila {$rowCount}: La categoría «{$categoryName}» no existe en tu tienda. Créala en Categorías o usa una de las que ya tienes.";
 
                         if ($textoVariante !== '') {
-                            $gruposRechazados[$claveDeFicha] = $rowCount;
+                            $gruposRechazados[$claveDeFicha] = [$rowCount, 'una categoría que no existe'];
                         }
 
                         continue;
@@ -659,6 +666,27 @@ class ProductController extends Controller
                                 $specs[$key] = $val;
                             }
                         }
+                    }
+                }
+
+                // FUN-8: las specs fijas del tipo, con las mismas reglas que el
+                // formulario. Una que no vale rechaza la fila, igual que una
+                // categoria que no existe: entrar con ella seria guardar un dato
+                // que el armador no sabe leer, sin que nadie lo vea. Sin
+                // categoria en el archivo, si el producto ya existe se mira al
+                // actualizarlo (`actualizarDesdeCsv`), con la que ya tiene.
+                if ($specs !== null && $categoryId !== null) {
+                    $specs = SpecsFijas::normalizar($specs, $tiposDeCategoria[$categoryId] ?? null);
+                    $specsQueNoValen = SpecsFijas::errores($specs, $tiposDeCategoria[$categoryId] ?? null);
+
+                    if ($specsQueNoValen !== []) {
+                        $errors[] = "Fila {$rowCount}: ".implode(' ', $specsQueNoValen);
+
+                        if ($textoVariante !== '') {
+                            $gruposRechazados[$claveDeFicha] = [$rowCount, 'una especificación que no vale'];
+                        }
+
+                        continue;
                     }
                 }
 
@@ -977,6 +1005,20 @@ class ProductController extends Controller
         // El nombre es la clave con la que se encontró, y `is_active` el import
         // no lo lee: los dos se quedan como estaban.
         $cambios = $this->soloLoQueTrae(array_diff_key($ficha['atributos'], ['name' => true, 'is_active' => true]));
+
+        // FUN-8: si la fila no traia categoria, sus specs se leyeron sin tipo;
+        // se guardan con la que ya tiene el producto, asi que se miran con ella.
+        if (isset($cambios['specs']) && ! isset($cambios['category_id'])) {
+            $tipo = $producto->category?->component_type;
+            $cambios['specs'] = SpecsFijas::normalizar($cambios['specs'], $tipo);
+            $specsQueNoValen = SpecsFijas::errores($cambios['specs'], $tipo);
+
+            if ($specsQueNoValen !== []) {
+                $errors[] = "Fila {$fila}: ".implode(' ', $specsQueNoValen);
+
+                return null;
+            }
+        }
 
         if ($ficha['variantes'] === []) {
             // Con variantes, precio y stock de la ficha son un resumen que no se

@@ -136,6 +136,7 @@ class RutasPublicasNoExponenDatosInternosTest extends TestCase
         $r['GET tienda']           = $this->getJson($base);
         $r['GET resolve-domain']   = $this->getJson('/api/public/resolve-domain?domain=tiendax.test');
         $r['GET planes']           = $this->getJson('/api/public/plans');
+        $r['GET specs fijas']      = $this->getJson('/api/public/component-specs');
         $r['GET categorias']       = $this->getJson("$base/categories");
         $r['GET productos']        = $this->getJson("$base/products");
         $r['GET facetas']          = $this->getJson("$base/facets");

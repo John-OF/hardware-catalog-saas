@@ -1,7 +1,7 @@
 import './ProductsPage.css';
 
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
@@ -35,6 +35,10 @@ import Dialogo from '../../components/ui/Dialogo';
 import EditorDeVariantes from '../../components/dashboard/EditorDeVariantes';
 import EditorDeTramos from '../../components/dashboard/EditorDeTramos';
 import InformeDeImport from '../../components/dashboard/InformeDeImport';
+import FichaTecnica from '../../components/dashboard/FichaTecnica';
+import { useSpecsFijas } from '../../hooks/useSpecsFijas';
+import { camposDe, reacomodarSpecs, separarSpecs, unirSpecs } from '../../utils/specsFijas';
+import { COMPONENT_TYPES } from '../../utils/componentTypes';
 import {
   agregarVariantesAlFormulario,
   problemaDeVariantes,
@@ -158,6 +162,10 @@ export default function ProductsPage() {
   // Specs list state (list of { key, value })
   const [specsList, setSpecsList] = useState<{ key: string; value: string }[]>([]);
 
+  // FUN-8: los campos con nombre fijo del tipo de la categoría elegida. Las
+  // specs libres de arriba siguen para todo lo demás.
+  const [fichaFija, setFichaFija] = useState<Record<string, string>>({});
+
   // MOD-5: variantes. Con alguna, precio y stock son de cada una y los campos de
   // la ficha se esconden: el backend los calcula como resumen.
   const [ejesVariantes, setEjesVariantes] = useState<string[]>([]);
@@ -181,6 +189,28 @@ export default function ProductsPage() {
     queryKey: ['categories'],
     queryFn: getCategories,
   });
+
+  // FUN-8: qué campos fijos pregunta la categoría elegida. La lista viene de la
+  // API (`config/component_specs.php`); aquí no hay ninguna copia.
+  const { data: definicionDeSpecs } = useSpecsFijas();
+  const tipoDelFormulario = categories.find((c) => c.id === categoryId)?.component_type ?? null;
+  const camposDelTipo = useMemo(
+    () => camposDe(definicionDeSpecs, tipoDelFormulario),
+    [definicionDeSpecs, tipoDelFormulario],
+  );
+
+  // Al cambiar de categoría —o al llegar la definición con el formulario ya
+  // abierto— se vuelve a repartir entre campos fijos y filas libres, para que
+  // lo que se ve sea lo que se guarda (ver `reacomodarSpecs`). Durante el render
+  // y no en un efecto: es el patrón de React para "estado que depende de otro
+  // que cambió", y evita pintar un fotograma con el reparto viejo.
+  const [camposRepartidos, setCamposRepartidos] = useState(camposDelTipo);
+  if (camposRepartidos !== camposDelTipo) {
+    setCamposRepartidos(camposDelTipo);
+    const { fijas, libres } = reacomodarSpecs(fichaFija, specsList, camposDelTipo);
+    setFichaFija(fijas);
+    setSpecsList(libres);
+  }
 
   // Fetch products
   const { data: paginatedData, isLoading } = useQuery<PaginatedResponse<Product>>({
@@ -339,6 +369,7 @@ export default function ProductsPage() {
     setExistingGallery([]);
     setDeletedImageIds([]);
     setSpecsList([]);
+    setFichaFija({});
     setEjesVariantes([]);
     setFilasVariantes([]);
     setTramosFicha([]);
@@ -367,16 +398,11 @@ export default function ProductsPage() {
     setExistingGallery(product.images || []);
     setDeletedImageIds([]);
     
-    // Map specs record to array [{key, value}]
-    if (product.specs) {
-      const mapped = Object.entries(product.specs).map(([key, value]) => ({
-        key,
-        value: value.toString()
-      }));
-      setSpecsList(mapped);
-    } else {
-      setSpecsList([]);
-    }
+    // FUN-8: las del tipo de su categoría a sus campos; el resto, a filas libres.
+    const tipoDelProducto = categories.find((c) => c.id === product.category_id)?.component_type ?? null;
+    const { fijas, libres } = separarSpecs(product.specs, camposDe(definicionDeSpecs, tipoDelProducto));
+    setFichaFija(fijas);
+    setSpecsList(libres);
 
     const { ejes, filas } = variantesDesdeProducto(product.variants);
     setEjesVariantes(ejes);
@@ -499,16 +525,9 @@ export default function ProductsPage() {
       formData.append('deleted_image_ids', JSON.stringify(deletedImageIds));
     }
 
-    // Convert specs array back to JSON object
-    const specsObj: Record<string, string> = {};
-    specsList.forEach((item) => {
-      if (item.key.trim() && item.value.trim()) {
-        specsObj[item.key.trim()] = item.value.trim();
-      }
-    });
-    
-    // Append specs as JSON string or key value
-    formData.append('specs', JSON.stringify(specsObj));
+    // Las fijas y las libres juntas: el servidor sabe cuáles son cuáles por la
+    // categoría (FUN-8). Siempre se manda entero, también vacío.
+    formData.append('specs', JSON.stringify(unirSpecs(fichaFija, specsList)));
 
     // Siempre, también vacía: una lista vacía es lo que le dice al backend que
     // quite las variantes de un producto que las tenía.
@@ -597,12 +616,17 @@ export default function ProductsPage() {
     // tienda —la de procesadores y la de almacenamiento, por su tipo— y deja la
     // columna vacía si no tiene. Con nombres fijos, la plantilla fallaría en
     // cualquier tienda que llame a las suyas de otra forma.
+    //
+    // FUN-8: las specs del ejemplo usan las claves fijas (`socket`, `tdp`...),
+    // que son las que lee el armador, mezcladas con una libre ("Frecuencia")
+    // para que se vea que las dos conviven. Los datos son los de las fichas de
+    // Intel y Kingston.
     const categoriaDe = (tipo: Category['component_type']) =>
       comoCeldaCsv(categories.find((c) => c.component_type === tipo)?.name ?? '');
 
     const headers = "nombre;marca;variante;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
-    const row = `Intel Core i7-14700K;Intel;;409.99;389.99;15;${categoriaDe('cpu')};"Procesador de alto rendimiento para socket LGA1700";"Frecuencia:3.4 GHz|Núcleos:20"\n`
-      + `Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;${categoriaDe('ssd')};"SSD NVMe Gen4";"Interfaz:PCIe 4.0"\n`
+    const row = `Intel Core i7-14700K;Intel;;409.99;389.99;15;${categoriaDe('cpu')};"Procesador de alto rendimiento para socket LGA1700";"socket:LGA1700|tdp:125|graficos_integrados:si|incluye_disipador:no|nucleos:20|hilos:28|Frecuencia:3.4 GHz"\n`
+      + `Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;${categoriaDe('ssd')};"SSD NVMe Gen4";"interfaz:M.2 NVMe"\n`
       + 'Kingston NV3;;Capacidad: 2 TB;499.99;;3;;;\n';
 
     // BOM para que Excel lo abra como UTF-8; sin él "Núcleos" se ve como
@@ -1364,10 +1388,17 @@ export default function ProductsPage() {
                 />
               </div>
 
+              <FichaTecnica
+                campos={camposDelTipo}
+                valores={fichaFija}
+                tipo={COMPONENT_TYPES.find((t) => t.value === tipoDelFormulario)?.label ?? ''}
+                onChange={(clave, valor) => setFichaFija((actual) => ({ ...actual, [clave]: valor }))}
+              />
+
               {/* Specs Editor */}
               <div className="form-group specs-editor-group">
                 <div className="specs-header">
-                  <label>Especificaciones Técnicas</label>
+                  <label>{camposDelTipo.length > 0 ? 'Otras especificaciones' : 'Especificaciones Técnicas'}</label>
                   <button type="button" onClick={addSpecRow} className="add-spec-btn">
                     <PlusCircle size={15} />
                     <span>Añadir</span>

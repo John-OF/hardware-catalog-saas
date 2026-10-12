@@ -32,10 +32,10 @@ class CsvImportTest extends TestCase
     /** Igual que `handleDownloadTemplate` en ProductsPage.tsx. */
     private const PLANTILLA_CABECERA = "nombre;marca;variante;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
 
-    private const PLANTILLA_FILA = 'Intel Core i7-14700K;Intel;;409.99;389.99;15;Procesadores;"Procesador de alto rendimiento para socket LGA1700";"Frecuencia:3.4 GHz|Núcleos:20"'."\n";
+    private const PLANTILLA_FILA = 'Intel Core i7-14700K;Intel;;409.99;389.99;15;Procesadores;"Procesador de alto rendimiento para socket LGA1700";"socket:LGA1700|tdp:125|graficos_integrados:si|incluye_disipador:no|nucleos:20|hilos:28|Frecuencia:3.4 GHz"'."\n";
 
     /** Las otras dos filas de la plantilla, el ejemplo de variantes (MOD-12). */
-    private const PLANTILLA_FILAS_VARIANTE = 'Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;Almacenamiento;"SSD NVMe Gen4";"Interfaz:PCIe 4.0"'."\n"
+    private const PLANTILLA_FILAS_VARIANTE = 'Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;Almacenamiento;"SSD NVMe Gen4";"interfaz:M.2 NVMe"'."\n"
         .'Kingston NV3;;Capacidad: 2 TB;499.99;;3;;;'."\n";
 
     protected function setUp(): void
@@ -142,9 +142,13 @@ class CsvImportTest extends TestCase
         $this->assertSame('389.99', $producto->sale_price);
         $this->assertSame(15, $producto->stock);
 
-        // Lo que se perdía antes: las dos specs completas.
+        // Lo que se perdía antes: las specs completas. Desde FUN-8 el ejemplo
+        // usa las claves fijas del procesador, mezcladas con una libre.
         $this->assertSame(
-            ['Frecuencia' => '3.4 GHz', 'Núcleos' => '20'],
+            [
+                'socket' => 'LGA1700', 'tdp' => '125', 'graficos_integrados' => 'si', 'incluye_disipador' => 'no',
+                'nucleos' => '20', 'hilos' => '28', 'Frecuencia' => '3.4 GHz',
+            ],
             $producto->specs
         );
     }
@@ -170,7 +174,7 @@ class CsvImportTest extends TestCase
 
         $this->assertCount(2, $variantes);
         $this->assertSame('Kingston', $ssd->brand);
-        $this->assertSame(['Interfaz' => 'PCIe 4.0'], $ssd->specs);
+        $this->assertSame(['interfaz' => 'M.2 NVMe'], $ssd->specs);
         // El resumen de la ficha: la mas barata y el stock sumado (MOD-5).
         $this->assertSame('289.99', $ssd->price);
         $this->assertSame(11, $ssd->stock);

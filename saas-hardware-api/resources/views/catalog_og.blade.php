@@ -99,11 +99,14 @@
         {{-- Las specs son lo que de verdad busca alguien en este rubro
              ("socket AM5", "DDR5 6000"), así que van en el HTML y no sólo en la
              ficha del SPA. --}}
-        @if (! empty($producto->specs))
+        {{-- FUN-8: las de nombre fijo, con su etiqueta y unidad ("TDP / potencia
+             base: 105 W", no "tdp: 105"). --}}
+        @php($ficha = \App\Support\SpecsFijas::paraMostrar($producto->specs))
+        @if ($ficha !== [])
             <dl class="ficha">
-                @foreach ($producto->specs as $clave => $valor)
-                    <dt>{{ $clave }}</dt>
-                    <dd>{{ is_array($valor) ? implode(', ', $valor) : $valor }}</dd>
+                @foreach ($ficha as $spec)
+                    <dt>{{ $spec['etiqueta'] }}</dt>
+                    <dd>{{ $spec['valor'] }}</dd>
                 @endforeach
             </dl>
         @endif

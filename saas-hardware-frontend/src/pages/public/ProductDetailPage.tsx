@@ -48,6 +48,8 @@ import type { Tenant, Product, Page, ProductVariant } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { claveDeLinea, datosDeVenta, nombreConVariante, precioEsDesde, precioVisible, tieneVariantes } from '../../utils/variants';
 import { tramosDeVenta } from '../../utils/preciosPorCantidad';
+import { specsParaMostrar } from '../../utils/specsFijas';
+import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -278,6 +280,9 @@ export default function ProductDetailPage() {
     queryFn: () => getPublicProduct(resolvedSlug!, id!),
     enabled: !!resolvedSlug && !!id,
   });
+
+  // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo.
+  const { data: definicionDeSpecs } = useSpecsFijas();
 
   // Título, favicon y SEO metadata de la pestaña: "Producto · Mi Tienda"
   useTenantBranding(tenant, product?.name, product?.description, product?.images?.[0]?.image_url || product?.image_url);
@@ -772,17 +777,18 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Specifications table */}
+          {/* Specifications table. FUN-8: las de nombre fijo primero, con su
+              etiqueta y unidad ("TDP / potencia base: 105 W", no "tdp: 105"). */}
           {product.specs && Object.keys(product.specs).length > 0 && (
             <div className="detail-specs-section">
               <h3>Especificaciones Técnicas</h3>
               <div className="specs-table-wrapper">
                 <table className="specs-table">
                   <tbody>
-                    {Object.entries(product.specs).map(([key, val]) => (
-                      <tr key={key}>
-                        <td className="spec-name">{key}</td>
-                        <td className="spec-value">{val}</td>
+                    {specsParaMostrar(product.specs, definicionDeSpecs).map((spec) => (
+                      <tr key={spec.clave}>
+                        <td className="spec-name">{spec.etiqueta}</td>
+                        <td className="spec-value">{spec.valor}</td>
                       </tr>
                     ))}
                   </tbody>

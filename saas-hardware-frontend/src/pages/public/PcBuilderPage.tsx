@@ -36,6 +36,8 @@ import { getPublicPages } from '../../api/pages';
 import type { Tenant, Product, Category, ComponentType, PaginatedResponse, Page, ProductVariant } from '../../types';
 import { datosDeVenta, nombreConVariante, tieneVariantes } from '../../utils/variants';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
+import { useSpecsFijas } from '../../hooks/useSpecsFijas';
+import { specsParaMostrar } from '../../utils/specsFijas';
 
 /**
  * Pasos predefinidos para armar la PC.
@@ -150,6 +152,9 @@ export default function PcBuilderPage() {
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   // Fetch Categories to map step keys
+  // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo.
+  const { data: definicionDeSpecs } = useSpecsFijas();
+
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['publicCategories', resolvedSlug],
     queryFn: async () => {
@@ -204,7 +209,9 @@ export default function PcBuilderPage() {
 
   const getRamType = (product: Product): string | null => {
     if (!product.specs) return null;
-    const keys = ['tipo de memoria', 'memoria', 'tecnología', 'tecnologia', 'ram compatible', 'tipo ram', 'tipo'];
+    // `tipo_memoria` es la clave fija de FUN-8 (13.3); el resto, lo que se adivinaba
+    // antes. Puente hasta que 13.5 lea solo las fijas.
+    const keys = ['tipo_memoria', 'tipo de memoria', 'memoria', 'tecnología', 'tecnologia', 'ram compatible', 'tipo ram', 'tipo'];
     for (const key of Object.keys(product.specs)) {
       if (keys.includes(key.toLowerCase())) {
         const val = product.specs[key]?.toString().toLowerCase();
@@ -569,8 +576,8 @@ export default function PcBuilderPage() {
                         </span>
                         {selectedProduct.specs && (
                           <div className="prod-mini-specs">
-                            {Object.entries(selectedProduct.specs).slice(0, 2).map(([k, v]) => (
-                              <span key={k} className="mini-spec-badge">{k}: {v}</span>
+                            {specsParaMostrar(selectedProduct.specs, definicionDeSpecs).slice(0, 2).map((spec) => (
+                              <span key={spec.clave} className="mini-spec-badge">{spec.etiqueta}: {spec.valor}</span>
                             ))}
                           </div>
                         )}
