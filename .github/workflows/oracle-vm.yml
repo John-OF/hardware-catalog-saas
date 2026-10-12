@@ -44,11 +44,39 @@ jobs:
       - name: Instalar la CLI de Oracle
         run: pip install --quiet oci-cli
 
-      - name: Preparar la clave
+      - name: Comprobar que estan los secretos
+        env:
+          S_USER: ${{ secrets.OCI_USER }}
+          S_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          S_TENANCY: ${{ secrets.OCI_TENANCY }}
+          S_REGION: ${{ secrets.OCI_REGION }}
+          S_KEY_B64: ${{ secrets.OCI_KEY_B64 }}
+          S_SUBNET: ${{ secrets.OCI_SUBNET_ID }}
+          S_IMAGE: ${{ secrets.OCI_IMAGE_ID }}
+          S_SSH: ${{ secrets.OCI_SSH_PUBKEY }}
         run: |
-          echo "${{ secrets.OCI_KEY_B64 }}" | base64 -d > "$OCI_CLI_KEY_FILE"
+          falta=0
+          for par in OCI_USER:S_USER OCI_FINGERPRINT:S_FINGERPRINT OCI_TENANCY:S_TENANCY \
+                     OCI_REGION:S_REGION OCI_KEY_B64:S_KEY_B64 OCI_SUBNET_ID:S_SUBNET \
+                     OCI_IMAGE_ID:S_IMAGE OCI_SSH_PUBKEY:S_SSH; do
+            nombre=${par%%:*}; var=${par##*:}; valor=${!var}
+            if [ -z "$valor" ]; then echo "::error::Falta el secreto $nombre (o esta vacio)"; falta=1
+            else echo "$nombre: ok (${#valor} caracteres)"; fi
+          done
+          exit $falta
+
+      - name: Preparar la clave
+        env:
+          S_KEY_B64: ${{ secrets.OCI_KEY_B64 }}
+          S_SSH: ${{ secrets.OCI_SSH_PUBKEY }}
+        run: |
+          # tr quita espacios y saltos de linea que se cuelan al pegar el secreto
+          printf '%s' "$S_KEY_B64" | tr -d ' \r\n' | base64 -d > "$OCI_CLI_KEY_FILE" \
+            || { echo "::error::OCI_KEY_B64 no es base64 valido: debe ser la clave privada en UNA linea"; exit 1; }
           chmod 600 "$OCI_CLI_KEY_FILE"
-          echo "${{ secrets.OCI_SSH_PUBKEY }}" > /tmp/key.pub
+          head -1 "$OCI_CLI_KEY_FILE" | grep -q "BEGIN" \
+            || { echo "::error::OCI_KEY_B64 se decodifica pero no es una clave PEM"; exit 1; }
+          printf '%s\n' "$S_SSH" > /tmp/key.pub
 
       - name: Ver si la VM ya existe
         id: existe
