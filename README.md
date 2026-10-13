@@ -70,7 +70,8 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
   sale ninguno
 - **En producción, un cron del sistema llamando `php artisan schedule:run` cada minuto**: es lo que
   cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`), lo que vacía la
-  papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`) y lo que hace la
+  papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`), lo que borra la
+  actividad de tienda de más de un año (`bitacora:purgar`, `INF-20`) y lo que hace la
   **copia de seguridad diaria** (`copias:crear`, `INF-7`); sin él, ninguna prueba se cierra aunque la
   fecha ya haya pasado, la papelera crece sin techo y **no hay ninguna copia de la base**. Como sin él
   no hay ningún error que leer, cada tarea avisa fuera al terminar (`INF-18`, ver *Vigilancia de las
@@ -192,8 +193,8 @@ Un cron caído no da errores: se calla, y la copia de esa noche simplemente no e
 tarea del scheduler avisa al terminar a una URL de `config/salud.php` (`VIGILANCIA_*_URL`), y es un
 servicio externo —healthchecks.io, Better Stack— el que da la alarma cuando **deja de llegar** el
 aviso. Al fallar se avisa a la misma URL con `/fail`, para enterarse en el momento. Hacen falta
-cuatro comprobaciones en ese servicio: `copias`, `pruebas` y `papelera` cada día, y `salud` cada
-hora, que cubre de paso al propio cron. Sin URL no se avisa a nadie, que es lo que pasa en local.
+cinco comprobaciones en ese servicio: `copias`, `pruebas`, `papelera` y `bitacora` cada día, y
+`salud` cada hora, que cubre de paso al propio cron. Sin URL no se avisa a nadie, que es lo que pasa en local.
 
 ### Copias de seguridad y cómo restaurar una (`INF-7`)
 
@@ -398,7 +399,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 89 archivos, 974 tests (+1 en tests/Unit)
+tests/Feature/         # 91 archivos, 983 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -423,7 +424,7 @@ tests/Feature/         # 89 archivos, 974 tests (+1 en tests/Unit)
 |---|---|---|
 | GET | `/` | Datos y branding de la tienda (solo columnas públicas) |
 | GET | `/categories` | Categorías activas (con `component_type`) |
-| GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación |
+| GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación. Con `ids[]`, solo esos productos y sin caché: las piezas de un armado compartido (MOD-20) |
 | GET | `/facets` | Valores de spec reales del catálogo, para los filtros |
 | GET | `/builder/compatibility` | Veredicto del armador de PC (`seleccion[paso]=id`): incidencias mientras se elige y al pedir, consumo estimado, y con `paso` y `candidatos[]`, la etiqueta de cada producto del cajón (FUN-8) |
 | GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
@@ -468,7 +469,7 @@ un colaborador; un `admin` puede todo. El reparto y su criterio están en `route
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
 | CRUD | `/api/pages` | Páginas informativas | No |
 | GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto), cambiar rol, activar, eliminar | No |
-| GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página) | No |
+| GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página), con `retencion_dias`: lo de más de un año lo borra `bitacora:purgar` (INF-20) | No |
 | GET·DELETE | `/api/trash` | La papelera (MOD-8): `?tipo=productos\|pedidos` (paginado, con los totales de los dos) y `DELETE` para vaciarla entera | Sí |
 | POST·DELETE | `/api/trash/{tipo}/{id}/restore` · `/api/trash/{tipo}/{id}` | Restaurar (puede dar 422 si el plan ya no tiene hueco) y eliminar definitivamente | Sí |
 
@@ -536,17 +537,18 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 | `MAIL_*` / `RESEND_API_KEY` | Envío de correo |
 | `TURNSTILE_SECRET_KEY` | Anti-bot de reseñas. Fuera de local, sin clave se rechazan con 502 |
 | `PLATFORM_ALLOWED_IPS` | IPs del panel de plataforma. **En producción, vacío = no entra nadie** |
-| `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
+| `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_BITACORA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
 | `PASSWORD_UNCOMPROMISED` | Contrasta contraseñas contra Have I Been Pwned |
 | `APP_DEBUG` | **En producción tiene que ser `false` o la app no arranca** |
 
 ### Comandos
 
 ```bash
-php artisan test        # 975 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 984 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
+php artisan bitacora:purgar          # Borra la actividad de tienda de +365 días; la de plataforma no caduca (INF-20; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
 php artisan platform:quitar-dos-pasos {email}  # Quita la verificación en dos pasos a un operador y le cierra las sesiones (SEC-9)
 vendor/bin/pint         # Formateo (Laravel Pint)
@@ -570,7 +572,7 @@ react-hot-toast. CSS propio, sin framework.
 |---|---|
 | `/{slug}` · `/` | Catálogo (`/` resuelve la tienda por el dominio; en un host de `VITE_PLATFORM_HOSTS`, landing — `pages/marketing/LandingPage.tsx`, INF-1/INF-9) |
 | `/{slug}/product/:id` · `/product/:id` | Ficha de producto |
-| `/{slug}/builder` · `/builder` | Armador de PC |
+| `/{slug}/builder` · `/builder` | Armador de PC. El armado va en la URL para poder compartirlo (`?cpu=<id>&ram=<id>&ram_variante=<id>…`, MOD-20) |
 | `/{slug}/p/:pageSlug` · `/p/:pageSlug` | Página informativa |
 
 **Cuenta y panel:**
@@ -627,7 +629,8 @@ src/
 │                   # variantesEnFormulario, plataforma (¿es el host del SaaS?),
 │                   # paymentMethods (qué mostrarle al comprador), subidas (qué se
 │                   # puede subir y cuánto, copia de config/subidas.php, UI-15),
-│                   # specsFijas (repartir y pintar las specs de FUN-8)
+│                   # specsFijas (repartir y pintar las specs de FUN-8),
+│                   # armadoCompartido (el armado de PC en la URL, MOD-20)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -685,7 +688,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 280 tests (Vitest + Testing Library, jsdom)
+npm test          # 286 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 

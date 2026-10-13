@@ -76,6 +76,9 @@ export default function ActivityPage() {
           <p className="page-description">
             Quién cambió qué en el panel de tu tienda: precios, pedidos, categorías, equipo y
             configuración. Solo lo ven los administradores.
+            {data?.retencion_dias && (
+              <> Se guarda lo de los últimos {data.retencion_dias} días; lo anterior se borra solo.</>
+            )}
           </p>
         </div>
       </div>

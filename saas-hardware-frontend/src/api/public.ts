@@ -44,6 +44,11 @@ export const getPublicProducts = async (
     /** Whitelist del backend: price_asc | price_desc | newest | name. */
     sort?: string;
     page?: number;
+    /**
+     * Solo estos productos (MOD-20): las piezas de un armado compartido por
+     * enlace. Con `ids`, el resto de filtros no se mira.
+     */
+    ids?: string[];
   }
 ): Promise<PaginatedResponse<Product>> => {
   const response = await api.get<PaginatedResponse<Product>>(`/public/${slug}/products`, { params });

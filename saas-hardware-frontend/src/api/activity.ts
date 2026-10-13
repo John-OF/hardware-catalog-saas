@@ -12,7 +12,9 @@ export const getActividad = async (params?: {
   actor?: string;
   page?: number;
   per_page?: number;
-}): Promise<PaginatedResponse<ActividadDelPanel>> => {
-  const { data } = await api.get<PaginatedResponse<ActividadDelPanel>>('/activity', { params });
+}): Promise<PaginatedResponse<ActividadDelPanel> & { retencion_dias?: number }> => {
+  // `retencion_dias` (INF-20): lo anterior se borra solo. Viene del servidor,
+  // que es quien lo borra, para que la pantalla no prometa otro número.
+  const { data } = await api.get<PaginatedResponse<ActividadDelPanel> & { retencion_dias?: number }>('/activity', { params });
   return data;
 };

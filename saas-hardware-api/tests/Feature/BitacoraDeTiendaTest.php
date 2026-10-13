@@ -327,6 +327,14 @@ class BitacoraDeTiendaTest extends TestCase
         $this->como($this->admin)->getJson('/api/activity')->assertOk();
     }
 
+    /** INF-20: la pantalla dice cuánto se guarda, con el número que usa la purga. */
+    public function test_el_listado_dice_cuantos_dias_se_guarda(): void
+    {
+        $this->como($this->admin)->getJson('/api/activity')
+            ->assertOk()
+            ->assertJsonPath('retencion_dias', ActivityLog::DIAS_EN_TIENDA);
+    }
+
     public function test_cada_tienda_ve_solo_lo_suyo_y_nunca_lo_del_operador(): void
     {
         $otra = $this->crearTienda('otra-tienda', 'Otra Tienda');

@@ -37,6 +37,7 @@ return [
         'copias'   => env('VIGILANCIA_COPIAS_URL'),
         'pruebas'  => env('VIGILANCIA_PRUEBAS_URL'),
         'papelera' => env('VIGILANCIA_PAPELERA_URL'),
+        'bitacora' => env('VIGILANCIA_BITACORA_URL'),
         'salud'    => env('VIGILANCIA_SALUD_URL'),
     ],
 

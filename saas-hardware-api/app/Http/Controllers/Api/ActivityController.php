@@ -43,6 +43,8 @@ class ActivityController extends Controller
             ->select(['id', 'actor_id', 'actor_email', 'actor_role', 'action', 'description', 'context', 'created_at'])
             ->paginate(Paginacion::porPagina($request, 30));
 
-        return response()->json($lineas);
+        // INF-20: cuánto se guarda, para que la pantalla lo diga en vez de dejar
+        // que alguien busque algo de hace dos años y crea que no pasó.
+        return response()->json([...$lineas->toArray(), 'retencion_dias' => ActivityLog::DIAS_EN_TIENDA]);
     }
 }

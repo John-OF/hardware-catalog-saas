@@ -1,7 +1,7 @@
 import './PcBuilderPage.css';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   Cpu,
@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
+  Share2,
   X
 } from 'lucide-react';
 import Imagen from '../../components/ui/Imagen';
@@ -38,6 +39,7 @@ import { datosDeVenta, nombreConVariante, tieneVariantes } from '../../utils/var
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 import { specsParaMostrar } from '../../utils/specsFijas';
+import { armadoDesdeElEnlace, escribirArmadoEnElEnlace, leerArmadoDelEnlace } from '../../utils/armadoCompartido';
 
 /**
  * Pasos predefinidos para armar la PC.
@@ -59,6 +61,8 @@ const BUILDER_STEPS: { id: number; key: ComponentType; name: string }[] = [
   { id: 8, key: 'case', name: 'Gabinete / Chasis' },
 ];
 
+const PASOS = BUILDER_STEPS.map((s) => s.key);
+
 export default function PcBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
   const isCustomDomain = !slug;
@@ -72,6 +76,16 @@ export default function PcBuilderPage() {
   // aparte de `selections` a propósito: la compatibilidad se evalúa con las specs
   // de la ficha, que son las mismas para todas sus variantes.
   const [variantesElegidas, setVariantesElegidas] = useState<Record<string, ProductVariant | null>>({});
+
+  // MOD-20: el armado vive también en la URL, para poder compartirlo. Lo que
+  // trae el enlace se lee una sola vez al entrar; las piezas se piden después
+  // al catálogo por id, con su precio y su stock de hoy.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [delEnlace] = useState(() => leerArmadoDelEnlace(searchParams, PASOS));
+  const idsDelEnlace = Object.values(delEnlace).map((pieza) => pieza.id);
+  const [cargandoEnlace, setCargandoEnlace] = useState(idsDelEnlace.length > 0);
+  /** Piezas del enlace que ya no están en el catálogo: se dicen, no se callan. */
+  const [faltanDelEnlace, setFaltanDelEnlace] = useState(0);
 
   // Y la que está marcada en el desplegable de cada producto del cajón, antes de
   // pulsar "Seleccionar".
@@ -127,10 +141,28 @@ export default function PcBuilderPage() {
 
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
-  // Fetch Categories to map step keys
   // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo.
   const { data: definicionDeSpecs } = useSpecsFijas();
 
+  // MOD-20: las piezas del enlace, con la misma forma que las del cajón.
+  const { data: piezasDelEnlace, isError: errorDelEnlace } = useQuery({
+    queryKey: ['armado-compartido', resolvedSlug, idsDelEnlace],
+    queryFn: () => getPublicProducts(resolvedSlug!, { ids: idsDelEnlace }),
+    enabled: !!resolvedSlug && cargandoEnlace,
+  });
+
+  // Al llegar, se eligen. Durante el render y no en un efecto: es el patrón de
+  // React para "estado que se ajusta cuando llega otro", y no pinta un
+  // fotograma con el armado vacío.
+  if (cargandoEnlace && (piezasDelEnlace || errorDelEnlace)) {
+    const { selecciones, variantes, faltan } = armadoDesdeElEnlace(delEnlace, piezasDelEnlace?.data ?? []);
+    setCargandoEnlace(false);
+    setSelections(selecciones);
+    setVariantesElegidas(variantes);
+    setFaltanDelEnlace(faltan);
+  }
+
+  // Fetch Categories to map step keys
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['publicCategories', resolvedSlug],
     queryFn: async () => {
@@ -242,8 +274,11 @@ export default function PcBuilderPage() {
       }
     }
 
-    setSelections({ ...selections, [stepKey]: product });
-    setVariantesElegidas({ ...variantesElegidas, [stepKey]: variante });
+    const selecciones = { ...selections, [stepKey]: product };
+    const variantes = { ...variantesElegidas, [stepKey]: variante };
+    setSelections(selecciones);
+    setVariantesElegidas(variantes);
+    guardarEnElEnlace(selecciones, variantes);
     setActiveStepId(null);
     toast.success(`${nombreConVariante(product.name, variante?.nombre)} agregado al armado`);
   };
@@ -255,6 +290,26 @@ export default function PcBuilderPage() {
     const variantes = { ...variantesElegidas };
     delete variantes[stepKey];
     setVariantesElegidas(variantes);
+    guardarEnElEnlace(temp, variantes);
+  };
+
+  /**
+   * MOD-20: la URL sigue al armado, sin crear una entrada de historial por
+   * cada pieza (el botón "atrás" saca del armador, no deshace una elección).
+   * Lo que faltaba del enlace deja de importar en cuanto se toca el armado.
+   */
+  const guardarEnElEnlace = (selecciones: Record<string, Product>, variantes: Record<string, ProductVariant | null>) => {
+    setSearchParams((actuales) => escribirArmadoEnElEnlace(actuales, PASOS, selecciones, variantes), { replace: true });
+    setFaltanDelEnlace(0);
+  };
+
+  const copiarEnlace = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('Enlace del armado copiado');
+    } catch {
+      toast.error('No se pudo copiar: copia la dirección de la barra del navegador.');
+    }
   };
 
   /**
@@ -308,6 +363,8 @@ export default function PcBuilderPage() {
     if (consumo) {
       message += `*Consumo del Sistema:* ${consumo.estimado}W (Recomendado: ${consumo.recomendado}W)\n`;
     }
+    // MOD-20: con el enlace, la tienda abre exactamente este armado.
+    message += `*Ver el armado:* ${window.location.href}\n`;
     message += `\nPor favor, confírmenme stock y disponibilidad. Gracias!`;
 
     const url = `https://wa.me/${tenant?.whatsapp_number?.replace('+', '') ?? ''}?text=${encodeURIComponent(message)}`;
@@ -485,7 +542,12 @@ export default function PcBuilderPage() {
 
             {/* Banner Validación de Compatibilidad */}
             <div className="compatibility-status-section">
-              {Object.keys(selections).length === 0 ? (
+              {cargandoEnlace ? (
+                <div className="status-banner empty">
+                  <Loader2 className="spinner" size={16} />
+                  <span>Cargando el armado del enlace…</span>
+                </div>
+              ) : Object.keys(selections).length === 0 ? (
                 <div className="status-banner empty">
                   <Cpu size={16} />
                   <span>Agrega componentes para verificar compatibilidad.</span>
@@ -533,7 +595,7 @@ export default function PcBuilderPage() {
               )}
 
               {/* List of issues */}
-              {(compatibilityIssues.length > 0 || noDisponibles.length > 0) && (
+              {(compatibilityIssues.length > 0 || noDisponibles.length > 0 || faltanDelEnlace > 0) && (
                 <div className="issues-list">
                   {compatibilityIssues.map((issue, idx) => (
                     <div key={`${issue.regla}-${idx}`} className={`issue-item ${issue.tipo}`}>
@@ -543,6 +605,16 @@ export default function PcBuilderPage() {
                       <span>{issue.mensaje}</span>
                     </div>
                   ))}
+                  {faltanDelEnlace > 0 && (
+                    <div className="issue-item unknown">
+                      <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>
+                        {faltanDelEnlace === 1
+                          ? 'Una pieza del enlace ya no está en el catálogo: elige otra en su paso.'
+                          : `${faltanDelEnlace} piezas del enlace ya no están en el catálogo: elige otras en sus pasos.`}
+                      </span>
+                    </div>
+                  )}
                   {noDisponibles.length > 0 && (
                     <div className="issue-item unknown">
                       <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -571,6 +643,13 @@ export default function PcBuilderPage() {
                 disabled={!haySeleccion || !veredictoAlDia}
               >
                 <MessageCircle size={18} /> Consultar por WhatsApp
+              </button>
+              <button
+                onClick={copiarEnlace}
+                className="btn-secondary btn-share-build"
+                disabled={!haySeleccion}
+              >
+                <Share2 size={18} /> Copiar enlace del armado
               </button>
             </div>
           </div>

@@ -30,7 +30,11 @@ use Illuminate\Http\Request;
  * de su panel. Cada bitácora lee solo el suyo: la del operador no se inunda de
  * cambios de precio y la de la tienda no enseña las notas del operador.
  *
- * Solo se escribe y se lee; no hay edición ni borrado.
+ * Solo se escribe y se lee; no hay edición, y **el único borrado es por
+ * antigüedad**: `bitacora:purgar` quita la actividad de tienda de más de
+ * `DIAS_EN_TIENDA` días (INF-20). No hay botón para borrarla a mano, a
+ * propósito: una tienda puede tener varios administradores (FUN-4), y uno que
+ * pudiera vaciarla podría borrar el rastro de lo que hizo él mismo.
  *
  * **Qué pasa si anotar falla, según el origen.** `registrar()` deja subir el
  * error: en plataforma la línea es parte de la acción (la sesión de soporte no
@@ -107,6 +111,21 @@ class ActivityLog extends Model
     public const CONFIGURACION_DOMINIO = 'configuracion.dominio_verificado';
 
     /** Las áreas de la bitácora de tienda, en el orden en que las ofrece el filtro. */
+    /**
+     * Días que se guarda la actividad del panel de una tienda (INF-20). Un año
+     * entero cubre la pregunta típica —"¿quién cambió este precio en la campaña
+     * del año pasado?"— y un ejercicio contable; más no aporta y la tabla crece
+     * con cada import (hasta 100 productos de detalle por línea, FUN-19).
+     *
+     * La de **plataforma no caduca**: es la que responde "quién suspendió esta
+     * tienda" o "quién entró en modo soporte", la escribe solo el operador y
+     * crece poco.
+     *
+     * La página de privacidad (`PrivacidadPage.tsx`, INF-15) promete este mismo
+     * número: si cambia aquí, cambia allí.
+     */
+    public const DIAS_EN_TIENDA = 365;
+
     public const AREAS_DE_TIENDA = ['producto', 'pedido', 'categoria', 'pagina', 'resena', 'espera', 'cupon', 'papelera', 'equipo', 'configuracion'];
 
     protected $fillable = [

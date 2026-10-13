@@ -35,6 +35,10 @@ Vigilancia::tarea(Schedule::command('trials:cerrar-vencidas')->daily(), 'pruebas
 // quedan ocupando disco para siempre.
 Vigilancia::tarea(Schedule::command('papelera:purgar')->daily(), 'papelera');
 
+// INF-20: la actividad del panel de tienda caduca al año. Sin esto la tabla
+// crece con cada import, que guarda el detalle de hasta 100 productos.
+Vigilancia::tarea(Schedule::command('bitacora:purgar')->daily(), 'bitacora');
+
 // INF-7: la copia de seguridad de la base, a diario. Se programa de madrugada
 // porque `mysqldump` con `--single-transaction` no bloquea la tienda, pero sí
 // compite por disco y red con quien esté comprando.

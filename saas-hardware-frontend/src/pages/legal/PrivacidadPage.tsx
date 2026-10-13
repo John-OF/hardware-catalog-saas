@@ -91,6 +91,8 @@ export default function PrivacidadPage() {
         <li>Mientras tu tienda exista. Si se suspende —por ejemplo, al terminar la prueba sin elegir
           plan— sus datos se conservan para que puedas reactivarla.</li>
         <li>Lo que mandas a la papelera del panel se borra solo a los 30 días.</li>
+        <li>El registro de cambios del panel de tu tienda (quién cambió qué) se guarda 365 días y después
+          se borra solo.</li>
         <li>Las copias de seguridad de la base de datos se guardan 30 días y después se borran.</li>
         <li>Si pides la baja de tu tienda, borramos sus datos en un plazo máximo de 30 días; las copias
           de seguridad que aún los contengan caducan en los 30 días siguientes. Conservaremos solo lo que

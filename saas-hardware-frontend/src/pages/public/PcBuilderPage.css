@@ -403,7 +403,8 @@
   justify-content: center;
 }
 
-:where(.page-pc-builder) .btn-order-whatsapp {
+:where(.page-pc-builder) .btn-order-whatsapp,
+:where(.page-pc-builder) .btn-share-build {
   width: 100%;
   justify-content: center;
 }

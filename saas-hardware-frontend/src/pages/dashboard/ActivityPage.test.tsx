@@ -54,6 +54,13 @@ describe('ActivityPage (INF-3)', () => {
     expect(screen.getByText('Productos', { selector: '.activity-area' })).toBeInTheDocument();
   });
 
+  it('dice cuánto se guarda, con el número que manda el servidor (INF-20)', async () => {
+    vi.mocked(getActividad).mockResolvedValue({ ...pagina([linea({})]), retencion_dias: 365 });
+    abrir();
+
+    expect(await screen.findByText(/Se guarda lo de los últimos 365 días; lo anterior se borra solo\./)).toBeInTheDocument();
+  });
+
   it('dice cuándo la persona ya no está en el equipo, con el correo que quedó guardado', async () => {
     vi.mocked(getActividad).mockResolvedValue(pagina([linea({ actor: null, actor_email: 'exvendedor@tienda.test' })]));
     abrir();

@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 class PublicCatalogController extends Controller
 {
@@ -115,6 +116,22 @@ class PublicCatalogController extends Controller
         // cache; ahora se acumula y se vuelca cada pocos minutos (AUD-2).
         $vistas->record('tenants', $tenant->id);
 
+        // MOD-20: un armado compartido por enlace trae sus piezas por id. Sin
+        // cache a proposito: son como mucho ocho filas, y cada combinacion de
+        // ids seria una entrada nueva de cache —la fuga que AUD-7 cerro en el
+        // filtro de specs—. Lo que no es un UUID se descarta antes de consultar.
+        $ids = collect((array) $request->query('ids', []))
+            ->filter(fn ($id) => is_string($id) && Str::isUuid($id))
+            ->unique()
+            ->take(count(ComponentType::deArmador()))
+            ->values();
+
+        if ($request->has('ids')) {
+            return response()->json(
+                $this->catalogoPublico($tenant)->whereIn('id', $ids->all())->paginate(24)->toArray()
+            );
+        }
+
         // Obtener la versión de caché actual para el tenant (soporte de invalidación en driver file)
         $version = Cache::remember("tenant:{$slug}:cache_version", 86400, fn () => 1);
 
@@ -143,12 +160,7 @@ class PublicCatalogController extends Controller
         $cacheKey = "catalog:{$slug}:v{$version}:".md5(json_encode($criterios));
 
         $products = Cache::remember($cacheKey, 300, function () use ($tenant, $request, $specs, $componentType) {
-            return Product::where('tenant_id', $tenant->id)
-                ->where('is_active', true)
-                ->where('status', 'published')
-                ->with(['category:id,name,icon', 'images', 'variants'])
-                ->withAvg(['reviews' => fn ($q) => $q->where('is_approved', true)], 'rating')
-                ->withCount(['reviews' => fn ($q) => $q->where('is_approved', true)])
+            return $this->catalogoPublico($tenant)
                 ->when($request->category_id, fn ($q) => $q->where('category_id', $request->category_id))
                 ->when($componentType, fn ($q) => $q->whereHas(
                     'category',
@@ -173,6 +185,25 @@ class PublicCatalogController extends Controller
         });
 
         return response()->json($products);
+    }
+
+    /**
+     * Lo que el listado del catalogo publico ensena de una tienda, con lo que
+     * lleva cada producto. La comparten el listado y las piezas de un armado
+     * compartido (MOD-20), que tienen que llegar con la misma forma: el armador
+     * las trata igual que las que eligio del cajon.
+     *
+     * El `component_type` de la categoria va para que el armador compruebe que
+     * cada pieza de un enlace es de su paso.
+     */
+    private function catalogoPublico(Tenant $tenant): Builder
+    {
+        return Product::where('tenant_id', $tenant->id)
+            ->where('is_active', true)
+            ->where('status', 'published')
+            ->with(['category:id,name,icon,component_type', 'images', 'variants'])
+            ->withAvg(['reviews' => fn ($q) => $q->where('is_approved', true)], 'rating')
+            ->withCount(['reviews' => fn ($q) => $q->where('is_approved', true)]);
     }
 
     /**
