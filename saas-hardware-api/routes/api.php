@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Public\PublicCatalogController;
 use App\Http\Controllers\Api\Public\PublicAuthController;
 use App\Http\Controllers\Api\Public\PublicFavoritesController;
 use App\Http\Controllers\Api\Public\PublicOrdersController;
+use App\Http\Controllers\Api\Public\PublicBuilderController;
 use App\Http\Controllers\Api\Public\PublicComponentSpecsController;
 use App\Http\Controllers\Api\Public\PublicPlansController;
 use Illuminate\Support\Facades\Route;
@@ -106,6 +107,9 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
     // Valores de specs de TODO el catálogo, para que los filtros no dependan
     // de la página visible (PUB-2).
     Route::get('/facets',    [PublicCatalogController::class, 'facets']);
+    // El veredicto del armador de PC (FUN-8, 13.5): las reglas viven en el
+    // servidor y el navegador solo pregunta y pinta.
+    Route::get('/builder/compatibility', [PublicBuilderController::class, 'compatibilidad']);
     Route::get('/products/{product}', [PublicCatalogController::class, 'product']);
     Route::post('/products/{product}/reviews', [PublicCatalogController::class, 'storeReview'])
         ->middleware(['throttle:escritura_publica', 'throttle:anonymous_reviews']);

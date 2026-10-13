@@ -140,6 +140,9 @@ class RutasPublicasNoExponenDatosInternosTest extends TestCase
         $r['GET categorias']       = $this->getJson("$base/categories");
         $r['GET productos']        = $this->getJson("$base/products");
         $r['GET facetas']          = $this->getJson("$base/facets");
+        $r['GET compatibilidad']   = $this->getJson("$base/builder/compatibility?".http_build_query([
+            'seleccion' => ['gpu' => $this->producto->id], 'paso' => 'gpu', 'candidatos' => [$this->producto->id],
+        ]));
         $r['GET ficha']            = $this->getJson("$base/products/{$this->producto->id}");
         $r['GET ficha variantes']  = $this->getJson("$base/products/{$this->conVariantes->id}");
         $r['GET paginas']          = $this->getJson("$base/pages");

@@ -357,6 +357,8 @@ app/
     ├── Busqueda.php        # La busqueda de productos (INF-6): la misma en catalogo, panel y CSV
     ├── SpecsFijas.php      # Specs con nombre fijo por tipo de componente (FUN-8): normalizar,
     │                       # validar y pintar con etiqueta y unidad
+    ├── Compatibilidad.php  # Las quince reglas del armador de PC (FUN-8): solo aqui, sin copia
+    │                       # en el navegador
     ├── Impuesto.php       # El impuesto de una venta (MOD-2): checkout, mostrador y reportes
     ├── Cupones.php        # Aplicar un cupon (MOD-4) y repartirlo al medir el margen
     ├── PreciosPorCantidad.php  # El precio por mayor (MOD-15): un tramo es un PRECIO, no un descuento
@@ -396,7 +398,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 88 archivos, 946 tests (+1 en tests/Unit)
+tests/Feature/         # 89 archivos, 974 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -423,6 +425,7 @@ tests/Feature/         # 88 archivos, 946 tests (+1 en tests/Unit)
 | GET | `/categories` | Categorías activas (con `component_type`) |
 | GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación |
 | GET | `/facets` | Valores de spec reales del catálogo, para los filtros |
+| GET | `/builder/compatibility` | Veredicto del armador de PC (`seleccion[paso]=id`): incidencias mientras se elige y al pedir, consumo estimado, y con `paso` y `candidatos[]`, la etiqueta de cada producto del cajón (FUN-8) |
 | GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
@@ -540,7 +543,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 947 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 975 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -682,7 +685,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 278 tests (Vitest + Testing Library, jsdom)
+npm test          # 280 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -761,6 +764,14 @@ tienen tests.
   servidor y `specsParaMostrar()` (`utils/specsFijas.ts`) en el navegador, nunca la clave a pelo.
   **Renombrar una clave deja huérfano lo guardado con la vieja**, como renombrar una columna; la
   etiqueta se cambia libre.
+- **Las reglas del armador viven solo en `App\Support\Compatibilidad`** y leen solo las specs con
+  nombre fijo: una spec libre ("Socket: AM5" escrita a mano) cuenta como dato que falta, y se dice.
+  El navegador pregunta a `GET /api/public/{slug}/builder/compatibility` y pinta; no tiene copia de
+  ninguna regla. La respuesta trae dos veredictos del mismo armado —mientras se elige y al pedir—
+  para que "Pedir armado" no espere a nada: abrir WhatsApp después de una petición es lo que el
+  navegador bloquea como ventana emergente. Una regla nueva va ahí con su caso en
+  `CompatibilidadTest`, y si lee un valor de una lista de la config por su nombre, ese valor entra en
+  la comprobación de que sigue existiendo.
 - **La utilidad de una venta sale de `order_items.unit_cost`**, el costo copiado el día de la venta,
   igual que `unit_price`. Nunca del costo actual del producto: cambiar el costo hoy no puede
   reescribir lo que se ganó ayer. El envío cobrado (`delivery_cost`) no cuenta como utilidad.

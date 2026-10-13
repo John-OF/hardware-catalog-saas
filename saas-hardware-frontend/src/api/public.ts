@@ -132,3 +132,49 @@ export const subscribeStockNotification = async (
   );
   return response.data;
 };
+
+/**
+ * Una incidencia del armado. `unknown` es "no se pudo comprobar": falta un
+ * dato, y el mensaje dice cuál y en qué producto. Nunca se pinta como bueno.
+ */
+export interface IncidenciaDelArmado {
+  tipo: 'error' | 'warning' | 'unknown';
+  /** Qué regla la dio (`socket`, `largo_gpu`…): para la clave de la lista, no para decidir nada. */
+  regla: string;
+  mensaje: string;
+}
+
+export type EtiquetaDeCandidato = 'compatible' | 'advertencia' | 'incompatible' | 'sin_datos' | 'sin_comprobar';
+
+export interface CompatibilidadDelArmado {
+  /** Mientras se elige. */
+  armado: { incidencias: IncidenciaDelArmado[]; comprobadas: number };
+  /**
+   * El mismo armado como si se pidiera ya: lo que falta deja de ser "todavía"
+   * (un procesador sin gráficos y sin tarjeta es un error). Viene en la misma
+   * respuesta para mirarlo al pulsar "Pedir armado" sin esperar a nada: abrir
+   * WhatsApp después de una petición es lo que el navegador bloquea.
+   */
+  al_pedir: { incidencias: IncidenciaDelArmado[]; comprobadas: number };
+  /** Null sin ninguna pieza elegida. `asumido`: alguna pieza no dice su consumo y se usó uno típico. */
+  consumo: { estimado: number; recomendado: number; asumido: boolean } | null;
+  /** Lo que aporta cada candidato del cajón, sin heredar lo que ya fallaba entre otras piezas. */
+  candidatos: Record<string, { etiqueta: EtiquetaDeCandidato; incidencias: IncidenciaDelArmado[] }>;
+  /** Piezas elegidas que ya no están en el catálogo: se trataron como no elegidas. */
+  no_disponibles: string[];
+}
+
+/**
+ * El veredicto del armador de PC (FUN-8, 13.5). Las quince reglas viven en el
+ * servidor (`App\Support\Compatibilidad`); aquí no hay ninguna copia.
+ *
+ * Con `paso` y `candidatos` (el cajón abierto), trae además la etiqueta de cada
+ * candidato.
+ */
+export const getCompatibilidad = async (
+  slug: string,
+  params: { seleccion: Record<string, string>; paso?: string; candidatos?: string[] },
+): Promise<CompatibilidadDelArmado> => {
+  const response = await api.get<CompatibilidadDelArmado>(`/public/${slug}/builder/compatibility`, { params });
+  return response.data;
+};

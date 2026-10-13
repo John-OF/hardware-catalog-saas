@@ -1,8 +1,8 @@
 import './PcBuilderPage.css';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   Cpu,
   ShoppingBag,
@@ -23,7 +23,7 @@ import {
 import Imagen from '../../components/ui/Imagen';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axios';
-import { getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
+import { getCompatibilidad, getPublicTenant, getPublicProducts, resolveTenantDomain } from '../../api/public';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
@@ -58,30 +58,6 @@ const BUILDER_STEPS: { id: number; key: ComponentType; name: string }[] = [
   { id: 7, key: 'cooling', name: 'Enfriamiento / Disipadores' },
   { id: 8, key: 'case', name: 'Gabinete / Chasis' },
 ];
-
-/**
- * Una incidencia del armado.
- *
- * `unknown` es el estado que faltaba y el motivo de este cambio: hasta aqui, si
- * la spec no estaba escrita con el nombre que el codigo espera —"Zoc." en vez de
- * "Socket"—, el chequeo no encontraba el dato, no decia nada, y el producto
- * salia etiquetado como **Compatible**. Un visto verde por falta de informacion,
- * no por comprobacion. Ahora eso se dice: "no podemos comprobarlo".
- *
- * Es un parche honesto, no el arreglo: el arreglo es pedir las specs con nombre
- * fijo (Fase 13 de `mejoras_propuestas.md`, la mitad abierta de FUN-8).
- */
-interface CompatibilityIssue {
-  type: 'error' | 'warning' | 'unknown';
-  message: string;
-}
-
-/** Lo que sale de evaluar un armado: qué falla y cuántas comprobaciones se pudieron hacer. */
-interface CompatibilityResult {
-  issues: CompatibilityIssue[];
-  /** Comprobaciones que se ejecutaron de verdad (con sus dos datos delante). */
-  comprobadas: number;
-}
 
 export default function PcBuilderPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -195,207 +171,58 @@ export default function PcBuilderPage() {
     setProductPage(1);
   }, [activeStepId]);
 
-  // Auxiliares de normalización de specs
-  const getSocket = (product: Product): string | null => {
-    if (!product.specs) return null;
-    const keys = ['socket', 'zócalo', 'zocalo', 'socket cpu', 'socket compatible'];
-    for (const key of Object.keys(product.specs)) {
-      if (keys.includes(key.toLowerCase())) {
-        return product.specs[key]?.toString().trim() || null;
-      }
-    }
-    return null;
-  };
+  // FUN-8, 13.5: las reglas de compatibilidad viven en el servidor
+  // (`App\Support\Compatibilidad`). Aquí antes había una copia que leía las
+  // specs por aproximación ('socket', 'zócalo', 'tdp'...) y que el servidor
+  // nunca comprobaba; ahora el navegador pregunta y pinta.
+  const seleccionIds = useMemo(
+    () => Object.fromEntries(Object.entries(selections).map(([paso, producto]) => [paso, producto.id])),
+    [selections],
+  );
+  const haySeleccion = Object.keys(seleccionIds).length > 0;
 
-  const getRamType = (product: Product): string | null => {
-    if (!product.specs) return null;
-    // `tipo_memoria` es la clave fija de FUN-8 (13.3); el resto, lo que se adivinaba
-    // antes. Puente hasta que 13.5 lea solo las fijas.
-    const keys = ['tipo_memoria', 'tipo de memoria', 'memoria', 'tecnología', 'tecnologia', 'ram compatible', 'tipo ram', 'tipo'];
-    for (const key of Object.keys(product.specs)) {
-      if (keys.includes(key.toLowerCase())) {
-        const val = product.specs[key]?.toString().toLowerCase();
-        if (val.includes('ddr5')) return 'ddr5';
-        if (val.includes('ddr4')) return 'ddr4';
-        if (val.includes('ddr3')) return 'ddr3';
-      }
-    }
-    return null;
-  };
+  const {
+    data: veredicto,
+    isError: errorAlComprobar,
+    isPlaceholderData: veredictoViejo,
+  } = useQuery({
+    queryKey: ['compatibilidad', resolvedSlug, seleccionIds],
+    queryFn: () => getCompatibilidad(resolvedSlug!, { seleccion: seleccionIds }),
+    enabled: !!resolvedSlug && haySeleccion,
+    // Mientras llega el veredicto del armado nuevo se queda el anterior: sin
+    // esto, el resumen parpadearía en cada pieza elegida.
+    placeholderData: keepPreviousData,
+  });
 
-  const parseTdp = (specs: Record<string, string | number>): number | null => {
-    const keys = ['tdp', 'consumo', 'potencia', 'tdp max', 'tdp (w)'];
-    for (const k of Object.keys(specs)) {
-      if (keys.some(key => k.toLowerCase().includes(key))) {
-        const matches = specs[k].toString().match(/\d+/);
-        if (matches) return parseInt(matches[0]);
-      }
-    }
-    return null;
-  };
-
-  const parseWatts = (psu: Product): number | null => {
-    if (psu.specs) {
-      const keys = ['potencia', 'watts', 'capacidad', 'vatios', 'watts reales'];
-      for (const k of Object.keys(psu.specs)) {
-        if (keys.some(key => k.toLowerCase().includes(key))) {
-          const matches = psu.specs[k].toString().match(/\d+/);
-          if (matches) return parseInt(matches[0]);
-        }
-      }
-    }
-    const nameMatches = psu.name.match(/(\d{3,4})\s*w/i);
-    if (nameMatches) return parseInt(nameMatches[1]);
-    return null;
-  };
-
-  // Cálculo de TDP Estimado
-  const cpu = selections['cpu'];
-  const gpu = selections['gpu'];
-
-  let cpuTdp = 65;
-  let gpuTdp = 120;
-  // Si la pieza no dice su TDP se usa un valor tipico, que es razonable para
-  // estimar pero NO es un dato de la tienda. Se marca para poder decirlo en vez
-  // de presentar el consumo como si estuviera medido.
-  let tdpAsumido = false;
-  if (cpu) {
-    const val = cpu.specs ? parseTdp(cpu.specs) : null;
-    if (val) cpuTdp = val;
-    else tdpAsumido = true;
-  }
-  if (gpu) {
-    const val = gpu.specs ? parseTdp(gpu.specs) : null;
-    if (val) gpuTdp = val;
-    else tdpAsumido = true;
-  }
-  const estimatedPower = (cpu ? cpuTdp : 0) + (gpu ? gpuTdp : 0) + (Object.keys(selections).length > 0 ? 100 : 0);
-  const recommendedWatts = Math.round(estimatedPower * 1.25 + 50);
+  // Sin piezas no hay nada que enseñar, aunque quede un veredicto en caché.
+  const compatibilityIssues = haySeleccion ? veredicto?.armado.incidencias ?? [] : [];
+  const comprobadas = haySeleccion ? veredicto?.armado.comprobadas ?? 0 : 0;
+  const consumo = haySeleccion ? veredicto?.consumo ?? null : null;
+  const noDisponibles = haySeleccion ? veredicto?.no_disponibles ?? [] : [];
+  const hasErrors = compatibilityIssues.some(i => i.tipo === 'error');
+  const hasWarnings = compatibilityIssues.some(i => i.tipo === 'warning');
+  const hasUnknowns = compatibilityIssues.some(i => i.tipo === 'unknown');
 
   /**
-   * Evalúa un armado: qué falla, qué no se pudo comprobar y cuántas
-   * comprobaciones llegaron a ejecutarse.
-   *
-   * Las tres reglas necesitan que la spec exista en las DOS piezas. Cuando falta
-   * en alguna, antes no pasaba nada —y el silencio se leía como "todo bien"—;
-   * ahora sale una incidencia de tipo `unknown` que dice qué falta y en qué
-   * producto, para que el comprador sepa que ahí no se comprobó nada.
+   * Si el veredicto que hay es el del armado que se ve. Justo después de elegir
+   * una pieza queda un momento el anterior: pedir con él sería comprobar otro
+   * armado. Si la comprobación falló del todo, no se bloquea nada: el armador
+   * avisa, no prohíbe.
    */
-  const evaluarCompatibilidad = (selectionsMap: Record<string, Product>): CompatibilityResult => {
-    const issues: CompatibilityIssue[] = [];
-    let comprobadas = 0;
+  const veredictoAlDia = !haySeleccion || errorAlComprobar || (!!veredicto && !veredictoViejo);
 
-    const cpuSel = selectionsMap['cpu'];
-    const gpuSel = selectionsMap['gpu'];
-    const mbSel = selectionsMap['motherboard'];
-    const ramSel = selectionsMap['ram'];
-    const psuSel = selectionsMap['power'];
-
-    const normalizar = (valor: string) => valor.toLowerCase().replace(/\s+/g, '');
-
-    if (cpuSel && mbSel) {
-      const cpuSocket = getSocket(cpuSel);
-      const mbSocket = getSocket(mbSel);
-
-      if (!cpuSocket || !mbSocket) {
-        const faltan = [!cpuSocket ? cpuSel.name : null, !mbSocket ? mbSel.name : null].filter(Boolean);
-        issues.push({
-          type: 'unknown',
-          message: `No podemos comprobar el socket: falta esa especificación en ${faltan.join(' y ')}.`,
-        });
-      } else {
-        comprobadas++;
-        if (normalizar(cpuSocket) !== normalizar(mbSocket)) {
-          issues.push({
-            type: 'error',
-            message: `Incompatibilidad de Socket: CPU usa (${cpuSocket}) pero Placa Madre usa (${mbSocket}).`,
-          });
-        }
-      }
-    }
-
-    if (ramSel && mbSel) {
-      const ramType = getRamType(ramSel);
-      const mbRamType = getRamType(mbSel);
-
-      if (!ramType || !mbRamType) {
-        const faltan = [!ramType ? ramSel.name : null, !mbRamType ? mbSel.name : null].filter(Boolean);
-        issues.push({
-          type: 'unknown',
-          message: `No podemos comprobar el tipo de memoria: falta esa especificación en ${faltan.join(' y ')}.`,
-        });
-      } else {
-        comprobadas++;
-        if (ramType !== mbRamType) {
-          issues.push({
-            type: 'error',
-            message: `Incompatibilidad de RAM: Memoria es ${ramType.toUpperCase()} pero Placa Madre requiere ${mbRamType.toUpperCase()}.`,
-          });
-        }
-      }
-    }
-
-    if (psuSel && (cpuSel || gpuSel)) {
-      const psuWatts = parseWatts(psuSel);
-
-      if (!psuWatts) {
-        issues.push({
-          type: 'unknown',
-          message: `No podemos comprobar la potencia: ${psuSel.name} no dice cuántos vatios entrega.`,
-        });
-      } else {
-        comprobadas++;
-
-        if (psuWatts < estimatedPower) {
-          issues.push({
-            type: 'error',
-            message: `Insuficiencia de Poder: La fuente de ${psuWatts}W no cubre el consumo mínimo estimado (${estimatedPower}W).`,
-          });
-        } else if (psuWatts < recommendedWatts) {
-          issues.push({
-            type: 'warning',
-            message: `Fuente al Límite: Se recomienda una fuente de al menos ${recommendedWatts}W (seleccionada: ${psuWatts}W).`,
-          });
-        }
-
-        // La comparacion de arriba es contra un consumo estimado; si alguna
-        // pieza no dijo su TDP, ese numero lleva dentro un valor supuesto y hay
-        // que decirlo, porque de el depende el veredicto de la fuente.
-        if (tdpAsumido) {
-          issues.push({
-            type: 'unknown',
-            message: 'El consumo es una estimación: alguna pieza no indica su TDP y se usó un valor típico.',
-          });
-        }
-      }
-    }
-
-    return { issues, comprobadas };
-  };
-
-  const { issues: compatibilityIssues, comprobadas } = evaluarCompatibilidad(selections);
-  const hasErrors = compatibilityIssues.some(i => i.type === 'error');
-  const hasWarnings = compatibilityIssues.some(i => i.type === 'warning');
-  const hasUnknowns = compatibilityIssues.some(i => i.type === 'unknown');
-
-  /**
-   * Lo que aporta ESTE producto al armado, sin heredar lo que ya fallaba.
-   *
-   * Se compara contra el armado sin la pieza de ese paso: si la CPU y la placa
-   * ya se llevaban mal, antes TODOS los candidatos de todos los pasos salian
-   * marcados como "Incompatible" —la etiqueta describia el armado entero, no al
-   * producto que estabas mirando— y el comprador se quedaba sin saber cual
-   * elegir.
-   */
-  const incidenciasDelCandidato = (stepKey: string, product: Product): CompatibilityIssue[] => {
-    const sinEstePaso = { ...selections };
-    delete sinEstePaso[stepKey];
-
-    const previas = evaluarCompatibilidad(sinEstePaso).issues.map(i => i.message);
-    const conProducto = evaluarCompatibilidad({ ...selections, [stepKey]: product }).issues;
-
-    return conProducto.filter(i => !previas.includes(i.message));
-  };
+  // El cajón abierto: la etiqueta de cada candidato de la página que se ve. Sin
+  // memo: la clave de la consulta se compara por valor, no por referencia.
+  const candidatoIds = availableProducts.map(p => p.id);
+  const { data: deLosCandidatos } = useQuery({
+    queryKey: ['compatibilidad-candidatos', resolvedSlug, seleccionIds, activeStep?.key, candidatoIds],
+    queryFn: () => getCompatibilidad(resolvedSlug!, {
+      seleccion: seleccionIds,
+      paso: activeStep!.key,
+      candidatos: candidatoIds,
+    }),
+    enabled: !!resolvedSlug && !!activeStep && candidatoIds.length > 0,
+  });
 
   // Suma total de precios
   const totalPrice = Object.entries(selections).reduce(
@@ -404,19 +231,18 @@ export default function PcBuilderPage() {
   );
 
   const handleSelectProduct = (stepKey: string, product: Product, variante: ProductVariant | null = null) => {
-    const tempSelections = { ...selections, [stepKey]: product };
     // Solo los errores que APORTA esta pieza: preguntar por un conflicto que ya
-    // existia entre otras dos seria echarle la culpa a quien no la tiene.
-    // Las incidencias de tipo `unknown` no preguntan nada: avisan, no estorban.
-    const tempErrors = incidenciasDelCandidato(stepKey, product).filter(i => i.type === 'error');
+    // existia entre otras dos seria echarle la culpa a quien no la tiene. Eso
+    // lo decide el servidor al calcular la etiqueta del candidato.
+    const errores = (deLosCandidatos?.candidatos[product.id]?.incidencias ?? []).filter(i => i.tipo === 'error');
 
-    if (tempErrors.length > 0) {
-      if (!window.confirm(`⚠️ Advertencia de Compatibilidad:\n\n${tempErrors.map(e => e.message).join('\n')}\n\n¿Deseas agregar este componente de todas formas?`)) {
+    if (errores.length > 0) {
+      if (!window.confirm(`⚠️ Advertencia de Compatibilidad:\n\n${errores.map(e => e.mensaje).join('\n')}\n\n¿Deseas agregar este componente de todas formas?`)) {
         return;
       }
     }
 
-    setSelections(tempSelections);
+    setSelections({ ...selections, [stepKey]: product });
     setVariantesElegidas({ ...variantesElegidas, [stepKey]: variante });
     setActiveStepId(null);
     toast.success(`${nombreConVariante(product.name, variante?.nombre)} agregado al armado`);
@@ -431,17 +257,30 @@ export default function PcBuilderPage() {
     setVariantesElegidas(variantes);
   };
 
+  /**
+   * La última palabra antes de pedir, con el veredicto "al pedir": ahí, un
+   * procesador sin gráficos y sin tarjeta ya no es un aviso sino un error. Es
+   * síncrona a propósito —el veredicto ya llegó con el resumen— para que abrir
+   * WhatsApp siga siendo la respuesta directa al clic.
+   */
+  const confirmarAlPedir = (): boolean => {
+    if (errorAlComprobar || !veredicto) {
+      return window.confirm('No pudimos comprobar la compatibilidad del armado. ¿Seguir de todas formas?');
+    }
+
+    const errores = veredicto.al_pedir.incidencias.filter(i => i.tipo === 'error');
+    if (errores.length === 0) return true;
+
+    return window.confirm(`⚠️ Tu armado tiene problemas de compatibilidad:\n\n${errores.map(e => e.mensaje).join('\n')}\n\n¿Seguir de todas formas?`);
+  };
+
   const handleAddAllToCart = () => {
     const items = Object.entries(selections);
     if (items.length === 0) {
       toast.error('No has seleccionado ningún componente todavía');
       return;
     }
-    if (hasErrors) {
-      if (!window.confirm('⚠️ Tu armado tiene conflictos críticos de compatibilidad. ¿Seguro que deseas agregarlos todos al carrito?')) {
-        return;
-      }
-    }
+    if (!confirmarAlPedir()) return;
 
     items.forEach(([key, prod]) => {
       addItem(slug!, prod, 1, variantesElegidas[key]);
@@ -456,8 +295,9 @@ export default function PcBuilderPage() {
       toast.error('No has seleccionado ningún componente todavía');
       return;
     }
+    if (!confirmarAlPedir()) return;
 
-    let message = `*Hola! He armado una PC compatible desde tu catálogo virtual:*\n\n`;
+    let message = `*Hola! He armado una PC desde tu catálogo virtual:*\n\n`;
     items.forEach(([key, prod]) => {
       const step = BUILDER_STEPS.find(s => s.key === key);
       const variante = variantesElegidas[key];
@@ -465,7 +305,9 @@ export default function PcBuilderPage() {
     });
 
     message += `\n*Total Estimado:* ${money(totalPrice)}\n`;
-    message += `*Consumo del Sistema:* ${estimatedPower}W (Recomendado: ${recommendedWatts}W)\n`;
+    if (consumo) {
+      message += `*Consumo del Sistema:* ${consumo.estimado}W (Recomendado: ${consumo.recomendado}W)\n`;
+    }
     message += `\nPor favor, confírmenme stock y disponibilidad. Gracias!`;
 
     const url = `https://wa.me/${tenant?.whatsapp_number?.replace('+', '') ?? ''}?text=${encodeURIComponent(message)}`;
@@ -473,29 +315,19 @@ export default function PcBuilderPage() {
   };
 
   /**
-   * La etiqueta de un producto del cajón.
-   *
-   * Cuatro estados, no tres. "Sin datos" es el que faltaba: antes, un producto
-   * cuya spec no se encontraba salia como **Compatible** —verde por ignorancia—
-   * y ese es justo el aviso que no sirve. Solo se dice "Compatible" cuando algo
-   * se comprobo de verdad.
+   * La etiqueta de un producto del cajón, como la decide el servidor. Cinco
+   * estados y no tres: "Sin datos" (falta un dato para comprobarlo) y "Sin
+   * comprobar" (no hay con qué compararlo todavía) no son "Compatible".
    */
-  const estadoDelCandidato = (stepKey: string, product: Product): { clase: string; etiqueta: string } => {
-    const nuevas = incidenciasDelCandidato(stepKey, product);
-
-    if (nuevas.some(i => i.type === 'error')) return { clase: 'badge-danger', etiqueta: 'Incompatible' };
-    if (nuevas.some(i => i.type === 'warning')) return { clase: 'badge-warning', etiqueta: 'Advertencia' };
-    if (nuevas.some(i => i.type === 'unknown')) return { clase: 'badge-unknown', etiqueta: 'Sin datos' };
-
-    // Sin incidencias puede significar dos cosas distintas: que se comprobo y
-    // salio bien, o que no habia nada que comprobar todavia (esta es la primera
-    // pieza del armado). Decir "Compatible" en el segundo caso es prometer una
-    // revision que no ha ocurrido.
-    const conProducto = evaluarCompatibilidad({ ...selections, [stepKey]: product });
-
-    return conProducto.comprobadas > 0
-      ? { clase: 'badge-success', etiqueta: 'Compatible' }
-      : { clase: 'badge-unknown', etiqueta: 'Sin comprobar' };
+  const estadoDelCandidato = (product: Product): { clase: string; etiqueta: string } => {
+    switch (deLosCandidatos?.candidatos[product.id]?.etiqueta) {
+      case 'incompatible': return { clase: 'badge-danger', etiqueta: 'Incompatible' };
+      case 'advertencia': return { clase: 'badge-warning', etiqueta: 'Advertencia' };
+      case 'sin_datos': return { clase: 'badge-unknown', etiqueta: 'Sin datos' };
+      case 'compatible': return { clase: 'badge-success', etiqueta: 'Compatible' };
+      case 'sin_comprobar': return { clase: 'badge-unknown', etiqueta: 'Sin comprobar' };
+      default: return { clase: 'badge-unknown', etiqueta: 'Comprobando…' };
+    }
   };
 
   if (isLoadingTenant) {
@@ -525,7 +357,7 @@ export default function PcBuilderPage() {
           </>
         )}
       >
-        <button onClick={handleWhatsAppOrder} className="btn-primary whatsapp-header-btn" disabled={Object.keys(selections).length === 0}>
+        <button onClick={handleWhatsAppOrder} className="btn-primary whatsapp-header-btn" disabled={!haySeleccion || !veredictoAlDia}>
           <MessageCircle size={18} /> Pedir Armado
         </button>
       </StoreHeader>
@@ -633,17 +465,17 @@ export default function PcBuilderPage() {
             </div>
 
             {/* Estimación TDP */}
-            {Object.keys(selections).length > 0 && (
+            {consumo && (
               <div className="tdp-calculator-row">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                   <span>Consumo estimado:</span>
-                  <span style={{ fontWeight: 600 }}>{estimatedPower} W</span>
+                  <span style={{ fontWeight: 600 }}>{consumo.estimado} W</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <span>Fuente recomendada:</span>
-                  <span>{recommendedWatts} W</span>
+                  <span>{consumo.recomendado} W</span>
                 </div>
-                {tdpAsumido && (
+                {consumo.asumido && (
                   <p className="tdp-nota">
                     Alguna pieza no indica su consumo: se usó un valor típico para estimarlo.
                   </p>
@@ -671,7 +503,7 @@ export default function PcBuilderPage() {
                   <AlertTriangle size={18} />
                   <div>
                     <strong>Sugerencias detectadas</strong>
-                    <p>Tu armado funcionará, pero hay sugerencias de potencia.</p>
+                    <p>Tu armado funcionará, pero hay cosas que conviene revisar abajo.</p>
                   </div>
                 </div>
               ) : hasUnknowns ? (
@@ -701,16 +533,26 @@ export default function PcBuilderPage() {
               )}
 
               {/* List of issues */}
-              {compatibilityIssues.length > 0 && (
+              {(compatibilityIssues.length > 0 || noDisponibles.length > 0) && (
                 <div className="issues-list">
                   {compatibilityIssues.map((issue, idx) => (
-                    <div key={idx} className={`issue-item ${issue.type}`}>
-                      {issue.type === 'unknown'
+                    <div key={`${issue.regla}-${idx}`} className={`issue-item ${issue.tipo}`}>
+                      {issue.tipo === 'unknown'
                         ? <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
                         : <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />}
-                      <span>{issue.message}</span>
+                      <span>{issue.mensaje}</span>
                     </div>
                   ))}
+                  {noDisponibles.length > 0 && (
+                    <div className="issue-item unknown">
+                      <HelpCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>
+                        {noDisponibles.length === 1
+                          ? 'Una pieza elegida ya no está en el catálogo y no se comprobó: quítala y elige otra.'
+                          : `${noDisponibles.length} piezas elegidas ya no están en el catálogo y no se comprobaron: quítalas y elige otras.`}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -718,15 +560,15 @@ export default function PcBuilderPage() {
             <div className="summary-actions">
               <button
                 onClick={handleAddAllToCart}
-                className="btn-primary-glow btn-add-cart"
-                disabled={Object.keys(selections).length === 0}
+                className="btn-primary btn-add-cart"
+                disabled={!haySeleccion || !veredictoAlDia}
               >
                 <ShoppingCart size={18} /> Agregar todo al pedido
               </button>
               <button
                 onClick={handleWhatsAppOrder}
                 className="btn-secondary btn-order-whatsapp"
-                disabled={Object.keys(selections).length === 0}
+                disabled={!haySeleccion || !veredictoAlDia}
               >
                 <MessageCircle size={18} /> Consultar por WhatsApp
               </button>
@@ -779,7 +621,8 @@ export default function PcBuilderPage() {
                   {availableProducts.map((product) => {
                     const variante = varianteDelCajon(product);
                     const price = datosDeVenta(product, variante).precio;
-                    const { clase: compClass, etiqueta: compLabel } = estadoDelCandidato(activeStep!.key, product);
+                    const { clase: compClass, etiqueta: compLabel } = estadoDelCandidato(product);
+                    const principal = specsParaMostrar(product.specs, definicionDeSpecs)[0];
                     
                     return (
                       <div key={product.id} className="drawer-product-card glass-card">
@@ -798,9 +641,9 @@ export default function PcBuilderPage() {
                             <span className={`badge ${compClass}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
                               {compLabel}
                             </span>
-                            {product.specs && getSocket(product) && (
+                            {principal && (
                               <span className="mini-spec-badge" style={{ fontSize: '0.65rem' }}>
-                                Socket: {getSocket(product)}
+                                {principal.etiqueta}: {principal.valor}
                               </span>
                             )}
                           </div>
