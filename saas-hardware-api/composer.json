@@ -17,6 +17,8 @@
         "mews/purifier": "^3.4",
         "pragmarx/google2fa": "^9.1",
         "ramsey/uuid": "^4.9",
+        "resend/resend-laravel": "^1.6",
+        "sentry/sentry-laravel": "^4.29",
         "spatie/laravel-multitenancy": "^4.1"
     },
     "require-dev": {

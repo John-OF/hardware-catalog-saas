@@ -56,6 +56,10 @@ export default function PrivacidadPage() {
         contar cuántas personas distintas ven cada producto. No dice quién eres ni se cruza con ningún
         otro dato. No usamos cookies de publicidad ni herramientas de analítica de terceros.</p>
 
+      <p><strong>Si algo falla:</strong> cuando la aplicación se rompe, se envía el aviso del error (qué
+        falló, en qué parte del programa y a qué tienda le pasó) a Sentry, para poder arreglarlo. No
+        incluye lo que escribiste, tu sesión, tu dirección IP ni tus datos personales.</p>
+
       <p><strong>Pagos del servicio:</strong> los procesa Paddle, nuestro revendedor. Nosotros no vemos ni
         guardamos los datos de tu tarjeta.</p>
 
@@ -75,6 +79,7 @@ export default function PrivacidadPage() {
         <li>Cloudflare, que guarda las imágenes de las tiendas y comprueba que quien deja una reseña no
           es un programa automático;</li>
         <li>el proveedor que envía los correos del servicio;</li>
+        <li>Sentry, que recibe los avisos de errores de la aplicación (sin datos personales);</li>
         <li>Paddle, que cobra las suscripciones, emite las facturas y gestiona los impuestos.</li>
       </ul>
       <p>

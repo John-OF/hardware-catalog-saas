@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Tenant;
+use App\Support\Observabilidad;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,6 +40,7 @@ class InitializeTenantByHeader
         }
 
         $tenant->makeCurrent();
+        Observabilidad::tienda($tenant->slug);
 
         return $next($request);
     }

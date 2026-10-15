@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Tenant;
+use App\Support\Observabilidad;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,6 +47,7 @@ class InitializeTenantBySlug
         }
 
         $tenant->makeCurrent();
+        Observabilidad::tienda($tenant->slug);
 
         return $next($request);
     }

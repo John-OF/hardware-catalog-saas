@@ -1,4 +1,4 @@
-# Hardware Catalog SaaS
+# Gondofy
 
 Plataforma **SaaS multi-tenant** para que tiendas de componentes de PC publiquen su propio catálogo
 en línea. Cada tienda (tenant) administra su negocio desde un panel privado (`/dashboard`) y obtiene
@@ -534,8 +534,9 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 | `CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_ORIGIN_PATTERNS` | Orígenes permitidos (los dominios propios no se conocen de antemano) |
 | `FILESYSTEM_DISK` + `R2_*` | Imágenes. **En producción tiene que ser `r2` o la app no arranca**; salida explícita con `ALLOW_LOCAL_STORAGE=true` |
 | `QUEUE_CONNECTION` | Los correos van por cola: **hace falta un worker** |
-| `MAIL_*` / `RESEND_API_KEY` | Envío de correo |
+| `MAIL_*` / `RESEND_API_KEY` | Envío de correo. Proveedor elegido: **Resend** (`MAIL_MAILER=resend`, paquete `resend/resend-laravel` ya instalado), remitente `no-responder@gondofy.com`, que tiene que ser de un dominio **verificado** en Resend (SPF/DKIM en el DNS). La clave, con permiso *Sending access*, va sólo en el `.env`. Por defecto `MAIL_MAILER=log` |
 | `TURNSTILE_SECRET_KEY` | Anti-bot de reseñas. Fuera de local, sin clave se rechazan con 502 |
+| `SENTRY_LARAVEL_DSN` · `SENTRY_ENVIRONMENT` | Errores no controlados hacia Sentry (`TEC-5`). Vacío = no se envía nada (local y suite). Sin datos personales: ni cuerpo de la petición, ni IP, ni usuario (`App\Support\Observabilidad`) |
 | `PLATFORM_ALLOWED_IPS` | IPs del panel de plataforma. **En producción, vacío = no entra nadie** |
 | `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_BITACORA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
 | `PASSWORD_UNCOMPROMISED` | Contrasta contraseñas contra Have I Been Pwned |
@@ -544,7 +545,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 984 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 989 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -681,6 +682,7 @@ que aquí sólo van valores públicos; una clave secreta nunca va en el frontend
 | `VITE_API_URL` | URL base de la API | `http://localhost:8000/api` |
 | `VITE_TURNSTILE_SITEKEY` | Site key del widget Turnstile | sin ella, el formulario de reseñas queda deshabilitado |
 | `VITE_PLATFORM_HOSTS` | Hosts de la propia plataforma, separados por comas (`plataforma.com,www.plataforma.com`). En ellos `/` es la landing; en cualquier otro host, `/` resuelve la tienda por dominio propio (INF-9). **En producción hay que ponerlo al hacer el build**, o la landing no sale nunca | `localhost,127.0.0.1` |
+| `VITE_SENTRY_DSN` · `VITE_SENTRY_ENVIRONMENT` | Errores no controlados hacia Sentry, proyecto React (`TEC-5`). Sin ellas no se envía nada. Sin usuario, cookies, cabeceras ni parámetros de URL, y sin rastro de navegación (`utils/observabilidad.ts`) | sin DSN, apagado |
 | `VITE_LEGAL_TITULAR` · `VITE_LEGAL_CORREO` | Nombre del titular y correo de contacto que salen en las páginas legales (`INF-15`). Son datos personales del dueño, por eso no van en el código | sin ellas, las páginas avisan en pantalla de que no están listas para publicarse |
 
 ```bash
@@ -688,7 +690,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 286 tests (Vitest + Testing Library, jsdom)
+npm test          # 293 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 

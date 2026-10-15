@@ -92,6 +92,10 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // TEC-5: los errores no controlados van a Sentry. Sin DSN no hace nada
+        // (local y suite); qué sale y qué no, en App\Support\Observabilidad.
+        \Sentry\Laravel\Integration::handles($exceptions);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );

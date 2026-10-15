@@ -15,6 +15,11 @@ import { Toaster } from 'react-hot-toast';
 import { router } from './router';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { seedStoredTheme } from './utils/theme';
+import { iniciarObservabilidad } from './utils/observabilidad';
+
+// TEC-5: antes de montar React, para que cuente un error del propio arranque. Sin
+// VITE_SENTRY_DSN no hace nada.
+iniciarObservabilidad();
 
 // UI-2: la paleta de la tienda se aplicaba en un efecto, o sea despues de que
 // resolviera la peticion del tenant, asi que el primer frame salia con los

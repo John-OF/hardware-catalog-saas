@@ -1,5 +1,6 @@
 import { useRouteError } from 'react-router-dom';
 import ErrorScreen from './ErrorScreen';
+import { capturarError } from '../../utils/observabilidad';
 
 /**
  * `errorElement` de las rutas (PUB-5).
@@ -13,6 +14,8 @@ export default function RouteErrorFallback() {
   const error = useRouteError();
 
   console.error('Error no controlado en una ruta:', error);
+  // TEC-5: React Router se traga el error, así que Sentry no lo ve solo.
+  capturarError(error);
 
   // El detalle solo en desarrollo: en producción no le sirve al comprador y
   // puede filtrar detalles de implementación.

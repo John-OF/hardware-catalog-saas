@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import ErrorScreen from './ErrorScreen';
+import { capturarError } from '../../utils/observabilidad';
 
 /**
  * Red de seguridad para errores fuera del router (PUB-5).
@@ -29,7 +30,8 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Punto único donde enganchar Sentry o equivalente cuando se cablee (TEC-5).
+    // TEC-5: sin DSN, capturarError no hace nada.
+    capturarError(error, { componentStack: info.componentStack });
     console.error('Error no controlado en la interfaz:', error, info.componentStack);
   }
 
