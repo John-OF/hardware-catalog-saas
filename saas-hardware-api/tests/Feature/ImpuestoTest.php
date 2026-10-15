@@ -77,6 +77,20 @@ class ImpuestoTest extends TestCase
         $this->assertSame(1000.0, $pedido->base_imponible);
     }
 
+    public function test_el_impuesto_de_fabrica_es_el_iva_de_ecuador_y_no_el_igv_de_peru(): void
+    {
+        // Lo que ve quien lo enciende sin tocar el nombre ni la tasa.
+        $nueva = Tenant::create([
+            'slug' => 'tienda-nueva-iva',
+            'name' => 'Tienda Nueva',
+            'whatsapp_number' => '593999999999',
+        ])->fresh();
+
+        $this->assertFalse((bool) $nueva->tax_enabled);
+        $this->assertSame('IVA', $nueva->tax_name);
+        $this->assertSame('15.00', (string) $nueva->tax_rate);
+    }
+
     // --------------------------------------------------------- precio incluido
 
     public function test_con_el_impuesto_incluido_el_total_no_cambia_y_se_desglosa(): void

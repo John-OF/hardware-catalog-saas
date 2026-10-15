@@ -166,8 +166,8 @@ export default function SettingsPage() {
   // MOD-2. Apagado por defecto: encenderlo cambia lo que se cobra o cómo se
   // desglosa, y eso lo decide el dueño, no nosotros por él.
   const [taxEnabled, setTaxEnabled] = useState(false);
-  const [taxName, setTaxName] = useState('IGV');
-  const [taxRate, setTaxRate] = useState('18');
+  const [taxName, setTaxName] = useState('IVA');
+  const [taxRate, setTaxRate] = useState('15');
   const [taxIncluded, setTaxIncluded] = useState(true);
 
   /** Cambia un campo de un método sin tocar los otros tres. */
@@ -236,8 +236,8 @@ export default function SettingsPage() {
     setDeliveryEnabled(tenant.delivery_enabled ?? false);
     setDeliveryCost(tenant.delivery_cost != null ? String(tenant.delivery_cost) : '0');
     setTaxEnabled(tenant.tax_enabled ?? false);
-    setTaxName(tenant.tax_name || 'IGV');
-    setTaxRate(tenant.tax_rate != null ? String(tenant.tax_rate) : '18');
+    setTaxName(tenant.tax_name || 'IVA');
+    setTaxRate(tenant.tax_rate != null ? String(tenant.tax_rate) : '15');
     setTaxIncluded(tenant.tax_included ?? true);
 
     const th = tenant.theme ?? {};
@@ -382,7 +382,7 @@ export default function SettingsPage() {
       delivery_enabled: deliveryEnabled,
       delivery_cost: deliveryCost || '0',
       tax_enabled: taxEnabled,
-      tax_name: taxName || 'IGV',
+      tax_name: taxName || 'IVA',
       tax_rate: taxRate || '0',
       tax_included: taxIncluded,
       theme: {
@@ -559,7 +559,7 @@ export default function SettingsPage() {
               maxLength={255} 
             />
             <span className="helper-text">
-              Deja en blanco para usar la URL por defecto: <code>http://localhost:5173/{tenant.slug}</code>
+              Deja en blanco para usar la URL por defecto: <code>{window.location.origin}/{tenant.slug}</code>
             </span>
             {!dominioIncluido && (
               <span className="helper-text helper-text-warning">
@@ -840,7 +840,7 @@ export default function SettingsPage() {
                   value={taxName}
                   onChange={(e) => setTaxName(e.target.value)}
                 />
-                <span className="helper-text">Como se llame en tu país: IGV, IVA, ITBMS…</span>
+                <span className="helper-text">Como se llame en tu país: IVA, IGV, ITBMS…</span>
               </div>
 
               <div className="form-group">

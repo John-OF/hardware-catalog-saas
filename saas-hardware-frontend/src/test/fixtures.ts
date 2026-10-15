@@ -24,8 +24,8 @@ export const unaTienda = (datos: Partial<Tenant> = {}): Tenant => ({
   delivery_cost: 0,
   // MOD-2: apagado, como una tienda recién creada.
   tax_enabled: false,
-  tax_name: 'IGV',
-  tax_rate: 18,
+  tax_name: 'IVA',
+  tax_rate: 15,
   tax_included: true,
   ...datos,
 });
