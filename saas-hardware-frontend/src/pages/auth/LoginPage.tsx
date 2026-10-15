@@ -91,7 +91,7 @@ export default function LoginPage() {
           <div className="logo-badge">
             <Cpu size={32} />
           </div>
-          <h1>SaaS Hardware</h1>
+          <h1>Gondofy</h1>
           <p>Panel de Administración</p>
         </div>
 

@@ -1,6 +1,6 @@
 # saas-hardware-frontend
 
-Panel de administración y catálogo público de **Hardware Catalog SaaS**, en una sola SPA.
+Panel de administración y catálogo público de **Gondofy**, en una sola SPA.
 React 19 · Vite · TypeScript · React Router 7 · TanStack Query · Zustand.
 
 **La documentación vive en el [README de la raíz](../README.md)**, que es el único sitio donde se

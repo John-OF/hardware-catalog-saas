@@ -43,7 +43,7 @@ describe('páginas legales', () => {
     expect(screen.getAllByText(/Ana Pérez/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'ana@ejemplo.com' })[0]).toHaveAttribute('href', 'mailto:ana@ejemplo.com');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(document.title).toBe('Términos y condiciones — Catálogo de Componentes PC');
+    expect(document.title).toBe('Términos y condiciones — Gondofy');
   });
 
   it('sin los datos del titular, avisa a la vista en vez de quedarse en blanco', () => {

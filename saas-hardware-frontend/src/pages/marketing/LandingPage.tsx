@@ -88,7 +88,7 @@ export default function LandingPage() {
       <header className="landing-nav">
         <div className="landing-brand">
           <span className="landing-logo"><Cpu size={22} /></span>
-          Catálogo de Componentes PC
+          Gondofy
         </div>
         <nav className="landing-nav-links">
           <a href="#planes">Planes</a>
@@ -193,7 +193,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        <span>Catálogo de Componentes PC</span>
+        <span>Gondofy</span>
         {/* INF-15: Paddle revisa que la web enlace estas tres páginas. */}
         <nav className="landing-footer-links" aria-label="Legal">
           {PAGINAS_LEGALES.map(({ ruta, titulo }) => (

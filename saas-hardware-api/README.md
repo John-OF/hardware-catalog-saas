@@ -1,6 +1,6 @@
 # saas-hardware-api
 
-API REST y multitenancy de **Hardware Catalog SaaS**. Laravel 13 · PHP 8.3 · Sanctum ·
+API REST y multitenancy de **Gondofy**. Laravel 13 · PHP 8.3 · Sanctum ·
 spatie/laravel-multitenancy.
 
 **La documentación vive en el [README de la raíz](../README.md)**, que es el único sitio donde se

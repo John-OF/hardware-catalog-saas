@@ -13,13 +13,13 @@
  * a revisar una página sin titular sin que nadie lo vea.
  */
 
-export const NOMBRE_DEL_SERVICIO = 'Catálogo de Componentes PC';
+export const NOMBRE_DEL_SERVICIO = 'Gondofy';
 
 /** País desde el que se presta el servicio, y cuya ley se aplica. */
 export const PAIS_DEL_TITULAR = 'Ecuador';
 
 /** Fecha de la última versión de los textos: cambiarla al cambiarlos. */
-export const ULTIMA_ACTUALIZACION = '26 de septiembre de 2026';
+export const ULTIMA_ACTUALIZACION = '14 de octubre de 2026';
 
 /**
  * Las tres páginas y sus rutas. Las rutas son también slugs reservados en el
