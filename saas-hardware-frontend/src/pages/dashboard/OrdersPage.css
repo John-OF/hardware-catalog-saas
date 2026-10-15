@@ -66,6 +66,19 @@
   cursor: pointer;
 }
 
+/* UI-19: en un celular el selector fijo de 220px dejaba al buscador en un cuadro
+   de ~48px (y `.search-box` sin ancho propio se encogia a su icono). Se apila:
+   buscador arriba, estado debajo, los dos a todo el ancho. */
+@media (max-width: 640px) {
+  :where(.page-orders) .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  :where(.page-orders) .status-select {
+    width: 100%;
+  }
+}
+
 :where(.page-orders) .inner-loader {
   display: flex;
   flex-direction: column;

@@ -326,8 +326,12 @@ html:has(.dashboard-layout) {
 :where(.page-dashboard) .sidebar-toggle-mobile {
   display: none;
   position: absolute;
-  top: 1.75rem;
-  left: 1.5rem;
+  /* UI-19: la tarjeta del titulo (`.dashboard-topbar`) empieza a 1.5rem del borde
+     y 1.5rem de arriba, con 1rem de relleno. Con `1.75rem / 1.5rem` el boton
+     quedaba justo sobre su borde; a `2.5rem / 2.5rem` queda DENTRO, en el hueco
+     que le deja el `padding-left: 5rem` de la barra. */
+  top: 2.5rem;
+  left: 2.5rem;
   z-index: 100;
   background: var(--bg-sidebar);
   border: 1px solid var(--border);

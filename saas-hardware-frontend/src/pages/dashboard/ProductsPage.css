@@ -499,6 +499,15 @@
   :where(.page-products) .select-filter {
     width: 100%;
   }
+  /* UI-19: "Nuevo producto" quedaba 140px fuera de la pantalla. El grupo lleva
+     `display: flex` en linea (sin wrap), asi que el wrap va aqui. */
+  :where(.page-products) .action-buttons-group {
+    flex-wrap: wrap;
+  }
+  :where(.page-products) .action-buttons-group > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 /* Consumo del plan junto a los botones de la barra de filtros (SAAS-3). En

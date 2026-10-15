@@ -834,6 +834,7 @@ export default function ProductsPage() {
         </div>
       ) : (
         <>
+          <p className="aviso-scroll-x">Desliza la tabla hacia los lados para ver todas las columnas.</p>
           <div className="table-container glass-card">
             <table className="premium-table">
               <thead>

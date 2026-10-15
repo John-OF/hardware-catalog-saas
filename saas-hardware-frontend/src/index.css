@@ -805,3 +805,21 @@ select.premium-input option {
 .spinner {
   animation: spin 1s linear infinite;
 }
+
+/* UI-19: aviso de que una tabla se desplaza hacia los lados. En un celular las
+   tablas del panel (productos, pedidos) miden mas que la pantalla y van con
+   scroll dentro de su tarjeta, pero nada decia que a la derecha habia mas
+   columnas: precio, existencias y acciones quedaban fuera de la vista sin pista.
+   Solo se ve donde hace falta. */
+.aviso-scroll-x {
+  display: none;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .aviso-scroll-x {
+    display: block;
+  }
+}

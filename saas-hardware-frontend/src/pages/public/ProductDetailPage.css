@@ -73,7 +73,10 @@
 
 :where(.page-product-detail) .product-showcase {
   display: grid;
-  grid-template-columns: 1.1fr 1.2fr;
+  /* `minmax(0, …)` y no `1fr` a secas: sin el 0, la columna no baja de lo que
+     mide su contenido (la tabla de especificaciones, los campos de «Avísame») y
+     en un celular el bloque salía 31 px más ancho que su tarjeta (UI-19). */
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr);
   gap: 3rem;
   padding: 3rem;
   border-radius: var(--radius-xl);
@@ -467,9 +470,23 @@
 /* Responsive */
 @media (max-width: 860px) {
   :where(.page-product-detail) .product-showcase {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
     padding: 1.75rem;
+  }
+  :where(.page-product-detail) .product-details-block,
+  :where(.page-product-detail) .product-image-block {
+    min-width: 0;
+  }
+  /* UI-19: «Agregar al pedido», «Consultar» y el corazon no caben en una fila
+     en 390px (el corazon quedaba 60px fuera). La fila lleva `display: flex` en
+     linea, sin wrap: el wrap va aqui, y los dos botones grandes bajan juntos. */
+  :where(.page-product-detail) .detail-cta-row {
+    flex-wrap: wrap;
+  }
+  :where(.page-product-detail) .detail-cta-row .add-cart-btn,
+  :where(.page-product-detail) .detail-cta-row .whatsapp-buy-btn {
+    flex: 1 1 9rem;
   }
   :where(.page-product-detail) .detail-title {
     font-size: 1.6rem;

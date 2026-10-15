@@ -256,6 +256,8 @@ export default function OrdersPage() {
           <p>Los pedidos que realicen los clientes en tu catálogo virtual aparecerán en esta sección.</p>
         </div>
       ) : (
+        <>
+        <p className="aviso-scroll-x">Desliza la tabla hacia los lados para ver todas las columnas.</p>
         <div className="table-container glass-card">
           <table className="orders-table">
             <thead>
@@ -384,6 +386,7 @@ export default function OrdersPage() {
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* Detail Modal / Drawer */}

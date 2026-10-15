@@ -6,7 +6,9 @@
    el analisis de colisiones). */
 
 .img-source-field { display: flex; flex-direction: column; gap: 0.5rem; }
-.img-source-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+/* `flex-wrap`: en un celular la etiqueta ("Logo de la tienda (opcional)") y el
+   selector URL/Subir no caben juntos y el selector quedaba recortado (UI-19). */
+.img-source-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .img-source-head label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
 .img-source-tabs { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .img-source-tabs button { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.6rem; background: transparent; border: none; color: var(--text-muted); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: var(--transition); }

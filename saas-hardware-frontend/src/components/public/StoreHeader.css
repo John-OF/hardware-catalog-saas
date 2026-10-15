@@ -60,3 +60,31 @@
   align-items: center;
   gap: 0.65rem;
 }
+
+/* UI-19: en un celular (390 px) la marca y las cuatro acciones del catalogo no
+   caben en una fila: el contenido medía 550 px y el botón de contacto y el
+   carrito quedaban fuera de la pantalla, que es justo el camino de compra. Ahora
+   la cabecera pasa a dos filas —la marca arriba, las acciones debajo— y las
+   acciones se parten en otra si ni así caben (320 px). */
+@media (max-width: 640px) {
+  .catalog-header {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .header-logo-area {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .header-logo-area h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .header-contact {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
