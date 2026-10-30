@@ -6,8 +6,9 @@ interface Props {
 }
 
 /**
- * Pantallas del panel que solo son de admin (FUN-4): configuración, categorías,
- * páginas y equipo.
+ * Pantallas del panel que solo son de admin (FUN-4). Desde MOD-21 queda solo
+ * una: Equipo, que no es un permiso que se delegue. Las demás piden su permiso
+ * por acción con `ConPermiso`.
  *
  * Quien es staff y llega aquí —por un enlace guardado o escribiendo la URL— va
  * al resumen en vez de a una pantalla que se pinta y luego falla con 403 en cada

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '../types';
+import type { Permiso } from '../utils/permisos';
 import { PLATFORM_TOKEN_KEY } from '../api/platform';
 
 interface AuthState {
@@ -85,3 +86,14 @@ export const rutaDeSalidaDelPanel = (): string =>
  */
 export const useEsAdmin = (): boolean | null =>
   useAuthStore((s) => (s.user ? s.user.role === 'admin' : null));
+
+/**
+ * Si quien usa el panel tiene un permiso por acción (MOD-21). Los mismos tres
+ * valores que `useEsAdmin`, y por lo mismo: `null` mientras `getMe()` no ha
+ * respondido.
+ *
+ * Lo que dice es lo que mandó el servidor en `user.permisos`, ya resuelto (un
+ * admin los trae todos). Solo esconde: la barrera es `permiso:` en cada ruta.
+ */
+export const usePuede = (permiso: Permiso): boolean | null =>
+  useAuthStore((s) => (s.user ? (s.user.permisos ?? []).includes(permiso) : null));

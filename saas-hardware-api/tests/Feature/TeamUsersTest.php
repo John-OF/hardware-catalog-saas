@@ -215,7 +215,9 @@ class TeamUsersTest extends TestCase
 
     /**
      * FUN-24: el correo decía "te invitó a administrar" a todos, también al
-     * colaborador, que al entrar veía bastante menos de lo prometido.
+     * colaborador, que al entrar veía bastante menos de lo prometido. Desde
+     * MOD-21 dice además el nombre de su rol y a qué partes del panel entra,
+     * sacadas de sus permisos y no de una lista escrita en el correo.
      */
     public function test_la_invitacion_de_un_colaborador_no_promete_administrar(): void
     {
@@ -228,7 +230,8 @@ class TeamUsersTest extends TestCase
 
         $this->assertSame("{$this->duenio->name} te invitó a colaborar en Tienda Equipo", $asunto);
         // El HTML del correo lleva estilos en linea: `<strong style="...">`.
-        $this->assertMatchesRegularExpression('/<strong[^>]*>colaborador<\/strong>/', $html);
+        $this->assertMatchesRegularExpression('/con el rol <strong[^>]*>Colaborador<\/strong>/', $html);
+        $this->assertStringContainsString('resumen, productos, pedidos, clientes, reportes, reseñas y lista de espera.', $html);
         $this->assertStringNotContainsString('administr', $asunto.$html);
     }
 

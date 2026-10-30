@@ -14,12 +14,13 @@ use Illuminate\Support\Collection;
  *
  * `Product`, `ProductVariant` y `OrderItem` esconden el costo en su `$hidden`:
  * no sale en ninguna respuesta mientras nadie lo pida. Este ayudante es el
- * unico sitio que lo pide, y solo para un **admin** de la tienda.
+ * unico sitio que lo pide, y solo para quien tiene el permiso `costos.ver`: un
+ * admin, o un rol del equipo que lo tenga marcado (MOD-21).
  *
- * Por que solo admin y no todo el panel: el costo de compra es lo que la tienda
- * le paga al proveedor, el dato con el que se negocia. El vendedor que atiende
- * el mostrador no lo necesita para vender, y en este panel el reparto ya va por
- * ahi -borrar, configurar, facturar y el equipo son de admin (FUN-4)-.
+ * Por que un permiso propio y no parte de "ver productos": el costo de compra
+ * es lo que la tienda le paga al proveedor, el dato con el que se negocia. El
+ * vendedor que atiende el mostrador no lo necesita para vender, y por eso el
+ * rol de fabrica «Colaborador» no lo trae.
  *
  * Se llama en el ULTIMO momento, sobre lo que se va a serializar, y no antes de
  * guardar nada: `makeVisible`/`append` solo cambian como se convierte a JSON.
@@ -28,7 +29,7 @@ class Costos
 {
     public static function usuarioPuedeVerlos(): bool
     {
-        return auth()->user()?->role === 'admin';
+        return Permisos::usuarioPuede('costos.ver');
     }
 
     /**

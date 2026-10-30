@@ -96,6 +96,11 @@ class ActivityLog extends Model
     public const EQUIPO_EDITADO = 'equipo.editado';
     public const EQUIPO_BORRADO = 'equipo.borrado';
     public const EQUIPO_REINVITADO = 'equipo.reinvitado';
+    // MOD-21: los roles son parte del equipo. Lo que se busca es "quién le dio
+    // a este rol permiso de borrar", y vive junto a quién invitó a quién.
+    public const EQUIPO_ROL_CREADO = 'equipo.rol_creado';
+    public const EQUIPO_ROL_EDITADO = 'equipo.rol_editado';
+    public const EQUIPO_ROL_BORRADO = 'equipo.rol_borrado';
     // MOD-8: la papelera es su propia área y no "producto"/"pedido", porque lo
     // que el dueño busca en la bitácora es "quién restauró esto" o "quién vació
     // la papelera", no el historial del producto.

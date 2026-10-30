@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\SaludController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\TeamRoleController;
 use App\Http\Controllers\Api\TrashController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
@@ -214,24 +215,24 @@ Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platfo
 |--------------------------------------------------------------------------
 */
 /*
-| Dos niveles (FUN-4). Todo el grupo pide 'panel' -admin o staff activo- y lo
-| que solo decide un admin va ademas en el subgrupo 'admin' del final.
+| Todo el grupo pide 'panel' -alguien del equipo, activo- y cada ruta, ademas,
+| su permiso: 'permiso:<clave>' (MOD-21). Las claves y lo que significan estan
+| en config/permisos.php; un admin las tiene todas y un staff, las de su rol.
 |
-| El criterio del reparto: staff lleva el dia a dia de la tienda (pedidos,
-| productos, resenas, lista de espera) y el admin decide como es la tienda
-| (configuracion, categorias -que gobiernan el armador desde FUN-8-, paginas,
-| plan y equipo). Dentro de lo que staff toca, lo que BORRA o cambia el catalogo
-| de golpe tambien es de admin: borrar productos o pedidos, importar CSV y las
-| acciones masivas. Moderar resenas y la lista de espera, incluido borrar, si es
-| de staff: es su trabajo diario y no se lleva nada que no se pueda rehacer.
+| Lo que NO es un permiso y sigue siendo solo de admin: el equipo y sus roles.
+| Un rol que pudiera tocar el equipo podria darse a si mismo cualquier permiso.
 |
-| El frontend esconde lo que staff no puede usar, pero la barrera es esta.
+| Una ruta nueva del panel lleva su permiso, o 'admin', o figura en SIN_PERMISO
+| de PermisosPorAccionTest con su motivo; si no, ese test falla.
+|
+| El frontend esconde lo que cada uno no puede usar, pero la barrera es esta.
 */
 // 'soporte' cierra el panel a escrituras cuando quien mira es el operador
 // entrando como soporte (INF-2). Va en el grupo entero a proposito: si fuera
 // ruta por ruta, la primera ruta nueva que alguien anadiera naceria sin ella.
 Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(function () {
 
+    // Sin permiso: son de la propia sesion (ver SIN_PERMISO).
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me',      [AuthController::class, 'me']);
 
@@ -241,90 +242,113 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     Route::post('/auth/email/resend', [AuthController::class, 'resendVerificationEmail'])
         ->middleware('throttle:reenvio_correo');
 
-    // Estadísticas
-    Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
-
-    // Reportes: ventas por periodo, más vendidos y stock bajo (MOD-9). Staff
-    // entra: son los mismos pedidos y el mismo stock que ya ve en sus dos
-    // pantallas. Lo que NO ve es el costo ni la utilidad, y eso no lo decide
-    // esta ruta sino `Costos::usuarioPuedeVerlos()` dentro: las claves no
-    // llegan a la respuesta.
-    Route::get('/reports', [ReportController::class, 'index']);
-
-    // Configuración del tenant. Staff la LEE -el panel necesita la moneda, el
-    // slug y si la tienda esta publicada- pero no la cambia.
+    // Configuración del tenant. Todo el equipo la LEE -el panel necesita la
+    // moneda, el slug y si la tienda esta publicada-; cambiarla es un permiso.
     Route::get('/tenant',    [TenantController::class, 'show']);
 
     // Plan, limites y consumo (SAAS-3). Aparte de /tenant para no tocar la
-    // forma de esa respuesta; el porque esta en PlanController.
+    // forma de esa respuesta; el porque esta en PlanController. Lo lee todo el
+    // equipo por lo mismo que /tenant: los avisos de prueba y de tope.
     Route::get('/plan',      [PlanController::class, 'show']);
 
-    // Exportar (MOD-7). Van AQUI y no en el grupo de admin de mas abajo por el
-    // orden de las rutas: `products/{product}` y `orders/{order}` los registra
-    // `apiResource` unas lineas mas abajo y se tragarian `/export` como si fuera
-    // un id. Es el mismo motivo por el que `products/reorder` esta antes.
-    //
-    // Solo admin: el catalogo lleva el costo de compra (MOD-6) y los pedidos,
-    // los datos de contacto de todos los clientes de la tienda.
-    Route::middleware('admin')->group(function () {
-        Route::get('products/export', [ExportController::class, 'products']);
-        Route::get('orders/export', [ExportController::class, 'orders']);
-        // El del reporte lleva la utilidad, así que vive con los otros dos
-        // aunque la pantalla que lo ofrece sí la vea staff (MOD-9).
-        Route::get('reports/export', [ExportController::class, 'reports']);
+    // Estadísticas
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->middleware('permiso:resumen.ver');
+
+    // Reportes: ventas por periodo, más vendidos y stock bajo (MOD-9). El costo
+    // y la utilidad no los decide esta ruta sino `Costos::usuarioPuedeVerlos()`
+    // dentro (permiso `costos.ver`): sin el, las claves no llegan a la respuesta.
+    Route::get('/reports', [ReportController::class, 'index'])->middleware('permiso:reportes.ver');
+
+    // Exportar (MOD-7). Van ANTES de los `apiResource` por el orden de las
+    // rutas: `products/{product}` y `orders/{order}` se tragarian `/export`
+    // como si fuera un id. Es el mismo motivo por el que `products/reorder`
+    // esta antes. Las columnas de costo y utilidad solo salen con `costos.ver`.
+    Route::get('products/export', [ExportController::class, 'products'])->middleware('permiso:productos.exportar');
+    Route::get('orders/export', [ExportController::class, 'orders'])->middleware('permiso:pedidos.exportar');
+    Route::get('reports/export', [ExportController::class, 'reports'])->middleware('permiso:reportes.exportar');
+
+    // Productos. `import` y `bulk` van antes del `apiResource` por lo mismo que
+    // `export`. Borrar en lote pide ademas `productos.borrar`, y eso lo mira
+    // el controlador: la ruta es la misma que publicar en lote.
+    Route::post('products/import', [ProductController::class, 'import'])->middleware('permiso:productos.importar');
+    Route::post('products/bulk', [ProductController::class, 'bulkAction'])->middleware('permiso:productos.masivo');
+    Route::post('products/reorder', [ProductController::class, 'reorder'])->middleware('permiso:productos.editar');
+    Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->middleware('permiso:productos.editar');
+    Route::get('products', [ProductController::class, 'index'])->middleware('permiso:productos.ver')->name('products.index');
+    Route::get('products/{product}', [ProductController::class, 'show'])->middleware('permiso:productos.ver')->name('products.show');
+    Route::post('products', [ProductController::class, 'store'])->middleware('permiso:productos.editar')->name('products.store');
+    Route::match(['put', 'patch'], 'products/{product}', [ProductController::class, 'update'])->middleware('permiso:productos.editar')->name('products.update');
+    Route::delete('products/{product}', [ProductController::class, 'destroy'])->middleware('permiso:productos.borrar')->name('products.destroy');
+
+    // Categorías. Leerlas no pide permiso: el formulario de producto las
+    // necesita para elegir una, y son las mismas que enseña el catalogo
+    // publico. Cambiarlas, si: gobiernan el armador desde FUN-8.
+    Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
+    Route::middleware('permiso:categorias.gestionar')->group(function () {
+        Route::post('categories/reorder', [CategoryController::class, 'reorder']);
+        Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
     });
 
-    // Productos: staff crea y edita, no borra (ver el subgrupo de abajo).
-    Route::post('products/reorder', [ProductController::class, 'reorder']);
-    Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate']);
-    Route::apiResource('products', ProductController::class)->except(['destroy']);
-
-    // Categorías: staff solo las lee, que es lo que necesita el formulario de
-    // producto para elegir una.
-    Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
-
     // Pedidos. El PDF va ANTES del apiResource, o `orders/{order}` se tragaria
-    // "pdf" como si fuera un id (mismo motivo que `products/export`).
-    // Lo descarga tambien staff (MOD-2): quien atiende el mostrador es quien
-    // cotiza, y el PDF no lleva ningun dato que staff no vea ya en el pedido.
-    Route::get('orders/{order}/pdf', QuoteController::class);
-    Route::apiResource('orders', OrderController::class)->except(['destroy']);
+    // "pdf" como si fuera un id (mismo motivo que `products/export`). Va con
+    // ver: el PDF no lleva nada que no este ya en el pedido.
+    Route::get('orders/{order}/pdf', QuoteController::class)->middleware('permiso:pedidos.ver');
+    Route::get('orders', [OrderController::class, 'index'])->middleware('permiso:pedidos.ver')->name('orders.index');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('permiso:pedidos.ver')->name('orders.show');
+    // La venta de mostrador (OWN-3) y el cambio de estado.
+    Route::post('orders', [OrderController::class, 'store'])->middleware('permiso:pedidos.gestionar')->name('orders.store');
+    Route::match(['put', 'patch'], 'orders/{order}', [OrderController::class, 'update'])->middleware('permiso:pedidos.gestionar')->name('orders.update');
+    // Borrar un pedido atendido devuelve su stock y borra el registro de la
+    // venta: no es gestionar pedidos, es rehacer la contabilidad.
+    Route::delete('orders/{order}', [OrderController::class, 'destroy'])->middleware('permiso:pedidos.borrar')->name('orders.destroy');
 
     // Clientes de la tienda (MOD-10). Lectura: no se crean ni se editan desde el
-    // panel -las cuentas las abre el propio cliente en el catalogo-. Staff los ve
-    // porque ya ve los mismos datos de contacto en cada pedido que atiende.
-    Route::get('customers', [CustomerController::class, 'index']);
-    Route::get('customers/{customer}', [CustomerController::class, 'show']);
+    // panel -las cuentas las abre el propio cliente en el catalogo-.
+    Route::get('customers', [CustomerController::class, 'index'])->middleware('permiso:clientes.ver');
+    Route::get('customers/{customer}', [CustomerController::class, 'show'])->middleware('permiso:clientes.ver');
 
     // Reseñas/Calificaciones
-    Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)->only(['index', 'update', 'destroy']);
+    Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)
+        ->only(['index', 'update', 'destroy'])
+        ->middleware('permiso:resenas.gestionar');
 
     // Lista de espera de "avisame cuando llegue" (FUN-1b). Sin `store`: las filas
     // las crea el catalogo publico, no el panel.
     Route::apiResource('stock-notifications', \App\Http\Controllers\Api\StockNotificationController::class)
-        ->only(['index', 'update', 'destroy']);
+        ->only(['index', 'update', 'destroy'])
+        ->middleware('permiso:espera.gestionar');
 
-    // ------------------------------------------------ solo admin (FUN-4)
-    Route::middleware('admin')->group(function () {
+    // Configuración de la tienda y su dominio propio (FUN-6).
+    Route::middleware('permiso:tienda.configurar')->group(function () {
         Route::put('/tenant', [TenantController::class, 'update']);
-        // Comprobar el registro TXT del dominio propio (FUN-6).
         Route::post('/tenant/custom-domain/verify', [TenantController::class, 'verifyCustomDomain']);
+    });
 
-        Route::post('products/import', [ProductController::class, 'import']);
+    // Páginas informativas privadas
+    Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class)->middleware('permiso:paginas.gestionar');
 
-        Route::post('products/bulk', [ProductController::class, 'bulkAction']);
-        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    // Actividad del panel: quién cambió qué (INF-3). Lo que escribe cada ruta
+    // está en App\Support\Bitacora y lo vigila BitacoraDeTiendaTest.
+    Route::get('activity', [ActivityController::class, 'index'])->middleware('permiso:actividad.ver');
 
-        Route::post('categories/reorder', [CategoryController::class, 'reorder']);
-        Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+    // Cupones (MOD-4): un cupon es dinero que se deja de cobrar.
+    Route::apiResource('coupons', CouponController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('permiso:cupones.gestionar');
 
-        // Borrar un pedido atendido devuelve su stock y borra el registro de la
-        // venta: no es gestionar pedidos, es rehacer la contabilidad.
-        Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
+    // Papelera (MOD-8). Su permiso requiere los dos borrados: si se pudiera
+    // restaurar y volver a borrar, no poder borrar no seria ninguna
+    // restriccion. `DELETE trash` va ANTES que `trash/{tipo}/{id}` para que no
+    // se lo trague como si fuera un tipo.
+    Route::middleware('permiso:papelera.gestionar')->group(function () {
+        Route::get('trash', [TrashController::class, 'index']);
+        Route::delete('trash', [TrashController::class, 'empty']);
+        Route::post('trash/{tipo}/{id}/restore', [TrashController::class, 'restore']);
+        Route::delete('trash/{tipo}/{id}', [TrashController::class, 'destroy']);
+    });
 
-        // Páginas informativas privadas
-        Route::apiResource('pages', \App\Http\Controllers\Api\PageController::class);
-
+    // ------------------------------------------- solo admin: el equipo
+    Route::middleware('admin')->group(function () {
         // Equipo de la tienda (FUN-4). Sin `show`: la lista ya trae todo lo que
         // hay de un usuario. El controlador resuelve el {user} a mano y no por
         // route model binding, para no salirse de la tienda (ver su cabecera).
@@ -333,23 +357,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
         Route::apiResource('users', UserController::class)
             ->only(['index', 'store', 'update', 'destroy']);
 
-        // Actividad del panel: quién cambió qué (INF-3). Solo admin: es lo que
-        // hace el resto del equipo. Lo que escribe cada ruta está en
-        // App\Support\Bitacora y lo vigila BitacoraDeTiendaTest.
-        Route::get('activity', [ActivityController::class, 'index']);
-
-        // Cupones (MOD-4). Solo admin: un cupon es dinero que se deja de cobrar,
-        // asi que lo decide quien decide los precios (FUN-4).
-        Route::apiResource('coupons', CouponController::class)
+        // Roles del equipo y el catalogo de permisos que se les puede marcar
+        // (MOD-21).
+        Route::get('permissions', [TeamRoleController::class, 'catalogo']);
+        Route::apiResource('team-roles', TeamRoleController::class)
             ->only(['index', 'store', 'update', 'destroy']);
-
-        // Papelera (MOD-8). Solo admin por lo mismo que borrar: si un
-        // colaborador pudiera restaurar y volver a borrar, no borrar no seria
-        // ninguna restriccion. `DELETE trash` va ANTES que `trash/{tipo}/{id}`
-        // para que no se lo trague como si fuera un tipo.
-        Route::get('trash', [TrashController::class, 'index']);
-        Route::delete('trash', [TrashController::class, 'empty']);
-        Route::post('trash/{tipo}/{id}/restore', [TrashController::class, 'restore']);
-        Route::delete('trash/{tipo}/{id}', [TrashController::class, 'destroy']);
     });
 });

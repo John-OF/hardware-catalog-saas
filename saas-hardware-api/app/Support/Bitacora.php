@@ -34,6 +34,15 @@ class Bitacora
     {
         $request = request();
 
+        // MOD-21: `actor_role` solo dice admin o staff. El nombre del rol del
+        // equipo va en el contexto, como foto del dia: si mañana el rol se
+        // renombra o se borra, la linea sigue diciendo con que rol se hizo.
+        $actor = $request->user();
+
+        if ($actor instanceof \App\Models\User && $actor->role === 'staff') {
+            $contexto += ['rol_del_actor' => $actor->teamRole?->name];
+        }
+
         try {
             ActivityLog::registrar(
                 $accion,

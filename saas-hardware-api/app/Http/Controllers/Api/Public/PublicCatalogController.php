@@ -1017,12 +1017,17 @@ class PublicCatalogController extends Controller
     private function notifyOwnerOfNewOrder(Tenant $tenant, Order $order): void
     {
         try {
-            // Todo el equipo activo, no solo los admins (FUN-4): quien atiende
-            // los pedidos suele ser staff, y es quien necesita enterarse.
+            // El equipo activo que ve pedidos, no solo los admins (FUN-4):
+            // quien atiende los pedidos suele ser staff, y es quien necesita
+            // enterarse. Pero no a quien su rol no deja ver pedidos (MOD-21):
+            // el correo trae el pedido entero, con los datos del comprador.
             $equipo = User::where('tenant_id', $tenant->id)
                 ->whereIn('role', User::ROLES_DE_PANEL)
                 ->where('is_active', true)
-                ->get();
+                ->with('teamRole')
+                ->get()
+                ->filter(fn (User $u) => \App\Support\Permisos::puede($u, 'pedidos.ver'))
+                ->values();
 
             if ($equipo->isEmpty()) {
                 return;

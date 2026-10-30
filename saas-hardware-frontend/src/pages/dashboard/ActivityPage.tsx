@@ -1,13 +1,12 @@
 import './ActivityPage.css';
 
 import { useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, History, Loader2 } from 'lucide-react';
 import { getActividad } from '../../api/activity';
-import { getTeamUsers } from '../../api/users';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFechaHora } from '../../utils/fechas';
-import type { AreaDeActividad } from '../../types';
+import type { ActividadDelPanel, AreaDeActividad } from '../../types';
 
 /** En el orden del menú del panel. */
 const AREAS: { valor: AreaDeActividad; etiqueta: string }[] = [
@@ -24,9 +23,25 @@ const AREAS: { valor: AreaDeActividad; etiqueta: string }[] = [
 const etiquetaDeArea = (action: string) =>
   AREAS.find((a) => action.startsWith(`${a.valor}.`))?.etiqueta ?? 'Otro';
 
+/**
+ * Con qué rol se hizo (MOD-21). El nombre del rol del equipo va en el contexto
+ * de la línea, como foto del día. Una línea de antes de MOD-21 no lo trae, y
+ * entonces el rol del equipo solo podía ser «Colaborador».
+ */
+const rolDeLaLinea = (linea: ActividadDelPanel): string => {
+  if (linea.actor_role === 'admin') return 'Administrador';
+
+  const contexto = linea.context ?? {};
+  if ('rol_del_actor' in contexto) {
+    return typeof contexto.rol_del_actor === 'string' ? contexto.rol_del_actor : 'Sin rol';
+  }
+
+  return 'Colaborador';
+};
+
 
 /**
- * Quién cambió qué en el panel (INF-3). Solo admin.
+ * Quién cambió qué en el panel (INF-3). Con el permiso `actividad.ver` (MOD-21).
  *
  * Con una sola persona por tienda no hacía falta; con equipo (FUN-4), "¿quién
  * bajó este precio?" no tenía respuesta. Las líneas las escribe el backend
@@ -46,13 +61,15 @@ export default function ActivityPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['actividad', area, actor, page],
     queryFn: () => getActividad({ area, actor, page }),
+    // Al cambiar de filtro se queda lo de antes hasta que llega lo nuevo, y con
+    // ello la lista de personas del filtro: sin esto, el desplegable se vaciaba
+    // un instante en cada cambio.
+    placeholderData: keepPreviousData,
   });
 
-  const { data: equipo = [] } = useQuery({
-    // La misma clave que Equipo, para compartir la lista ya cargada.
-    queryKey: ['teamUsers'],
-    queryFn: getTeamUsers,
-  });
+  // MOD-21: la lista del filtro viene con la propia actividad. Antes se pedía a
+  // `GET /users`, que es del admin, y un rol con este permiso recibía 403.
+  const equipo = data?.personas ?? [];
 
   const cambiar = (cambios: Record<string, string | null>) => {
     const siguiente = new URLSearchParams(searchParams);
@@ -75,7 +92,7 @@ export default function ActivityPage() {
           <h1>Actividad</h1>
           <p className="page-description">
             Quién cambió qué en el panel de tu tienda: precios, pedidos, categorías, equipo y
-            configuración. Solo lo ven los administradores.
+            configuración. Lo ven los administradores y los roles del equipo con ese permiso.
             {data?.retencion_dias && (
               <> Se guarda lo de los últimos {data.retencion_dias} días; lo anterior se borra solo.</>
             )}
@@ -104,7 +121,7 @@ export default function ActivityPage() {
         >
           <option value="">Todo el equipo</option>
           {equipo.map((u) => (
-            <option key={u.id} value={u.email}>{u.name}</option>
+            <option key={u.email} value={u.email}>{u.name}</option>
           ))}
           {/* Alguien que ya no está en el equipo, llegado por un enlace guardado. */}
           {actor && !equipo.some((u) => u.email === actor) && <option value={actor}>{actor}</option>}
@@ -140,9 +157,7 @@ export default function ActivityPage() {
                     {linea.actor?.name ?? linea.actor_email ?? 'Alguien'}
                     {!linea.actor && linea.actor_email && <span className="activity-gone"> (ya no está en el equipo)</span>}
                   </span>
-                  {linea.actor_role && (
-                    <span className="activity-role">{linea.actor_role === 'admin' ? 'Administrador' : 'Colaborador'}</span>
-                  )}
+                  {linea.actor_role && <span className="activity-role">{rolDeLaLinea(linea)}</span>}
                   <span className="activity-area">{etiquetaDeArea(linea.action)}</span>
                   <time className="activity-time" dateTime={linea.created_at}>
                     {formatearFechaHora(linea.created_at, tenant?.timezone)}

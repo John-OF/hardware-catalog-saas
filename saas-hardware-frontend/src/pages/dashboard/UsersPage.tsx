@@ -1,6 +1,7 @@
 import './UsersPage.css';
 
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
@@ -15,6 +16,7 @@ import {
   Power,
   Trash2,
   Send,
+  UserCog,
 } from 'lucide-react';
 import {
   getTeamUsers,
@@ -25,45 +27,133 @@ import {
   type RolDePanel,
 } from '../../api/users';
 import { getPlan } from '../../api/plan';
+import { CLAVE_ROLES, getRolesDelEquipo } from '../../api/teamRoles';
 import { useAuthStore } from '../../stores/authStore';
 import Dialogo from '../../components/ui/Dialogo';
-import type { PlanInfo, User } from '../../types';
+import RolesDelEquipo from './RolesDelEquipo';
+import type { PlanInfo, RolDelEquipo, User } from '../../types';
 
 /**
- * El equipo de la tienda (FUN-4).
+ * El equipo de la tienda (FUN-4) y sus roles (MOD-21).
  *
  * Hasta aquí una tienda era un solo usuario: el del alta. El dueño que tenía un
  * vendedor le pasaba su contraseña, y como el login cierra las sesiones
  * anteriores, los dos se echaban mutuamente todo el día.
  *
- * Dos roles. **Administrador** lo puede todo. **Colaborador** (`staff` en el
- * backend) lleva el día a día —pedidos, productos, reseñas, lista de espera—
- * pero no la configuración, las categorías, las páginas ni este equipo, y no
- * borra productos ni pedidos. El reparto de verdad está en `routes/api.php`;
- * esta pantalla solo lo cuenta.
+ * Dos pestañas. **Personas**: quién entra y con qué acceso —**Administrador**,
+ * que lo puede todo, o uno de los roles del equipo—. **Roles y permisos**: qué
+ * puede cada rol, acción por acción (`RolesDelEquipo`). La barrera de verdad es
+ * el middleware `permiso:` de cada ruta; esta pantalla solo la cuenta.
+ *
+ * La pestaña va en la URL (`?pestania=roles`), como los filtros del catálogo
+ * (UI-1): se puede guardar o pasar el enlace.
  *
  * Solo la ven los administradores (`SoloAdmin` en el router).
  */
 
-const NOMBRE_DE_ROL: Record<RolDePanel, string> = {
-  admin: 'Administrador',
-  staff: 'Colaborador',
+/** Lo que va en el desplegable de acceso: `admin` o el id de un rol del equipo. */
+const ADMIN = 'admin';
+
+const nombreDeAcceso = (usuario: User): string =>
+  usuario.role === 'admin' ? 'Administrador' : usuario.team_role?.name ?? 'Sin rol';
+
+/** El texto bajo el desplegable: qué podrá hacer con lo elegido. */
+const pistaDeAcceso = (acceso: string, roles: RolDelEquipo[]): string => {
+  if (acceso === ADMIN) {
+    return 'Podrá cambiar la configuración, el plan y el equipo, incluido tu propio acceso. Dáselo solo a quien lleve la tienda contigo.';
+  }
+
+  const rol = roles.find((r) => r.id === acceso);
+  if (!rol) return '';
+  if (rol.areas.length === 0) return 'Este rol todavía no tiene ningún permiso: podrá entrar, pero no ver nada.';
+
+  return `${rol.description ? `${rol.description}. ` : ''}Entra a: ${rol.areas.join(', ')}. Puedes cambiarlo más tarde.`;
 };
+
+function SelectorDeAcceso({ id, valor, onCambiar, roles }: {
+  id: string;
+  valor: string;
+  onCambiar: (valor: string) => void;
+  roles: RolDelEquipo[];
+}) {
+  return (
+    <>
+      <select id={id} value={valor} onChange={(e) => onCambiar(e.target.value)} className="premium-input">
+        {roles.map((r) => (
+          <option key={r.id} value={r.id}>{r.name}</option>
+        ))}
+        <option value={ADMIN}>Administrador — todo, como tú</option>
+      </select>
+      <p className="form-hint">{pistaDeAcceso(valor, roles)}</p>
+      {roles.length === 0 && (
+        <p className="form-hint">
+          No hay ningún rol del equipo: créalo en <strong>Roles y permisos</strong> para invitar a alguien con un
+          acceso limitado.
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function UsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pestania = searchParams.get('pestania') === 'roles' ? 'roles' : 'personas';
+
+  const cambiarPestania = (siguiente: 'personas' | 'roles') => {
+    const parametros = new URLSearchParams(searchParams);
+    if (siguiente === 'roles') parametros.set('pestania', 'roles');
+    else parametros.delete('pestania');
+    setSearchParams(parametros, { replace: true });
+  };
+
+  return (
+    <div className="users-page animate-fade-in page-users">
+      <div className="team-pestanias" role="tablist" aria-label="Equipo">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pestania === 'personas'}
+          className={`team-pestania ${pestania === 'personas' ? 'activa' : ''}`}
+          onClick={() => cambiarPestania('personas')}
+        >
+          Personas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pestania === 'roles'}
+          className={`team-pestania ${pestania === 'roles' ? 'activa' : ''}`}
+          onClick={() => cambiarPestania('roles')}
+        >
+          Roles y permisos
+        </button>
+      </div>
+
+      {pestania === 'roles' ? <RolesDelEquipo /> : <PersonasDelEquipo />}
+    </div>
+  );
+}
+
+function PersonasDelEquipo() {
   const queryClient = useQueryClient();
   const yo = useAuthStore((s) => s.user);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  // Colaborador por defecto: dar poder de administrador tiene que ser una
+  // Un rol del equipo por defecto: dar poder de administrador tiene que ser una
   // decisión, no lo que pasa si nadie toca el desplegable.
-  const [rol, setRol] = useState<RolDePanel>('staff');
+  const [acceso, setAcceso] = useState<string>('');
+  const [cambiandoAcceso, setCambiandoAcceso] = useState<User | null>(null);
+  const [accesoNuevo, setAccesoNuevo] = useState<string>('');
 
   const { data: usuarios = [], isLoading } = useQuery<User[]>({
     queryKey: ['teamUsers'],
     queryFn: getTeamUsers,
   });
+
+  const { data: roles = [] } = useQuery({ queryKey: CLAVE_ROLES, queryFn: getRolesDelEquipo });
+  const accesoPorDefecto = roles[0]?.id ?? ADMIN;
 
   // Para pintar "2 / 3" antes de que el dueño choque con el tope.
   const { data: plan } = useQuery<PlanInfo>({ queryKey: ['plan'], queryFn: getPlan });
@@ -102,10 +192,18 @@ export default function UsersPage() {
   });
 
   const cambiarRolMutation = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: RolDePanel }) => updateTeamUser(id, { role }),
+    mutationFn: ({ id, valor }: { id: string; valor: string }) =>
+      updateTeamUser(id, valor === ADMIN ? { role: 'admin' } : { role: 'staff' as RolDePanel, team_role_id: valor }),
     onSuccess: (usuario) => {
       refrescar();
-      toast.success(`${usuario.name} ahora es ${NOMBRE_DE_ROL[usuario.role as RolDePanel].toLowerCase()}`);
+      // El número de personas de cada rol cambió.
+      queryClient.invalidateQueries({ queryKey: CLAVE_ROLES });
+      toast.success(
+        usuario.role === 'admin'
+          ? `${usuario.name} ahora es administrador`
+          : `${usuario.name} ahora tiene el rol «${nombreDeAcceso(usuario)}»`,
+      );
+      setCambiandoAcceso(null);
     },
     onError: (err) => alFallar(err, 'No se pudo cambiar el rol'),
   });
@@ -114,6 +212,7 @@ export default function UsersPage() {
     mutationFn: deleteTeamUser,
     onSuccess: () => {
       refrescar();
+      queryClient.invalidateQueries({ queryKey: CLAVE_ROLES });
       toast.success('Persona eliminada del equipo');
     },
     onError: (err) => alFallar(err, 'No se pudo eliminar'),
@@ -128,7 +227,7 @@ export default function UsersPage() {
   const abrirModal = () => {
     setName('');
     setEmail('');
-    setRol('staff');
+    setAcceso(accesoPorDefecto);
     setIsModalOpen(true);
   };
 
@@ -142,17 +241,35 @@ export default function UsersPage() {
       return;
     }
 
-    invitarMutation.mutate({ name: name.trim(), email: email.trim(), role: rol });
+    const elegido = acceso || accesoPorDefecto;
+    invitarMutation.mutate(
+      elegido === ADMIN
+        ? { name: name.trim(), email: email.trim(), role: 'admin' }
+        : { name: name.trim(), email: email.trim(), role: 'staff', team_role_id: elegido },
+    );
   };
 
-  const cambiarRol = (usuario: User) => {
-    const nuevo: RolDePanel = usuario.role === 'admin' ? 'staff' : 'admin';
-    const aviso = nuevo === 'admin'
-      ? `¿Hacer administrador a ${usuario.name}? Podrá cambiar la configuración, las categorías y el equipo, incluido tu propio acceso.`
-      : `¿Pasar a ${usuario.name} a colaborador? Dejará de ver la configuración, las categorías, las páginas y el equipo.`;
+  const abrirCambioDeAcceso = (usuario: User) => {
+    setAccesoNuevo(usuario.role === 'admin' ? ADMIN : usuario.team_role_id ?? accesoPorDefecto);
+    setCambiandoAcceso(usuario);
+  };
+
+  const guardarAcceso = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cambiandoAcceso) return;
+
+    const actual = cambiandoAcceso.role === 'admin' ? ADMIN : cambiandoAcceso.team_role_id ?? '';
+    if (accesoNuevo === actual) {
+      setCambiandoAcceso(null);
+      return;
+    }
+
+    const aviso = accesoNuevo === ADMIN
+      ? `¿Hacer administrador a ${cambiandoAcceso.name}? Podrá cambiar la configuración y el equipo, incluido tu propio acceso.`
+      : `¿Darle a ${cambiandoAcceso.name} el rol «${roles.find((r) => r.id === accesoNuevo)?.name ?? ''}»?`;
 
     if (window.confirm(`${aviso} Se le cerrará la sesión para que entre con su nuevo acceso.`)) {
-      cambiarRolMutation.mutate({ id: usuario.id, role: nuevo });
+      cambiarRolMutation.mutate({ id: cambiandoAcceso.id, valor: accesoNuevo });
     }
   };
 
@@ -165,7 +282,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="users-page animate-fade-in page-users">
+    <>
       <div className="page-header-actions">
         <p className="page-description">
           Quién puede entrar al panel de tu tienda. Cada persona entra con su propio correo y su
@@ -177,13 +294,13 @@ export default function UsersPage() {
         </button>
       </div>
 
-      {/* Lo que puede cada rol, dicho antes de invitar y no descubierto después. */}
+      {/* Lo que puede cada uno, dicho antes de invitar y no descubierto después. */}
       <div className="team-notice glass-card">
         <ShieldCheck size={18} />
         <p>
-          Un <strong>colaborador</strong> atiende pedidos, reseñas y la lista de espera, y crea y edita
-          productos. No ve la configuración, las categorías, las páginas ni el equipo, y no puede
-          borrar productos ni pedidos. Un <strong>administrador</strong> puede todo lo que puedes tú.
+          Un <strong>administrador</strong> puede todo lo que puedes tú. Los demás tienen un <strong>rol del
+          equipo</strong>, y lo que puede cada rol —ver, editar, borrar, exportar, ver el costo— se decide en
+          la pestaña <strong>Roles y permisos</strong>.
         </p>
       </div>
 
@@ -220,7 +337,7 @@ export default function UsersPage() {
                 <div className="team-badges">
                   <span className={`badge ${usuario.role === 'admin' ? 'badge-rol-admin' : 'badge-neutro'}`}>
                     {usuario.role === 'admin' ? <ShieldCheck size={12} /> : <Shield size={12} />}
-                    {NOMBRE_DE_ROL[usuario.role as RolDePanel] ?? usuario.role}
+                    {nombreDeAcceso(usuario)}
                   </span>
 
                   {usuario.is_active ? (
@@ -257,12 +374,11 @@ export default function UsersPage() {
                   {!soyYo && (
                     <>
                       <button
-                        onClick={() => cambiarRol(usuario)}
+                        onClick={() => abrirCambioDeAcceso(usuario)}
                         className="btn-secondary team-btn"
                         disabled={cambiarRolMutation.isPending}
                       >
-                        {usuario.role === 'admin' ? <Shield size={15} /> : <ShieldCheck size={15} />}
-                        {usuario.role === 'admin' ? 'Pasar a colaborador' : 'Hacer administrador'}
+                        <UserCog size={15} /> Cambiar acceso
                       </button>
                       <button
                         onClick={() => cambiarEstadoMutation.mutate({ id: usuario.id, is_active: !usuario.is_active })}
@@ -323,20 +439,7 @@ export default function UsersPage() {
 
               <div className="form-group">
                 <label htmlFor="user-role">Acceso</label>
-                <select
-                  id="user-role"
-                  value={rol}
-                  onChange={(e) => setRol(e.target.value as RolDePanel)}
-                  className="premium-input"
-                >
-                  <option value="staff">Colaborador — pedidos, productos, reseñas</option>
-                  <option value="admin">Administrador — todo, como tú</option>
-                </select>
-                <p className="form-hint">
-                  {rol === 'staff'
-                    ? 'Lleva el día a día sin tocar la configuración, las categorías ni el equipo. Puedes cambiarlo más tarde.'
-                    : 'Podrá cambiar la configuración, el plan y el equipo, incluido tu propio acceso. Dáselo solo a quien lleve la tienda contigo.'}
-                </p>
+                <SelectorDeAcceso id="user-role" valor={acceso || accesoPorDefecto} onCambiar={setAcceso} roles={roles} />
               </div>
 
               <div className="dialogo-acciones">
@@ -351,6 +454,31 @@ export default function UsersPage() {
             </form>
         </Dialogo>
       )}
-    </div>
+
+      {cambiandoAcceso && (
+        <Dialogo
+          titulo={`Acceso de ${cambiandoAcceso.name}`}
+          onCerrar={() => setCambiandoAcceso(null)}
+          className="page-users"
+        >
+          <form onSubmit={guardarAcceso} className="dialogo-cuerpo">
+            <div className="form-group">
+              <label htmlFor="user-role-nuevo">Acceso</label>
+              <SelectorDeAcceso id="user-role-nuevo" valor={accesoNuevo} onCambiar={setAccesoNuevo} roles={roles} />
+            </div>
+
+            <div className="dialogo-acciones">
+              <button type="button" onClick={() => setCambiandoAcceso(null)} className="btn-secondary">
+                Cancelar
+              </button>
+              <button type="submit" disabled={cambiarRolMutation.isPending} className="btn-primary">
+                {cambiarRolMutation.isPending && <Loader2 className="spinner" size={16} />}
+                Guardar
+              </button>
+            </div>
+          </form>
+        </Dialogo>
+      )}
+    </>
   );
 }

@@ -1,12 +1,17 @@
 import './PlatformLoginPage.css';
 
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { ArrowLeft, Lock, Mail, Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { pideSegundoPaso, platformLogin, platformLoginConCodigo, type SesionDePlataforma } from '../../api/platform';
 import { avisarError } from '../../api/erroresDeFormulario';
 import { usePlatformAuthStore } from '../../stores/platformAuthStore';
+import type { CuentaDePrueba } from '../../utils/cuentasDePrueba';
+
+// Sólo en desarrollo: en el build la rama es código muerto y el componente no
+// llega ni como archivo aparte (utils/cuentasDePrueba.ts).
+const CuentasDePrueba = import.meta.env.DEV ? lazy(() => import('../../components/dev/CuentasDePrueba')) : null;
 
 export default function PlatformLoginPage() {
   const navigate = useNavigate();
@@ -42,11 +47,10 @@ export default function PlatformLoginPage() {
     setConRecuperacion(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const conContrasenia = async (correo: string, clave: string) => {
     setIsLoading(true);
     try {
-      const respuesta = await platformLogin(email, password);
+      const respuesta = await platformLogin(correo, clave);
 
       if (pideSegundoPaso(respuesta)) {
         setDesafio(respuesta.desafio);
@@ -62,6 +66,22 @@ export default function PlatformLoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void conContrasenia(email, password);
+  };
+
+  /**
+   * Sólo en desarrollo: la lista de `CuentasDePrueba` entra con un clic. Pasa
+   * por el mismo camino que el formulario, así que si la cuenta tiene el
+   * segundo paso activo, lo pide igual.
+   */
+  const entrarConCuentaDePrueba = (cuenta: CuentaDePrueba) => {
+    setEmail(cuenta.email);
+    setPassword(cuenta.password);
+    void conContrasenia(cuenta.email, cuenta.password);
   };
 
   const enviarCodigo = async (e: React.FormEvent) => {
@@ -209,6 +229,12 @@ export default function PlatformLoginPage() {
               )}
             </button>
           </form>
+        )}
+
+        {CuentasDePrueba && !desafio && (
+          <Suspense fallback={null}>
+            <CuentasDePrueba tipo="plataforma" onElegir={entrarConCuentaDePrueba} ocupado={isLoading} />
+          </Suspense>
         )}
       </div>
 

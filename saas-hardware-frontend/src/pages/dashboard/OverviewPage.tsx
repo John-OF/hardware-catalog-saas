@@ -16,20 +16,86 @@ import { Link } from 'react-router-dom';
 import { getDashboardStats } from '../../api/dashboard';
 import type { DashboardStats } from '../../api/dashboard';
 import { useTenantStore } from '../../stores/tenantStore';
+import { useAuthStore, usePuede } from '../../stores/authStore';
 import { formatearFecha } from '../../utils/fechas';
 import { formatMoney } from '../../utils/money';
+import type { Permiso } from '../../utils/permisos';
+
+/**
+ * Las pantallas a las que se puede ir desde el saludo de quien no ve el
+ * resumen (MOD-21), con el permiso que abre cada una: el mismo de `ConPermiso`.
+ */
+const PANTALLAS: { permiso: Permiso; ruta: string; nombre: string }[] = [
+  { permiso: 'pedidos.ver', ruta: '/dashboard/orders', nombre: 'Pedidos' },
+  { permiso: 'productos.ver', ruta: '/dashboard/products', nombre: 'Productos' },
+  { permiso: 'clientes.ver', ruta: '/dashboard/customers', nombre: 'Clientes' },
+  { permiso: 'reportes.ver', ruta: '/dashboard/reports', nombre: 'Reportes' },
+  { permiso: 'resenas.gestionar', ruta: '/dashboard/reviews', nombre: 'Reseñas' },
+  { permiso: 'espera.gestionar', ruta: '/dashboard/waitlist', nombre: 'Lista de espera' },
+  { permiso: 'cupones.gestionar', ruta: '/dashboard/coupons', nombre: 'Cupones' },
+  { permiso: 'categorias.gestionar', ruta: '/dashboard/categories', nombre: 'Categorías' },
+  { permiso: 'paginas.gestionar', ruta: '/dashboard/pages', nombre: 'Páginas' },
+  { permiso: 'actividad.ver', ruta: '/dashboard/activity', nombre: 'Actividad' },
+  { permiso: 'papelera.gestionar', ruta: '/dashboard/trash', nombre: 'Papelera' },
+  { permiso: 'tienda.configurar', ruta: '/dashboard/settings', nombre: 'Configuración' },
+];
+
+/**
+ * Lo que ve en `/dashboard` quien no tiene `resumen.ver` (MOD-21). Es también
+ * a donde manda `ConPermiso`, así que no puede redirigir a ningún sitio.
+ */
+function SinResumen() {
+  const user = useAuthStore((s) => s.user);
+  const permisos = user?.permisos ?? [];
+  const pantallas = PANTALLAS.filter((p) => permisos.includes(p.permiso));
+
+  return (
+    <div className="overview-page animate-fade-in page-overview">
+      <div className="state-card overview-sin-resumen">
+        <h3>Hola{user?.name ? `, ${user.name}` : ''}</h3>
+        {pantallas.length > 0 ? (
+          <>
+            <p>
+              Tu rol{user?.team_role ? ` «${user.team_role.name}»` : ''} no incluye el resumen de la tienda. Puedes
+              ir a:
+            </p>
+            <div className="overview-sin-resumen-enlaces">
+              {pantallas.map((p) => (
+                <Link key={p.ruta} to={p.ruta} className="btn-secondary">
+                  {p.nombre}
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p>
+            Tu rol todavía no tiene ningún permiso en el panel. Pídele a un administrador de la tienda que te dé acceso
+            a lo que necesites.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function OverviewPage() {
   const tenant = useTenantStore((s) => s.tenant);
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
+  const puedeVerResumen = usePuede('resumen.ver');
 
   const { data: stats, isLoading, isError } = useQuery<DashboardStats>({
     queryKey: ['dashboardStats'],
     queryFn: getDashboardStats,
     refetchInterval: 30000, // Autorefresh every 30s
+    // MOD-21: sin el permiso, la petición sería un 403 cada 30 segundos.
+    enabled: puedeVerResumen === true,
   });
 
-  if (isLoading) {
+  if (puedeVerResumen === false) {
+    return <SinResumen />;
+  }
+
+  if (isLoading || puedeVerResumen === null) {
     return (
       <div className="overview-loading page-overview">
         <Loader2 className="spinner" size={32} />

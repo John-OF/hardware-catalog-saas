@@ -18,9 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant'     => \App\Http\Middleware\InitializeTenantByHeader::class,
-            // 'panel' es la puerta (admin o staff); 'admin' se anade encima de
-            // lo que solo decide un admin (FUN-4).
+            // 'panel' es la puerta (admin o staff); 'permiso:<clave>' es la
+            // cerradura de cada ruta segun el rol del equipo (MOD-21), y 'admin'
+            // queda para lo que no se delega: el equipo.
             'panel'      => \App\Http\Middleware\EnsurePanelUser::class,
+            'permiso'    => \App\Http\Middleware\EnsurePermiso::class,
             'admin'      => \App\Http\Middleware\EnsureAdmin::class,
             'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
             // Cuando quien mira el panel es el operador entrando como soporte,
@@ -79,6 +81,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
             prepend: \App\Http\Middleware\EnsurePanelUser::class,
+        );
+        // Y la cerradura por permiso (MOD-21), que hereda el papel de
+        // EnsureAdmin en casi todas las rutas y por eso su mismo sitio.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\EnsurePermiso::class,
         );
 
         // Igual con el modo soporte (INF-2): la negativa tiene que llegar ANTES

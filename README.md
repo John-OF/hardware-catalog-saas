@@ -43,8 +43,9 @@ optimizadas, importación **y exportación** por CSV, pedidos con estados y desc
 stock, envío a domicilio o recojo en tienda y métodos de pago informativos, costo de compra con su
 margen y la utilidad de cada pedido, ficha de cada cliente registrado con lo que lleva comprado,
 venta de mostrador, moderación de reseñas, lista de espera de productos agotados, páginas
-informativas, métricas y personalización visual completa (colores, tipografías, portada, pie,
-favicon).
+informativas, métricas, personalización visual completa (colores, tipografías, portada, pie,
+favicon) y un equipo con **roles a medida y permisos por acción** (ver, editar, borrar, exportar,
+ver el costo…).
 
 **Para el comprador**: buscador con filtros por categoría, disponibilidad y specs reales del
 catálogo; comparador de hasta tres productos; **armador de PC** que avisa de incompatibilidades;
@@ -132,7 +133,22 @@ npm run dev                   # http://localhost:5173
 a arrancar sin R2. Con el orden al revés, `composer install` acaba en error; es lo que tuvo el CI
 de la API en rojo del 2026-09-06 al 2026-09-27 sin llegar a correr un test.
 
-`composer dev` levanta servidor, cola, logs y Vite a la vez, que es la forma corta de lo anterior.
+`composer dev`, desde `saas-hardware-api`, es la forma corta de los tres últimos comandos: levanta a
+la vez la API en el 8000, la cola y el Vite del frontend en el 5173. La primera vez necesita
+`npm install` dentro de `saas-hardware-api`, que es de donde sale `concurrently`. Lo que hay que saber:
+
+- **La cola va con `queue:listen`, no con `queue:work`**: relee el código en cada trabajo, así que en
+  local no hace falta reiniciarla después de tocar una notificación. En producción sigue siendo
+  `queue:work` bajo Supervisor, y ahí el reinicio es obligatorio (`INF-13`).
+- **Los dos puertos son fijos.** `artisan serve` con `--port` no salta al 8001 si el 8000 está
+  ocupado, y Vite va con `--strictPort`. Si cualquiera de los dos está tomado, ese proceso falla y
+  `--kill-others` apaga los otros dos: mejor eso que un frontend hablando con la API de otro proyecto.
+- **No lleva `php artisan pail`**: necesita la extensión `pcntl`, que PHP no tiene en Windows, y al
+  caerse arrastraría a los demás. El log está en `storage/logs/laravel.log`.
+- **No arranca el Vite propio de la API** (el `vite.config.js` que trae Laravel): sólo lo pide la
+  página de bienvenida de Laravel en la raíz de la API, que sin él se pinta con su estilo de
+  respaldo, y se quedaría con el 5173.
+- MySQL no va incluido: tiene que estar arrancado antes.
 
 ### Al desplegar una versión nueva
 
@@ -263,8 +279,10 @@ el de cualquier modelo, así que una consulta de `User` sobre **otras** tiendas 
 Hay **tres autenticaciones separadas**, todas con Sanctum (tokens Bearer):
 
 1. **Equipo de la tienda** — panel (header `X-Tenant` + Bearer). Token de 7 días, una sesión activa
-   por usuario. Dos roles: `admin` (todo) y `staff` (el día a día: pedidos, productos sin borrar,
-   reseñas, lista de espera). El rol se lee del usuario en cada petición, no del token. Un correo
+   por usuario. `admin` lo puede todo; `staff` puede lo que marque su **rol del equipo**
+   (`team_roles`, `MOD-21`): una lista de permisos por acción de `config/permisos.php`, que cada
+   tienda arma a su medida (trae «Colaborador», con lo que podía el `staff` fijo de antes). El rol y
+   sus permisos se leen de la base en cada petición, no del token. Un correo
    solo puede estar en el panel de **una** tienda, porque el login no pide la tienda. Un token con
    la ability `customer` no entra al panel aunque su usuario sea del equipo (`ACC-3`).
 2. **Clientes finales** — cuentas por tienda dentro del catálogo público (favoritos e historial).
@@ -330,7 +348,8 @@ app/
 │   │   ├── InitializeTenantByHeader.php    # Panel: X-Tenant
 │   │   ├── InitializeTenantBySlug.php      # Público: slug de la URL
 │   │   ├── EnsurePanelUser.php             # Puerta del panel: admin o staff
-│   │   ├── EnsureAdmin.php · EnsureSuperAdmin.php
+│   │   ├── EnsurePermiso.php               # `permiso:<clave>`: la cerradura de cada ruta del panel (MOD-21)
+│   │   ├── EnsureAdmin.php · EnsureSuperAdmin.php  # admin: solo el equipo y sus roles
 │   │   ├── EnsureTenantCustomer.php        # El token es de ESTA tienda
 │   │   ├── RestrictPlatformIp.php          # Lista de IPs del panel de plataforma
 │   │   ├── EnsurePlatformDosPasos.php      # En producción, sin 2FA el operador solo puede activarlo (SEC-9)
@@ -338,7 +357,8 @@ app/
 │   └── Requests/                           # StoreProductRequest, StoreCategoryRequest, ...
 ├── Jobs/ComprobarCola.php  # El trabajo de prueba de salud:comprobar: ¿hay worker, y con qué código? (INF-19)
 ├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
-│                      # Order, OrderItem, Coupon, Review, StockNotification, Page, ActivityLog
+│                      # Order, OrderItem, Coupon, Review, StockNotification, Page, ActivityLog,
+│                      # TeamRole (rol del equipo con sus permisos, MOD-21)
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
 ├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
 │                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
@@ -349,6 +369,7 @@ app/
 │   └── DomainVerifier.php  # Comprueba el TXT del dominio propio
 └── Support/
     ├── PlanGate.php        # Aplica los límites del plan
+    ├── Permisos.php        # Qué puede cada persona del panel (MOD-21): admin todo, staff su rol
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
     ├── DeLaTienda.php      # La regla `exists` acotada a la tienda resuelta (ACC-5)
@@ -380,6 +401,8 @@ config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (IN
 config/salud.php       # URL de aviso de cada tarea programada (INF-18) y los umbrales de
                        # salud:comprobar (INF-19), incluidos los mínimos de PHP del README
 config/plans.php       # La matriz de planes y límites
+config/permisos.php    # Los permisos por acción del equipo, por área, con lo que requiere cada
+                       # uno (MOD-21). El frontend copia solo las claves (utils/permisos.ts)
 config/component_specs.php # Las specs con nombre fijo de cada tipo de componente (FUN-8).
                        # Sin copia en el frontend: la sirve GET /api/public/component-specs
 config/currencies.php  # Monedas que puede elegir una tienda y cómo se escribe cada una:
@@ -444,34 +467,39 @@ tests/Feature/         # 91 archivos, 983 tests (+1 en tests/Unit)
 | GET | `/my-orders` | Historial de pedidos |
 | GET·POST | `/favorites` · `/favorites/{product}` | Listar y alternar favoritos |
 
-**Panel** (Bearer + `X-Tenant: {slug}` + rol `admin` o `staff`). La columna *Staff* dice qué puede
-un colaborador; un `admin` puede todo. El reparto y su criterio están en `routes/api.php`:
+**Panel** (Bearer + `X-Tenant: {slug}` + rol `admin` o `staff`). La columna *Permiso* dice qué
+permiso por acción (`MOD-21`, `config/permisos.php`) pide cada ruta a un `staff`; un `admin` los
+tiene todos. Sin él, 403 con el mismo mensaje en todas («Tu rol no te permite hacer esto…»). *—* es
+que basta con ser del equipo; *Solo admin* es que no se delega a ningún rol. El reparto y su
+criterio están en `routes/api.php`:
 
-| Método | Ruta | Descripción | Staff |
+| Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión | Sí |
-| POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | Sí |
-| GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | Sí |
-| GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **no salen para staff** (MOD-6) | Sí, sin costos |
-| GET | `/api/plan` | Plan, límites y consumo | Sí |
-| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | Solo `GET` |
-| POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | No |
-| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe un admin: si la clave no llega, el costo guardado **no se toca** (MOD-6). `archivos_enviados`: cuántas fotos manda el formulario; si llegan menos —PHP descarta en silencio las que pasan de `max_file_uploads`—, 422 y no se guarda nada (INF-12). Una foto que no cabría en la memoria de PHP al procesarla, 422 con sus medidas (INF-14). El listado trae `waitlist_count` —las esperas pendientes de la lista de espera— por producto y, desde FUN-25, por variante: el formulario lo usa para avisar antes de quitar una variante con gente esperando, porque al guardar se borran con ella | Todo menos `DELETE` |
-| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | No |
-| CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | Solo `GET` |
-| CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo para admin** (MOD-6) | Todo menos `DELETE` |
-| GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo —empotrado desde el disco, y solo si se subió: uno pegado de otra web no se descarga (FUN-20)— y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | No |
-| CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | Sí |
-| GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | Sí |
-| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) y la columna `tramos` con el precio por mayor (MOD-15) | No |
-| GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques | No |
-| GET·PUT·DELETE | `/api/reviews` | Moderación | Sí |
-| GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | Sí |
-| CRUD | `/api/pages` | Páginas informativas | No |
-| GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto), cambiar rol, activar, eliminar | No |
-| GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página), con `retencion_dias`: lo de más de un año lo borra `bitacora:purgar` (INF-20) | No |
-| GET·DELETE | `/api/trash` | La papelera (MOD-8): `?tipo=productos\|pedidos` (paginado, con los totales de los dos) y `DELETE` para vaciarla entera | Sí |
-| POST·DELETE | `/api/trash/{tipo}/{id}/restore` · `/api/trash/{tipo}/{id}` | Restaurar (puede dar 422 si el plan ya no tiene hueco) y eliminar definitivamente | Sí |
+| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión. `me` (y el login) traen en `user` el `team_role` (`{id, name}`, solo staff) y `permisos`: lo que puede de verdad, ya resuelto | — |
+| POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | — |
+| GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | `resumen.ver` |
+| GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **solo salen con `costos.ver`** (MOD-6) | `reportes.ver` |
+| GET | `/api/plan` | Plan, límites y consumo | — |
+| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | `GET` —; `PUT` `tienda.configurar` |
+| POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | `tienda.configurar` |
+| CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe quien tiene `costos.ver`: si la clave no llega, el costo guardado **no se toca** (MOD-6). `archivos_enviados`: cuántas fotos manda el formulario; si llegan menos —PHP descarta en silencio las que pasan de `max_file_uploads`—, 422 y no se guarda nada (INF-12). Una foto que no cabría en la memoria de PHP al procesarla, 422 con sus medidas (INF-14). El listado trae `waitlist_count` —las esperas pendientes de la lista de espera— por producto y, desde FUN-25, por variante: el formulario lo usa para avisar antes de quitar una variante con gente esperando, porque al guardar se borran con ella | `productos.ver` (leer) · `productos.editar` (alta, edición, duplicar, reordenar) · `productos.borrar` (`DELETE`) |
+| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | `productos.importar` · `productos.masivo` (borrar en lote pide además `productos.borrar`) |
+| CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | `GET` —; el resto `categorias.gestionar` |
+| CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo con `costos.ver`** (MOD-6) | `pedidos.ver` · `pedidos.gestionar` (venta de mostrador y estado) · `pedidos.borrar` |
+| GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo —empotrado desde el disco, y solo si se subió: uno pegado de otra web no se descarga (FUN-20)— y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | `pedidos.ver` |
+| CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | `cupones.gestionar` |
+| GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | `clientes.ver` |
+| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) y la columna `tramos` con el precio por mayor (MOD-15). Las columnas `costo` (catálogo) y `costo_total`/`utilidad` (pedidos) **solo salen con `costos.ver`**; sin ellas, reimportar el catálogo no toca el costo | `productos.exportar` · `pedidos.exportar` |
+| GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques; la utilidad, solo con `costos.ver` | `reportes.exportar` |
+| GET·PUT·DELETE | `/api/reviews` | Moderación | `resenas.gestionar` |
+| GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | `espera.gestionar` |
+| CRUD | `/api/pages` | Páginas informativas | `paginas.gestionar` |
+| GET·POST·PUT·DELETE | `/api/users` (+ `POST /{id}/resend-invitation`) | Equipo: invitar con `role` (`staff` por defecto) y `team_role_id` (sin él, el rol más antiguo de la tienda); cambiar rol o rol del equipo —las dos cosas le cierran la sesión—, activar, eliminar. Cada usuario trae `team_role` y `permisos` | Solo admin |
+| GET | `/api/permissions` | El catálogo de permisos por área, con su etiqueta y lo que requiere cada uno (MOD-21) | Solo admin |
+| GET·POST·PUT·DELETE | `/api/team-roles` | Roles del equipo (MOD-21): `name` (único sin mayúsculas ni tildes; «Administrador» reservado), `description`, `permissions` —se guardan con lo que requieren—. La lista trae `areas` y `members_count`. Cambiar los permisos cierra la sesión de quien tiene el rol; un rol que alguien tiene no se borra (422) | Solo admin |
+| GET | `/api/activity` | Actividad del panel: quién cambió qué (filtros `area`, `actor` por correo; 30 por página), con `retencion_dias` —lo de más de un año lo borra `bitacora:purgar` (INF-20)— y `personas`, el equipo de hoy para el filtro. En una línea de staff, `context.rol_del_actor` es el nombre del rol con que se hizo | `actividad.ver` |
+| GET·DELETE | `/api/trash` | La papelera (MOD-8): `?tipo=productos\|pedidos` (paginado, con los totales de los dos) y `DELETE` para vaciarla entera | `papelera.gestionar` |
+| POST·DELETE | `/api/trash/{tipo}/{id}/restore` · `/api/trash/{tipo}/{id}` | Restaurar (puede dar 422 si el plan ya no tiene hueco) y eliminar definitivamente | `papelera.gestionar` |
 
 **Plataforma** (Bearer + rol `superadmin` + lista de IPs):
 
@@ -545,7 +573,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 989 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 1018 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -583,12 +611,17 @@ react-hot-toast. CSS propio, sin framework.
 | `/login` · `/register` | Acceso y alta de tienda |
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
 | `/terminos` · `/privacidad` · `/reembolsos` | Páginas legales de la plataforma, las que Paddle revisa antes de aprobar la cuenta (`INF-15`). Enlazadas desde el pie de la landing y el alta de tienda; sus tres nombres son slugs reservados |
-| `/dashboard` | Resumen con métricas |
+| `/dashboard` | Resumen con métricas; sin `resumen.ver`, un saludo con las pantallas que esa persona sí puede abrir (MOD-21) |
 | `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
-| `/dashboard/users` · `/dashboard/activity` | Equipo y actividad del panel (solo admin; filtros de actividad en la URL: `area`, `persona`, `pagina`) |
-| `/dashboard/trash` | Papelera de productos y pedidos (solo admin, `MOD-8`; el tipo va en la URL: `tipo`, `pagina`) |
-| `/dashboard/coupons` | Cupones de descuento (solo admin, `MOD-4`) |
+| `/dashboard/users` | Equipo (solo admin). Dos pestañas: personas y `?pestania=roles`, los roles con sus permisos (MOD-21) |
+| `/dashboard/activity` | Actividad del panel (filtros en la URL: `area`, `persona`, `pagina`) |
+| `/dashboard/trash` | Papelera de productos y pedidos (`MOD-8`; el tipo va en la URL: `tipo`, `pagina`) |
+| `/dashboard/coupons` | Cupones de descuento (`MOD-4`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
+
+Cada pantalla del panel menos el resumen y Equipo pide el permiso de «ver» de su área
+(`ConPermiso`): sin él, vuelve al resumen. Dentro, cada botón (borrar, exportar, importar…) sale
+solo con su permiso (`usePuede`).
 | `/platform/login` | Acceso del operador del SaaS |
 | `/platform` · `/platform/tenants` · `/platform/tenants/:id` · `/platform/logs` | Panel del operador: resumen, tiendas, ficha y bitácora (layout en `PlatformLayout`) |
 | `/platform/seguridad` | Verificación en dos pasos del operador (`SEC-9`). En producción, sin activarla el layout manda aquí desde cualquier sección |
@@ -602,7 +635,8 @@ ser la ruta de entrada de casi todo el tráfico.
 ```
 src/
 ├── api/            # Cliente Axios (interceptores) y funciones por recurso
-├── router/         # Rutas, PrivateRoute, SoloAdmin (pantallas de admin), Suspense y errorElement
+├── router/         # Rutas, PrivateRoute, ConPermiso (pantalla con permiso, MOD-21), SoloAdmin
+│                   # (Equipo), Suspense y errorElement
 ├── pages/
 │   ├── auth/       # Login, RegisterStore, ForgotPassword, ResetPassword
 │   ├── legal/      # Terminos, Privacidad, Reembolsos (INF-15) y su marco común, PaginaLegal
@@ -685,12 +719,31 @@ que aquí sólo van valores públicos; una clave secreta nunca va en el frontend
 | `VITE_SENTRY_DSN` · `VITE_SENTRY_ENVIRONMENT` | Errores no controlados hacia Sentry, proyecto React (`TEC-5`). Sin ellas no se envía nada. Sin usuario, cookies, cabeceras ni parámetros de URL, y sin rastro de navegación (`utils/observabilidad.ts`) | sin DSN, apagado |
 | `VITE_LEGAL_TITULAR` · `VITE_LEGAL_CORREO` | Nombre del titular y correo de contacto que salen en las páginas legales (`INF-15`). Son datos personales del dueño, por eso no van en el código | sin ellas, las páginas avisan en pantalla de que no están listas para publicarse |
 
+**Cuentas de prueba en los logins (sólo desarrollo).** Con `npm run dev`, `/login` y
+`/platform/login` enseñan debajo del formulario una lista de cuentas para entrar con un clic, como
+el login de MVPSaaS. Una cuenta del otro tipo lleva a su login y entra allí, y la de plataforma pide
+el segundo paso si lo tiene activo. Salen de `CUENTAS_DE_PRUEBA`, un JSON en
+`saas-hardware-frontend/.env.development.local` (fuera de git):
+
+```bash
+CUENTAS_DE_PRUEBA='[
+  { "tipo": "plataforma", "etiqueta": "Operador", "email": "operador@plataforma.local", "password": "..." },
+  { "tipo": "tienda", "etiqueta": "Mi tienda de pruebas", "email": "admin@tienda.local", "password": "..." }
+]'
+```
+
+Va **sin** el prefijo `VITE_` a propósito: así no entra en `import.meta.env`, que acaba entero en
+el bundle. La inyecta `vite.config.ts` como `__CUENTAS_DE_PRUEBA__` sólo cuando corre el servidor de
+desarrollo; en `vite build` vale vacío, esté en el archivo que esté, y el componente
+(`components/dev/CuentasDePrueba.tsx`) se carga con `lazy()` detrás de `import.meta.env.DEV`, así
+que el build no lleva ni su código ni su CSS. Sin la variable, los logins son los de siempre.
+
 ```bash
 npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 293 tests (Vitest + Testing Library, jsdom)
+npm test          # 309 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -709,7 +762,9 @@ la descarga de las exportaciones (`api/exportaciones`: blob, filtros y nombre de
 pantalla de clientes (`CustomersPage`: totales, cliente sin compras y la ficha que solo se pide al
 abrirla), la de reportes (`ReportsPage`: que el rango y la agrupación se le pidan al servidor, que
 sin permiso no se pinte utilidad ni margen, la serie como tabla y el motivo de un rango rechazado),
-el aviso antes de quitar una variante con gente esperando (`EditorDeVariantes`, `FUN-25`), el login
+el aviso antes de quitar una variante con gente esperando (`EditorDeVariantes`, `FUN-25`), las
+casillas del editor de roles —marcar un permiso marca lo que requiere, como el servidor—
+(`utils/permisos`, `MOD-21`), el login
 de plataforma con su segundo paso y la pantalla de Seguridad del operador (`SEC-9`, con la
 redirección de `PlatformLayout` cuando es obligatoria), de qué tienda es cada línea de la bitácora
 del operador, y `money`/`phone`. La red se sustituye en cada test; ninguno
@@ -732,9 +787,17 @@ tienen tests.
 - **Los topes son de la creación, no del estado existente**: bajar de plan nunca borra nada.
 - **El costo de compra (`products.cost`, `product_variants.cost`) está oculto por defecto**: va en el
   `$hidden` de los modelos y solo lo enseña `App\Support\Costos::mostrar()`, que comprueba que quien
-  mira sea admin. Una consulta pública nueva no lo filtra por descuido: no lo lleva de entrada. Y en
+  mira tenga el permiso `costos.ver`. Una consulta pública nueva no lo filtra por descuido: no lo lleva de entrada. Y en
   el formulario, **una clave `cost` ausente significa "no lo toques"**, no "bórralo": es lo que
-  impide que un colaborador —que no ve el campo— vacíe los costos al editar un producto.
+  impide que alguien sin ese permiso —que no ve el campo— vacíe los costos al editar un producto.
+- **Permisos del equipo** (`MOD-21`): toda ruta del panel lleva `permiso:<clave>` (o `admin`, que
+  queda solo para el equipo y sus roles), o figura en `SIN_PERMISO` de `PermisosPorAccionTest` con su
+  motivo; si no, ese test falla. Lo que se decide **dentro** de una ruta pregunta a
+  `App\Support\Permisos` (`puede()`, `exigir()`), nunca `role === 'admin'` a mano. Un permiso nuevo
+  va en `config/permisos.php` (con lo que `requiere`) **y** en `utils/permisos.ts`, que copia solo las
+  claves. **Renombrar una clave la quita** de todos los roles que la tenían: está guardada en
+  `team_roles.permissions`. Falla en cerrado: un staff sin rol, con un rol de otra tienda o con un
+  permiso al que le falta lo que requiere, no puede nada con él.
 - **Lo que no es del comprador va oculto en el modelo, no quitado en el controlador** (`ACC-1`,
   `ACC-7`): el correo, el `visitor_id` y el `user_id` de las reseñas (`Review::$hidden`), las visitas
   de cada producto (`Product::$hidden`) y **la relación `tenant` de cualquier modelo con

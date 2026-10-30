@@ -1,3 +1,5 @@
+import type { Permiso } from '../utils/permisos';
+
 /** Base neutral de la tienda (PERS-2). Ver src/utils/neutrals.ts. */
 export type TenantNeutral = 'slate' | 'zinc' | 'stone' | 'navy' | 'plum';
 
@@ -194,6 +196,25 @@ export interface User {
    * mismo criterio que `email_verified`.
    */
   invitation_pending?: boolean;
+  /**
+   * MOD-21. El rol del equipo de un `staff` (null en un admin) y lo que puede
+   * de verdad, ya resuelto por el servidor: un admin trae todas las claves.
+   * Opcionales por lo mismo que `email_verified`.
+   */
+  team_role_id?: string | null;
+  team_role?: { id: string; name: string } | null;
+  permisos?: Permiso[];
+}
+
+/** Un rol del equipo de la tienda (MOD-21), como lo devuelve `GET /team-roles`. */
+export interface RolDelEquipo {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: Permiso[];
+  /** Las áreas del panel en las que tiene algo, por su nombre. */
+  areas: string[];
+  members_count: number;
 }
 
 /**

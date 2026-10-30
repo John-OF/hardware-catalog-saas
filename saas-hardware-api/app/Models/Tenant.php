@@ -21,6 +21,18 @@ class Tenant extends Model implements IsTenant
         return (string) Str::uuid7();
     }
 
+    /**
+     * Toda tienda nace con el rol «Colaborador» (MOD-21), para que la pantalla
+     * de equipo tenga desde el primer día un rol que dar al invitar. Las que ya
+     * existían lo recibieron en la migración `create_team_roles_table`.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Tenant $tenant) {
+            TeamRole::crearDeFabrica($tenant->id);
+        });
+    }
+
     protected $fillable = [
         'slug', 'name', 'logo_url', 'primary_color', 'theme',
         'whatsapp_number', 'plan', 'is_active', 'is_published', 'custom_domain', 'currency',

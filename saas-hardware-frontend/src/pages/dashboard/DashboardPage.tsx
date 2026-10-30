@@ -38,6 +38,7 @@ import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
 import SupportBanner from '../../components/dashboard/SupportBanner';
 import TrialBanner from '../../components/dashboard/TrialBanner';
 import { rutaDeSalidaDelPanel, useAuthStore, useEsAdmin } from '../../stores/authStore';
+import type { Permiso } from '../../utils/permisos';
 import { useTenantStore } from '../../stores/tenantStore';
 
 export default function DashboardPage() {
@@ -76,10 +77,14 @@ export default function DashboardPage() {
   // el campo vale undefined, y ahi el boton todavia no debe apagarse.
   const tiendaCerrada = tenant?.is_published === false;
 
-  // FUN-4: staff no ve Categorias, Paginas, Equipo ni Configuracion. `!== false`
-  // en el menu y no `=== true`: mientras getMe() no responde el rol es `null`, y
-  // lo normal es ser admin, asi que el menu no salta al recargar.
+  // FUN-4: el equipo es solo de admin. `!== false` en el menu y no `=== true`:
+  // mientras getMe() no responde el rol es `null`, y lo normal es ser admin,
+  // asi que el menu no salta al recargar.
   const esAdmin = useEsAdmin();
+
+  // MOD-21: cada entrada del menu sale si se tiene el permiso de "ver" de su
+  // pantalla. Mientras no hay usuario se ensenan todas, por lo mismo que arriba.
+  const ve = (permiso: Permiso): boolean => !user || (user.permisos ?? []).includes(permiso);
 
   useEffect(() => {
     // Si no hay token, fuera del panel. Por `rutaDeSalidaDelPanel` y no a
@@ -210,8 +215,9 @@ export default function DashboardPage() {
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
 
-          <NavLink 
-            to="/dashboard/products" 
+          {ve('productos.ver') && (
+          <NavLink
+            to="/dashboard/products"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             onClick={() => setIsSidebarOpen(false)}
           >
@@ -219,8 +225,9 @@ export default function DashboardPage() {
             <span>Productos</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
-          {esAdmin !== false && (
+          {ve('categorias.gestionar') && (
             <NavLink 
               to="/dashboard/categories" 
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
@@ -232,8 +239,9 @@ export default function DashboardPage() {
             </NavLink>
           )}
 
-          <NavLink 
-            to="/dashboard/orders" 
+          {ve('pedidos.ver') && (
+          <NavLink
+            to="/dashboard/orders"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             onClick={() => setIsSidebarOpen(false)}
           >
@@ -241,9 +249,11 @@ export default function DashboardPage() {
             <span>Pedidos</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
           {/* MOD-10: va justo detrás de Pedidos porque se mira por lo mismo,
               quién compró; aquí agrupado por persona en vez de por pedido. */}
+          {ve('clientes.ver') && (
           <NavLink
             to="/dashboard/customers"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
@@ -253,10 +263,12 @@ export default function DashboardPage() {
             <span>Clientes</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
           {/* MOD-9: detrás de Clientes porque cierra el bloque de "cómo va la
               tienda" -pedidos, quién compra, cuánto se vendió- antes de pasar a
               lo que se configura. */}
+          {ve('reportes.ver') && (
           <NavLink
             to="/dashboard/reports"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
@@ -266,10 +278,11 @@ export default function DashboardPage() {
             <span>Reportes</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
-          {esAdmin !== false && (
-            <NavLink 
-              to="/dashboard/pages" 
+          {ve('paginas.gestionar') && (
+            <NavLink
+              to="/dashboard/pages"  
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -279,8 +292,9 @@ export default function DashboardPage() {
             </NavLink>
           )}
 
-          <NavLink 
-            to="/dashboard/reviews" 
+          {ve('resenas.gestionar') && (
+          <NavLink
+            to="/dashboard/reviews"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             onClick={() => setIsSidebarOpen(false)}
           >
@@ -288,7 +302,9 @@ export default function DashboardPage() {
             <span>Reseñas</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
+          {ve('espera.gestionar') && (
           <NavLink
             to="/dashboard/waitlist"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
@@ -298,6 +314,7 @@ export default function DashboardPage() {
             <span>Lista de espera</span>
             <ChevronRight className="nav-arrow" size={16} />
           </NavLink>
+          )}
 
           {esAdmin !== false && (
             <NavLink
@@ -311,9 +328,9 @@ export default function DashboardPage() {
             </NavLink>
           )}
 
-          {esAdmin !== false && (
+          {ve('actividad.ver') && (
             <NavLink
-              to="/dashboard/activity"
+              to="/dashboard/activity" 
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -325,9 +342,9 @@ export default function DashboardPage() {
 
           {/* MOD-4: junto a Productos y Pedidos, que es donde se trabaja con
               precios; no al final con lo de administrar. */}
-          {esAdmin !== false && (
+          {ve('cupones.gestionar') && (
             <NavLink
-              to="/dashboard/coupons"
+              to="/dashboard/coupons" 
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -340,9 +357,9 @@ export default function DashboardPage() {
           {/* MOD-8: la papelera va junto a Actividad y no entre Productos y
               Pedidos, porque no es un sitio al que se entre a trabajar: se
               entra cuando algo se borró por error. */}
-          {esAdmin !== false && (
+          {ve('papelera.gestionar') && (
             <NavLink
-              to="/dashboard/trash"
+              to="/dashboard/trash" 
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -352,9 +369,9 @@ export default function DashboardPage() {
             </NavLink>
           )}
 
-          {esAdmin !== false && (
+          {ve('tienda.configurar') && (
             <NavLink
-              to="/dashboard/settings"
+              to="/dashboard/settings" 
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >
@@ -372,7 +389,8 @@ export default function DashboardPage() {
             </div>
             <div className="user-info">
               <h4>{user?.name}</h4>
-              <p>{user?.role === 'admin' ? 'Administrador' : 'Colaborador'}</p>
+              {/* MOD-21: el nombre de su rol del equipo, el mismo que ve el admin en Equipo. */}
+              <p>{!user ? '' : user.role === 'admin' ? 'Administrador' : user.team_role?.name ?? 'Sin rol'}</p>
             </div>
           </div>
           <button onClick={handleLogout} className="logout-btn">

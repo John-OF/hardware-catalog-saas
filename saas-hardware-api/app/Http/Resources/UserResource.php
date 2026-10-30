@@ -31,6 +31,14 @@ class UserResource extends JsonResource
             // El panel los usa para decidir qué mostrar.
             'role'      => $this->role,
             'is_active' => $this->is_active,
+            // MOD-21: el rol del equipo (solo staff) y lo que puede de verdad,
+            // ya resuelto: un admin trae todas las claves. El panel esconde con
+            // esto; la barrera sigue siendo `permiso:` en cada ruta.
+            'team_role_id' => $this->team_role_id,
+            'team_role'    => $this->role === 'staff' && $this->teamRole
+                ? ['id' => $this->teamRole->id, 'name' => $this->teamRole->name]
+                : null,
+            'permisos'     => \App\Support\Permisos::de($this->resource),
             // FUN-5: el booleano, no la fecha. Al panel solo le hace falta saber
             // si enseña el aviso de "confirma tu correo"; `email_verified_at` es
             // un dato interno y publicarlo sería volver a la fuga que este

@@ -216,3 +216,103 @@
   color: var(--primary);
   border: 1px solid rgba(var(--primary-rgb), 0.25);
 }
+
+/* MOD-21: las dos pestañas de Equipo, Personas y Roles y permisos. */
+:where(.page-users) .team-pestanias {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+:where(.page-users) .team-pestania {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+:where(.page-users) .team-pestania.activa {
+  background: rgba(var(--primary-rgb), 0.10);
+  color: var(--primary);
+}
+
+:where(.page-users) .form-opcional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* El editor de un rol: una caja por área, con su casilla de «Todo». */
+:where(.page-users) .permisos-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+:where(.page-users) .permisos-area {
+  margin: 0;
+  padding: 0.6rem 0.9rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+:where(.page-users) .permisos-area legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-users) .permisos-todo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+:where(.page-users) .permiso-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+:where(.page-users) .permiso-fila + .permiso-fila {
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-users) .permiso-fila input,
+:where(.page-users) .permisos-todo input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+:where(.page-users) .permiso-requiere {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}

@@ -76,7 +76,7 @@ class TeamInvitationNotification extends Notification implements ShouldQueue, No
         // Se lee del usuario y no se pasa al construir: encolada, la notificacion
         // vuelve a cargarlo de la base al enviarse, asi que un reenvio despues
         // de cambiarle el rol ya sale con el rol nuevo. Cualquier cosa que no sea
-        // `admin` se trata como colaborador: si hay que equivocarse, que sea
+        // `admin` se trata como del equipo: si hay que equivocarse, que sea
         // prometiendo menos.
         $esAdmin = $notifiable->role === 'admin';
 
@@ -86,7 +86,7 @@ class TeamInvitationNotification extends Notification implements ShouldQueue, No
 
         $acceso = $esAdmin
             ? "{$invitadoPor} te dio acceso al panel de **{$tienda}** como **administrador**: puedes gestionarlo todo, también la configuración de la tienda y el equipo."
-            : "{$invitadoPor} te dio acceso al panel de **{$tienda}** como **colaborador**, para el día a día: pedidos, productos, reseñas y la lista de espera.";
+            : $this->accesoDelEquipo($notifiable, $invitadoPor, $tienda);
 
         return (new MailMessage)
             ->subject($asunto)
@@ -97,5 +97,26 @@ class TeamInvitationNotification extends Notification implements ShouldQueue, No
             ->line("Este enlace caduca en {$minutos} minutos. Si se te pasa, pide una nueva invitación o usa la opción de recuperar la contraseña con este mismo correo.")
             ->line('Si no esperabas esta invitación, puedes ignorar este correo: sin elegir contraseña no se puede entrar.')
             ->salutation('Un saludo, el equipo de '.config('app.name'));
+    }
+
+    /**
+     * MOD-21: el nombre de su rol y a qué partes del panel entra, sacadas de
+     * sus permisos de verdad (`Permisos::de`) y no de una lista escrita aquí,
+     * que es lo que hacía que el correo prometiera de más (FUN-24). El nombre
+     * del rol lo escribe un admin, así que pasa por `TextoDeCorreo` (SEC-8).
+     */
+    private function accesoDelEquipo(object $notifiable, string $invitadoPor, string $tienda): string
+    {
+        $rol = TextoDeCorreo::enLinea((string) ($notifiable->teamRole?->name ?? 'del equipo'));
+        $areas = \App\Support\Permisos::areasDe(\App\Support\Permisos::de($notifiable));
+
+        if ($areas === []) {
+            return "{$invitadoPor} te dio acceso al panel de **{$tienda}** con el rol **{$rol}**. Por ahora ese rol no tiene ningún permiso: pídele que te lo dé.";
+        }
+
+        $ultima = array_pop($areas);
+        $lista = $areas === [] ? $ultima : implode(', ', $areas).' y '.$ultima;
+
+        return "{$invitadoPor} te dio acceso al panel de **{$tienda}** con el rol **{$rol}**, que te deja entrar a: ".mb_strtolower($lista).'.';
     }
 }

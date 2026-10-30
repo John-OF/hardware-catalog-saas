@@ -33,9 +33,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * importador acepta los dos delimitadores y se come el BOM (OWN-5), asi que lo
  * exportado se puede volver a importar.
  *
- * **Solo admin**: el CSV del catalogo lleva el costo de compra (MOD-6), el de
- * pedidos los datos de contacto de todos los clientes de la tienda, y el del
- * reporte (MOD-9) la utilidad.
+ * **Cada exportacion es un permiso** (MOD-21: `productos.exportar`,
+ * `pedidos.exportar`, `reportes.exportar`): el de pedidos lleva los datos de
+ * contacto de todos los clientes de la tienda. **Las columnas de costo y
+ * utilidad solo salen con `costos.ver`** (MOD-6), las tres por igual: quien
+ * exporta sin ese permiso se lleva el archivo sin ellas, no un 403. Sin la
+ * columna `costo`, reimportar el catalogo no toca el costo de nadie: el
+ * importador la trata como una celda vacia.
  */
 class ExportController extends Controller
 {
@@ -55,6 +59,9 @@ class ExportController extends Controller
     {
         $tenant = app('currentTenant');
 
+        // Antes del callback: `streamDownload` lo corre al enviar la respuesta.
+        $conCostos = Costos::usuarioPuedeVerlos();
+
         $consulta = $this->sinScopeDeTienda(Product::query(), $tenant->id)
             ->with([
                 'category' => fn ($q) => $q->withoutTenant(),
@@ -72,8 +79,8 @@ class ExportController extends Controller
             ->orderBy('sort_order')
             ->orderBy('created_at');
 
-        return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta) {
-            $this->fila($salida, [
+        return $this->csv("catalogo-{$tenant->slug}-".now($tenant->zonaHoraria())->format('Y-m-d').'.csv', function ($salida) use ($consulta, $conCostos) {
+            $this->fila($salida, $this->sinCosto([
                 'nombre', 'marca', 'variante', 'sku', 'precio', 'precio_oferta', 'costo',
                 // MOD-15: el precio por mayor, en el texto compacto `10:90|25:85`.
                 // Va por la misma razon que la columna `variante` de MOD-12: sin
@@ -81,7 +88,7 @@ class ExportController extends Controller
                 // habia negociado, y sin decirselo.
                 'tramos',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
-            ]);
+            ], $conCostos, [6]));
 
             foreach ($consulta->lazy(self::POR_LOTE) as $producto) {
                 // Lo que describe la ficha va solo en su primera fila, que es
@@ -104,7 +111,7 @@ class ExportController extends Controller
                 ];
 
                 if ($producto->variants->isEmpty()) {
-                    $this->fila($salida, [
+                    $this->fila($salida, $this->sinCosto([
                         ...$ficha,
                         '',
                         $producto->sku,
@@ -114,13 +121,13 @@ class ExportController extends Controller
                         PreciosPorCantidad::aTexto($producto->price_tiers),
                         $producto->stock,
                         ...$cola,
-                    ]);
+                    ], $conCostos, [6]));
 
                     continue;
                 }
 
                 foreach ($producto->variants as $indice => $variante) {
-                    $this->fila($salida, [
+                    $this->fila($salida, $this->sinCosto([
                         // El nombre SI se repite: es lo que agrupa las filas al
                         // reimportar, asi que sin el la variante se quedaria
                         // suelta.
@@ -134,7 +141,7 @@ class ExportController extends Controller
                         PreciosPorCantidad::aTexto($variante->price_tiers),
                         $variante->stock,
                         ...($indice === 0 ? $cola : ['', '', '', '']),
-                    ]);
+                    ], $conCostos, [6]));
                 }
             }
         });
@@ -162,6 +169,7 @@ class ExportController extends Controller
         ]);
 
         $zona = $tenant->zonaHoraria();
+        $conCostos = Costos::usuarioPuedeVerlos();
 
         $consulta = $this->sinScopeDeTienda(Order::query(), $tenant->id)
             ->with('items')
@@ -181,15 +189,15 @@ class ExportController extends Controller
             ))
             ->orderBy('created_at');
 
-        return $this->csv("pedidos-{$tenant->slug}-".now($zona)->format('Y-m-d').'.csv', function ($salida) use ($consulta, $zona) {
-            $this->fila($salida, [
+        return $this->csv("pedidos-{$tenant->slug}-".now($zona)->format('Y-m-d').'.csv', function ($salida) use ($consulta, $zona, $conCostos) {
+            $this->fila($salida, $this->sinCosto([
                 'numero', 'fecha', 'estado', 'cliente', 'telefono', 'correo',
                 'entrega', 'costo_envio', 'productos', 'total', 'costo_total',
                 'utilidad', 'nota',
-            ]);
+            ], $conCostos, [10, 11]));
 
             foreach ($consulta->lazy(self::POR_LOTE) as $pedido) {
-                $this->fila($salida, [
+                $this->fila($salida, $this->sinCosto([
                     $pedido->number,
                     // En la hora de la tienda, no en UTC (MOD-13): quien abre
                     // esto en Excel cuadra cajas con las horas de su mostrador.
@@ -207,7 +215,7 @@ class ExportController extends Controller
                     $pedido->costo_total,
                     $pedido->utilidad,
                     $pedido->customer_note,
-                ]);
+                ], $conCostos, [10, 11]));
             }
         });
     }
@@ -236,9 +244,8 @@ class ExportController extends Controller
 
         $reportes = new Reportes($tenant->id, $desde, $hasta, $agrupacion);
 
-        // Aqui siempre true: la ruta es de admin, que es justo quien puede ver
-        // el costo (MOD-6). Se pregunta igual en vez de escribir `true` para
-        // que el dia que la ruta se abra a staff el archivo se ajuste solo.
+        // MOD-21: exportar el reporte es un permiso y ver el costo es otro
+        // (MOD-6), asi que la utilidad sale solo si se tienen los dos.
         $conCostos = Costos::usuarioPuedeVerlos();
 
         // Se calculan AHORA y no dentro del callback: `streamDownload` lo
@@ -309,6 +316,24 @@ class ExportController extends Controller
      * @param  resource  $salida
      * @param  array<int, mixed>  $celdas
      */
+    /**
+     * La fila sin las columnas de costo y utilidad, si quien exporta no puede
+     * verlas (MOD-6, MOD-21). Por posicion, para que cabecera y filas se
+     * recorten igual.
+     *
+     * @param  list<mixed>  $celdas
+     * @param  list<int>  $posiciones
+     * @return list<mixed>
+     */
+    private function sinCosto(array $celdas, bool $conCostos, array $posiciones): array
+    {
+        if ($conCostos) {
+            return $celdas;
+        }
+
+        return array_values(array_diff_key($celdas, array_flip($posiciones)));
+    }
+
     private function fila($salida, array $celdas): void
     {
         fputcsv($salida, array_map(CeldaCsv::segura(...), $celdas), ';');

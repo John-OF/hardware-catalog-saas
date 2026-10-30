@@ -14,6 +14,7 @@ import RouteErrorFallback from '../components/ui/RouteErrorFallback';
 import RouteFallback from '../components/ui/RouteFallback';
 import PrivateRoute from './PrivateRoute';
 import SoloAdmin from './SoloAdmin';
+import ConPermiso from './ConPermiso';
 import CatalogPage from '../pages/public/CatalogPage';
 
 // AUD-18: hasta aquí no había ni un solo import dinámico, así que quien entraba
@@ -140,33 +141,29 @@ export const router = createBrowserRouter([
     path: '/dashboard',
     element: <PrivateRoute><DashboardPage /></PrivateRoute>,
     children: [
+      // El resumen nunca redirige: sin `resumen.ver` enseña un saludo con lo
+      // que esa persona sí puede abrir, y es a donde vuelve `ConPermiso`.
       { index: true,        element: <OverviewPage /> },
-      { path: 'products',   element: <ProductsPage /> },
-      { path: 'orders',     element: <OrdersPage /> },
-      // MOD-10. Sin SoloAdmin: staff ya ve los datos de contacto del cliente en
-      // cada pedido que atiende, así que la lista no le enseña nada nuevo.
-      { path: 'customers',  element: <CustomersPage /> },
-      // MOD-9. Sin SoloAdmin: staff ve las ventas y el stock bajo, que son los
-      // mismos datos que ya tiene en Pedidos y en Productos. El costo y el
-      // margen no se los manda el backend, así que no hay nada que esconder
-      // aquí.
-      { path: 'reports',    element: <ReportsPage /> },
-      { path: 'reviews',    element: <ReviewsPage /> },
-      { path: 'waitlist',   element: <WaitlistPage /> },
 
-      // Solo admin (FUN-4). El backend ya responde 403 a staff; esto evita
-      // pintarle una pantalla que falla en cada peticion.
-      { path: 'categories', element: <SoloAdmin><CategoriesPage /></SoloAdmin> },
-      { path: 'settings',   element: <SoloAdmin><SettingsPage /></SoloAdmin> },
-      { path: 'pages',      element: <SoloAdmin><PagesPage /></SoloAdmin> },
+      // MOD-21: cada pantalla pide el permiso de "ver" de su área. El backend
+      // ya responde 403 sin él; esto evita pintar una pantalla que falla en
+      // cada petición. Lo que se hace dentro (borrar, exportar…) lo esconde
+      // cada pantalla con `usePuede`.
+      { path: 'products',   element: <ConPermiso permiso="productos.ver"><ProductsPage /></ConPermiso> },
+      { path: 'orders',     element: <ConPermiso permiso="pedidos.ver"><OrdersPage /></ConPermiso> },
+      { path: 'customers',  element: <ConPermiso permiso="clientes.ver"><CustomersPage /></ConPermiso> },
+      { path: 'reports',    element: <ConPermiso permiso="reportes.ver"><ReportsPage /></ConPermiso> },
+      { path: 'reviews',    element: <ConPermiso permiso="resenas.gestionar"><ReviewsPage /></ConPermiso> },
+      { path: 'waitlist',   element: <ConPermiso permiso="espera.gestionar"><WaitlistPage /></ConPermiso> },
+      { path: 'categories', element: <ConPermiso permiso="categorias.gestionar"><CategoriesPage /></ConPermiso> },
+      { path: 'settings',   element: <ConPermiso permiso="tienda.configurar"><SettingsPage /></ConPermiso> },
+      { path: 'pages',      element: <ConPermiso permiso="paginas.gestionar"><PagesPage /></ConPermiso> },
+      { path: 'activity',   element: <ConPermiso permiso="actividad.ver"><ActivityPage /></ConPermiso> },
+      { path: 'trash',      element: <ConPermiso permiso="papelera.gestionar"><TrashPage /></ConPermiso> },
+      { path: 'coupons',    element: <ConPermiso permiso="cupones.gestionar"><CouponsPage /></ConPermiso> },
+
+      // El equipo y sus roles no son un permiso: solo admin (FUN-4, MOD-21).
       { path: 'users',      element: <SoloAdmin><UsersPage /></SoloAdmin> },
-      { path: 'activity',   element: <SoloAdmin><ActivityPage /></SoloAdmin> },
-      // MOD-8. Solo admin por lo mismo que borrar (FUN-4): restaurar y volver
-      // a borrar sería reordenar el catálogo de otro.
-      { path: 'trash',      element: <SoloAdmin><TrashPage /></SoloAdmin> },
-      // MOD-4. Solo admin: un cupón es dinero que se deja de cobrar, así que lo
-      // decide quien decide los precios (FUN-4).
-      { path: 'coupons',    element: <SoloAdmin><CouponsPage /></SoloAdmin> },
     ],
   },
 

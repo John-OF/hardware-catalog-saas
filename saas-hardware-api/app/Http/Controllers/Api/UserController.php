@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use App\Notifications\TeamInvitationNotification;
 use App\Support\Bitacora;
+use App\Support\DeLaTienda;
 use App\Support\PlanGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,10 +38,10 @@ use Illuminate\Validation\Rule;
  * esta misma tabla con rol `customer`; listarlos aqui mezclaria a los
  * compradores con el equipo (para verlos hace falta `MOD-10`, que no existe).
  *
- * **Dos roles: `admin` y `staff`** (segunda mitad de FUN-4). Todo este
- * controlador va detras del middleware `admin`: el equipo lo gestiona solo un
- * admin, y un staff ni lo ve. Que puede hacer cada rol en el resto del panel
- * esta en `routes/api.php`.
+ * **`admin` o `staff` con un rol del equipo** (FUN-4, MOD-21). Un admin lo
+ * puede todo; un staff, lo que marque su `team_role_id` (ver
+ * `TeamRoleController` y `App\Support\Permisos`). Todo este controlador va
+ * detras del middleware `admin`: el equipo no es un permiso que se delegue.
  */
 class UserController extends Controller
 {
@@ -48,6 +49,7 @@ class UserController extends Controller
     {
         $usuarios = User::where('tenant_id', app('currentTenant')->id)
             ->whereIn('role', User::ROLES_DE_PANEL)
+            ->with('teamRole')
             ->orderBy('created_at')
             ->get();
 
@@ -125,11 +127,16 @@ class UserController extends Controller
             // poder de admin tiene que ser una decision, no lo que pasa si nadie
             // toca el desplegable.
             'role' => ['sometimes', Rule::in(User::ROLES_DE_PANEL)],
+            // MOD-21: el rol del equipo, si es staff. Sin el, el de por defecto
+            // de la tienda (`TeamRole::porDefectoDe`); la pantalla lo manda
+            // siempre. Con un admin se ignora: el modelo le quita el rol.
+            'team_role_id' => ['sometimes', 'nullable', 'uuid', DeLaTienda::existe('team_roles')],
         ], [
             'name.required'  => 'Escribe el nombre de la persona.',
             'email.required' => 'Escribe su correo electrónico.',
             'email.email'    => 'Ese correo no parece válido.',
-            'role.in'        => 'Elige un rol válido: administrador o colaborador.',
+            'role.in'        => 'Elige un rol válido: administrador o del equipo.',
+            'team_role_id.*' => 'Ese rol no existe en tu tienda. Recarga la página y elige otro.',
         ]);
 
         $usuario = new User([
@@ -140,17 +147,19 @@ class UserController extends Controller
             // vacia seria una puerta abierta si algun dia se compara mal.
             'password' => Str::random(40),
             'role'     => $data['role'] ?? 'staff',
+            'team_role_id' => $data['team_role_id'] ?? null,
             'is_active' => true,
         ]);
         $usuario->tenant_id = $tenant->id;
         $usuario->save();
+        $usuario->load('teamRole');
 
         $this->enviarInvitacion($usuario, $tenant->name, (string) $request->user()->name);
 
         Bitacora::anotar(
             ActivityLog::EQUIPO_INVITADO,
-            "Invitó a {$usuario->name} ({$usuario->email}) como {$this->etiquetaDeRol($usuario->role)}.",
-            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role],
+            "Invitó a {$usuario->name} ({$usuario->email}) {$this->comoQue($usuario)}.",
+            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role, 'rol_del_equipo' => $usuario->teamRole?->name],
         );
 
         return response()->json(new UserResource($usuario), 201);
@@ -171,19 +180,35 @@ class UserController extends Controller
             'name'      => 'sometimes|string|max:200',
             'is_active' => 'sometimes|boolean',
             'role'      => ['sometimes', Rule::in(User::ROLES_DE_PANEL)],
+            // MOD-21: cambiar de rol del equipo, o el que recibe al bajar de
+            // admin (sin el, el de por defecto de la tienda).
+            'team_role_id' => ['sometimes', 'nullable', 'uuid', DeLaTienda::existe('team_roles')],
         ], [
-            'role.in' => 'Elige un rol válido: administrador o colaborador.',
+            'role.in'        => 'Elige un rol válido: administrador o del equipo.',
+            'team_role_id.*' => 'Ese rol no existe en tu tienda. Recarga la página y elige otro.',
         ]);
+
+        // Un `team_role_id` vacio no significa "sin rol": un staff sin rol no
+        // puede nada y eso no se elige desde aqui. Se trata como no enviado.
+        if (array_key_exists('team_role_id', $data) && $data['team_role_id'] === null) {
+            unset($data['team_role_id']);
+        }
+
+        $usuario->loadMissing('teamRole');
 
         $antes = [
             'name'      => $usuario->name,
-            'role'      => $this->etiquetaDeRol($usuario->role),
+            'role'      => $this->etiquetaDeRol($usuario),
             'is_active' => (bool) $usuario->is_active,
         ];
 
+        $rolFinal  = $data['role'] ?? $usuario->role;
         $seApaga   = array_key_exists('is_active', $data) && ! $data['is_active'];
-        $cambiaRol = isset($data['role']) && $data['role'] !== $usuario->role;
-        $seDegrada = $cambiaRol && $usuario->role === 'admin';
+        // Cambiar de rol del equipo es cambiar de rol igual que pasar de staff a
+        // admin: lo que la persona puede hacer es otro, y pasa por lo mismo.
+        $cambiaRol = (isset($data['role']) && $data['role'] !== $usuario->role)
+            || ($rolFinal === 'staff' && isset($data['team_role_id']) && $data['team_role_id'] !== $usuario->team_role_id);
+        $seDegrada = $rolFinal !== 'admin' && $usuario->role === 'admin';
 
         // Quien llega aqui es admin, asi que cambiarse el rol a si mismo solo
         // puede ser bajarse a staff: quedarse fuera de esta misma pantalla.
@@ -222,10 +247,10 @@ class UserController extends Controller
             $usuario->tokens()->delete();
         }
 
-        $actualizado = $usuario->fresh();
+        $actualizado = $usuario->fresh('teamRole');
         $cambios = Bitacora::cambios($antes, [
             'name'      => $actualizado->name,
-            'role'      => $this->etiquetaDeRol($actualizado->role),
+            'role'      => $this->etiquetaDeRol($actualizado),
             'is_active' => (bool) $actualizado->is_active,
         ], ['name' => 'nombre', 'role' => 'rol', 'is_active' => 'activo']);
 
@@ -243,6 +268,7 @@ class UserController extends Controller
     public function destroy(Request $request, string $id): JsonResponse
     {
         $usuario = $this->delEquipo($id);
+        $usuario->load('teamRole');
 
         // Misma transaccion con candado que en update(): dos borrados a la vez
         // tienen la misma carrera que dos bajadas de rol.
@@ -255,8 +281,8 @@ class UserController extends Controller
 
         Bitacora::anotar(
             ActivityLog::EQUIPO_BORRADO,
-            "Quitó del equipo a {$usuario->name} ({$usuario->email}), que era {$this->etiquetaDeRol($usuario->role)}.",
-            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role],
+            "Quitó del equipo a {$usuario->name} ({$usuario->email}), que tenía el rol {$this->etiquetaDeRol($usuario)}.",
+            ['usuario_id' => $usuario->id, 'email' => $usuario->email, 'rol' => $usuario->role, 'rol_del_equipo' => $usuario->teamRole?->name],
         );
 
         return response()->json(null, 204);
@@ -344,9 +370,25 @@ class UserController extends Controller
         }
     }
 
-    private function etiquetaDeRol(string $rol): string
+    /**
+     * Como se llama el acceso de alguien para la bitacora: «administrador» o
+     * el nombre de su rol del equipo (MOD-21). Un staff sin rol -no deberia
+     * pasar, ver `User::booted`- se dice tal cual, porque no puede nada.
+     */
+    private function etiquetaDeRol(User $usuario): string
     {
-        return $rol === 'admin' ? 'administrador' : 'colaborador';
+        if ($usuario->role === 'admin') {
+            return 'administrador';
+        }
+
+        return $usuario->teamRole?->name ?? 'sin rol';
+    }
+
+    private function comoQue(User $usuario): string
+    {
+        return $usuario->role === 'admin'
+            ? 'como administrador'
+            : "con el rol «{$this->etiquetaDeRol($usuario)}»";
     }
 
     private function enviarInvitacion(User $usuario, string $tienda, string $invitadoPor): void

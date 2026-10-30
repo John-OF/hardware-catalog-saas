@@ -14,6 +14,7 @@ use App\Support\Bitacora;
 use App\Support\Busqueda;
 use App\Support\CeldaCsv;
 use App\Support\Costos;
+use App\Support\Permisos;
 use App\Support\DeLaTienda;
 use App\Support\PlanGate;
 use App\Support\SpecsFijas;
@@ -1258,6 +1259,13 @@ class ProductController extends Controller
         ]);
 
         $action = $data['bulk_action'];
+
+        // MOD-21: la ruta pide `productos.masivo`; borrar en lote pide ademas
+        // poder borrar, o publicar en lote seria una forma de borrar sin permiso.
+        if ($action === 'delete') {
+            Permisos::exigir('productos.borrar');
+        }
+
         $query = Product::query();
 
         if (!empty($data['product_ids'])) {

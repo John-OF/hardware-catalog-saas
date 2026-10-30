@@ -56,7 +56,7 @@ import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { exportarCatalogo } from '../../api/exportaciones';
 import type { Product, Category, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
-import { useEsAdmin } from '../../stores/authStore';
+import { usePuede } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import { aceptaDe, conRecuentoDeArchivos, formatosDe, LIMITES_DE_SUBIDA, pistaDe, problemaDelArchivo, tamanoLegible } from '../../utils/subidas';
 
@@ -123,15 +123,18 @@ export default function ProductsPage() {
   // Bulk selection states
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
-  // FUN-4: staff crea y edita, pero no borra, no importa CSV y no hace acciones
-  // masivas (el backend le responde 403). Se esconde en vez de apagarse porque
-  // no es algo que vaya a poder hacer esperando: no es de su rol.
-  const puedeAdministrar = useEsAdmin() !== false;
+  // MOD-21: cada acción sale con su permiso (el backend responde 403 sin él).
+  // Se esconde en vez de apagarse porque no es algo que vaya a poder hacer
+  // esperando: no es de su rol. `!== false` porque mientras getMe() no
+  // responde no se sabe, y lo normal es ser admin; el backend manda igual.
+  const puedeEditar = usePuede('productos.editar') !== false;
+  const puedeBorrar = usePuede('productos.borrar') !== false;
+  const puedeImportar = usePuede('productos.importar') !== false;
+  const puedeEnLote = usePuede('productos.masivo') !== false;
+  const puedeExportar = usePuede('productos.exportar') !== false;
 
-  // MOD-6: el costo de compra y el margen son solo del admin. Mismo criterio
-  // optimista que arriba: mientras no se sabe el rol se enseña, porque lo normal
-  // es ser admin y el backend es el que manda de todas formas.
-  const puedeVerCostos = puedeAdministrar;
+  // MOD-6: el costo de compra y el margen, con su propio permiso.
+  const puedeVerCostos = usePuede('costos.ver') !== false;
   const [exportando, setExportando] = useState(false);
   const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
   const [bulkPriceAdjustment, setBulkPriceAdjustment] = useState('');
@@ -142,7 +145,7 @@ export default function ProductsPage() {
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
-  // MOD-6: solo lo ve y lo manda un admin. Ver `puedeVerCostos`.
+  // MOD-6: solo lo ve y lo manda quien tiene `costos.ver`. Ver `puedeVerCostos`.
   const [cost, setCost] = useState('');
   const [stock, setStock] = useState('');
   const [lowStockThreshold, setLowStockThreshold] = useState('5');
@@ -749,7 +752,7 @@ export default function ProductsPage() {
             </span>
           )}
 
-          {puedeAdministrar && (
+          {puedeImportar && (
             <button onClick={() => setIsImportModalOpen(true)} className="btn-secondary import-product-btn">
               <Upload size={18} />
               <span>Importar CSV</span>
@@ -757,22 +760,24 @@ export default function ProductsPage() {
           )}
 
           {/* MOD-7: se lleva lo que hay en pantalla, con sus filtros puestos. */}
-          {puedeAdministrar && (
+          {puedeExportar && (
             <button onClick={handleExport} className="btn-secondary" disabled={exportando}>
               {exportando ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
               <span>Exportar CSV</span>
             </button>
           )}
 
-          <button onClick={openCreateModal} className="btn-primary add-product-btn">
-            <Plus size={18} />
-            <span>Nuevo Producto</span>
-          </button>
+          {puedeEditar && (
+            <button onClick={openCreateModal} className="btn-primary add-product-btn">
+              <Plus size={18} />
+              <span>Nuevo Producto</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Bulk actions bar */}
-      {puedeAdministrar && selectedProductIds.length > 0 && (
+      {puedeEnLote && selectedProductIds.length > 0 && (
         <div className="bulk-actions-bar glass-card animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.5rem', background: 'rgba(var(--primary-rgb), 0.08)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-lg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
             <CheckSquare size={18} style={{ color: 'var(--primary)' }} />
@@ -804,14 +809,17 @@ export default function ProductsPage() {
             >
               Ajustar Precio
             </button>
-            <button 
-              type="button" 
-              onClick={() => handleBulkAction('delete')} 
-              className="btn-primary" 
-              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none' }}
-            >
-              <Trash2 size={14} style={{ marginRight: '4px', display: 'inline' }} /> Eliminar
-            </button>
+            {/* Borrar en lote pide además poder borrar (MOD-21). */}
+            {puedeBorrar && (
+              <button
+                type="button"
+                onClick={() => handleBulkAction('delete')}
+                className="btn-primary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.95)', color: 'white', border: 'none' }}
+              >
+                <Trash2 size={14} style={{ marginRight: '4px', display: 'inline' }} /> Eliminar
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -826,11 +834,13 @@ export default function ProductsPage() {
         <div className="empty-state glass-card">
           <ImageIcon size={48} className="empty-icon" />
           <h3>No se encontraron productos</h3>
-          <p>Crea un producto o ajusta los filtros de búsqueda.</p>
-          <button onClick={openCreateModal} className="btn-primary">
-            <Plus size={18} />
-            <span>Crear Producto</span>
-          </button>
+          <p>{puedeEditar ? 'Crea un producto o ajusta los filtros de búsqueda.' : 'Ajusta los filtros de búsqueda.'}</p>
+          {puedeEditar && (
+            <button onClick={openCreateModal} className="btn-primary">
+              <Plus size={18} />
+              <span>Crear Producto</span>
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -840,7 +850,7 @@ export default function ProductsPage() {
               <thead>
                 <tr>
                   <th style={{ width: '30px' }}></th>
-                  {puedeAdministrar && (
+                  {puedeEnLote && (
                     <th style={{ width: '40px', textAlign: 'center' }}>
                       <input 
                         type="checkbox" 
@@ -876,15 +886,16 @@ export default function ProductsPage() {
                       key={product.id}
                       className={`${isSelected ? 'row-selected' : ''} ${draggedProductIndex === index ? 'row-dragging' : ''}`}
                       style={{ background: isSelected ? 'rgba(var(--primary-rgb), 0.03)' : undefined }}
-                      draggable
+                      draggable={puedeEditar}
                       onDragStart={(e) => handleDragStartProduct(e, index)}
                       onDragOver={(e) => handleDragOverProduct(e, index)}
                       onDragEnd={handleDragEndProduct}
                     >
-                      <td style={{ textAlign: 'center', cursor: 'grab' }} className="drag-handle-cell" title="Arrastrar para ordenar">
-                        <GripVertical size={16} />
+                      {/* Reordenar es editar (MOD-21): sin el permiso, la celda se queda vacía. */}
+                      <td style={{ textAlign: 'center', cursor: puedeEditar ? 'grab' : undefined }} className="drag-handle-cell" title={puedeEditar ? 'Arrastrar para ordenar' : undefined}>
+                        {puedeEditar && <GripVertical size={16} />}
                       </td>
-                      {puedeAdministrar && (
+                      {puedeEnLote && (
                         <td style={{ textAlign: 'center' }}>
                           <input 
                             type="checkbox" 
@@ -995,13 +1006,17 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div className="table-actions">
-                          <button onClick={() => openEditModal(product)} className="table-action-btn edit" title="Editar">
-                            <Edit2 size={15} />
-                          </button>
-                          <button onClick={() => handleDuplicateProduct(product.id)} className="table-action-btn edit" title="Clonar / Duplicar" style={{ color: 'var(--primary)' }}>
-                            <Copy size={15} />
-                          </button>
-                          {puedeAdministrar && (
+                          {puedeEditar && (
+                            <button onClick={() => openEditModal(product)} className="table-action-btn edit" title="Editar">
+                              <Edit2 size={15} />
+                            </button>
+                          )}
+                          {puedeEditar && (
+                            <button onClick={() => handleDuplicateProduct(product.id)} className="table-action-btn edit" title="Clonar / Duplicar" style={{ color: 'var(--primary)' }}>
+                              <Copy size={15} />
+                            </button>
+                          )}
+                          {puedeBorrar && (
                             <button onClick={() => handleDelete(product.id, product.name)} className="table-action-btn delete" title="Eliminar">
                               <Trash2 size={15} />
                             </button>

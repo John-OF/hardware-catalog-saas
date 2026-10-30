@@ -5,14 +5,18 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ActivityPage from './ActivityPage';
 import { getActividad } from '../../api/activity';
-import { getTeamUsers } from '../../api/users';
 import type { ActividadDelPanel, PaginatedResponse } from '../../types';
 
 vi.mock('../../api/activity', () => ({ getActividad: vi.fn() }));
-vi.mock('../../api/users', () => ({ getTeamUsers: vi.fn() }));
+
+/** MOD-21: el equipo del filtro viene con la propia actividad, no de `GET /users`. */
+const personas = [
+  { name: 'Dueña', email: 'duenia@tienda.test' },
+  { name: 'Vendedor', email: 'vendedor@tienda.test' },
+];
 
 const pagina = (data: ActividadDelPanel[], extra: Partial<PaginatedResponse<ActividadDelPanel>> = {}) => ({
-  data, current_page: 1, last_page: 1, per_page: 30, total: data.length, ...extra,
+  data, current_page: 1, last_page: 1, per_page: 30, total: data.length, personas, ...extra,
 });
 
 const linea = (datos: Partial<ActividadDelPanel>): ActividadDelPanel => ({
@@ -39,10 +43,6 @@ const abrir = (ruta = '/dashboard/activity') =>
 describe('ActivityPage (INF-3)', () => {
   beforeEach(() => {
     vi.mocked(getActividad).mockReset();
-    vi.mocked(getTeamUsers).mockResolvedValue([
-      { id: 'u-1', name: 'Dueña', email: 'duenia@tienda.test', role: 'admin', is_active: true },
-      { id: 'u-2', name: 'Vendedor', email: 'vendedor@tienda.test', role: 'staff', is_active: true },
-    ]);
   });
 
   it('enseña quién, en qué área y qué cambió', async () => {
@@ -52,6 +52,16 @@ describe('ActivityPage (INF-3)', () => {
     expect(await screen.findByText('Editó «Ryzen 7»: precio 1500 → 1450.')).toBeInTheDocument();
     expect(screen.getByText('Colaborador')).toBeInTheDocument();
     expect(screen.getByText('Productos', { selector: '.activity-area' })).toBeInTheDocument();
+  });
+
+  it('dice con qué rol del equipo se hizo, el del día de la línea (MOD-21)', async () => {
+    vi.mocked(getActividad).mockResolvedValue(
+      pagina([linea({ context: { rol_del_actor: 'Caja' } })]),
+    );
+    abrir();
+
+    expect(await screen.findByText('Caja')).toBeInTheDocument();
+    expect(screen.queryByText('Colaborador')).not.toBeInTheDocument();
   });
 
   it('dice cuánto se guarda, con el número que manda el servidor (INF-20)', async () => {

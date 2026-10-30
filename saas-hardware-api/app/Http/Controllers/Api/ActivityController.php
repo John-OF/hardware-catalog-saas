@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\User;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,9 +13,10 @@ use Illuminate\Validation\Rule;
 /**
  * Actividad del panel de la tienda: quién cambió qué y cuándo (INF-3).
  *
- * Solo admin (va en el subgrupo `admin` de `routes/api.php`): es lo que hace el
- * resto del equipo, y dárselo a staff sería que cada colaborador vigile a los
- * demás.
+ * Con el permiso `actividad.ver` (MOD-21), que el rol de fábrica «Colaborador»
+ * no trae: es lo que hace el resto del equipo, y dárselo a todos sería que cada
+ * colaborador vigile a los demás. Un admin decide si un rol de confianza lo
+ * tiene.
  *
  * `ActivityLog` no lleva `BelongsToTenant` (ver su cabecera), así que el filtro
  * por tienda de aquí abajo **es** el aislamiento, no una ayuda: sin
@@ -43,8 +45,19 @@ class ActivityController extends Controller
             ->select(['id', 'actor_id', 'actor_email', 'actor_role', 'action', 'description', 'context', 'created_at'])
             ->paginate(Paginacion::porPagina($request, 30));
 
+        // MOD-21: quiénes forman el equipo hoy, para el filtro por persona. Antes
+        // la pantalla lo pedía a `GET /users`, que es del admin; desde que ver la
+        // actividad es un permiso que puede tener un rol del equipo, esa
+        // petición le daría 403. Solo nombre y correo: lo que pinta el filtro.
+        $personas = User::where('tenant_id', app('currentTenant')->id)
+            ->whereIn('role', User::ROLES_DE_PANEL)
+            ->orderBy('name')
+            ->get(['name', 'email'])
+            ->map(fn (User $u) => ['name' => $u->name, 'email' => $u->email])
+            ->values();
+
         // INF-20: cuánto se guarda, para que la pantalla lo diga en vez de dejar
         // que alguien busque algo de hace dos años y crea que no pasó.
-        return response()->json([...$lineas->toArray(), 'retencion_dias' => ActivityLog::DIAS_EN_TIENDA]);
+        return response()->json([...$lineas->toArray(), 'retencion_dias' => ActivityLog::DIAS_EN_TIENDA, 'personas' => $personas]);
     }
 }

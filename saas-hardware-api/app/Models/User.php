@@ -42,9 +42,10 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Los roles que entran al panel de una tienda (FUN-4).
      *
-     * `admin` lo puede todo; `staff` lleva el dia a dia -pedidos, productos,
-     * resenas, lista de espera- pero no la configuracion, las categorias, las
-     * paginas, el plan ni el equipo. El reparto de rutas esta en `routes/api.php`.
+     * `admin` lo puede todo; `staff` es "del equipo, con un rol": puede lo que
+     * marque su `teamRole` (MOD-21), nunca el equipo ni el plan. Quien lo
+     * decide es `App\Support\Permisos`, y el reparto de rutas esta en
+     * `routes/api.php`.
      *
      * Vive aqui porque se consulta en muchos sitios (login, reset, middleware,
      * tope del plan, equipo, aviso de pedido nuevo) y una lista copiada a mano
@@ -55,6 +56,52 @@ class User extends Authenticatable implements MustVerifyEmail
     public function esDelPanel(): bool
     {
         return in_array($this->role, self::ROLES_DE_PANEL, true);
+    }
+
+    /**
+     * Solo `staff` tiene rol del equipo (MOD-21).
+     *
+     * - Quien deja de ser `staff` (pasa a admin, o es cliente) se queda sin
+     *   rol: un admin no lo necesita y asi no cuenta como miembro del rol.
+     * - Quien PASA a ser `staff` sin que nadie le elija rol recibe el de por
+     *   defecto de su tienda (`TeamRole::porDefectoDe`). Solo al pasar a serlo,
+     *   no en cualquier guardado: si un staff se quedara sin rol, el siguiente
+     *   `save()` -el del login, por ejemplo- no debe darle uno a escondidas.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $usuario) {
+            // Un usuario leido con columnas sueltas, sin `role`, no se toca:
+            // sin esto, guardarlo le borraria el rol a un staff.
+            if (! array_key_exists('role', $usuario->getAttributes())) {
+                return;
+            }
+
+            if ($usuario->role !== 'staff') {
+                $usuario->team_role_id = null;
+
+                return;
+            }
+
+            $pasaAStaff = ! $usuario->exists || $usuario->isDirty('role');
+
+            if ($usuario->team_role_id === null && $pasaAStaff && $usuario->tenant_id) {
+                $usuario->team_role_id = TeamRole::porDefectoDe($usuario->tenant_id)->id;
+            }
+        });
+    }
+
+    /**
+     * El rol del equipo (MOD-21), cargado SIN el scope de tienda.
+     *
+     * Por lo mismo que `User` es la excepcion a AUD-4: los permisos se piden
+     * tambien sin tienda resuelta -en el login, que devuelve lo que puede quien
+     * entra-, y con el fallo en cerrado la relacion vendria vacia. Que el rol
+     * sea de la tienda de la persona lo comprueba `Permisos::de()`.
+     */
+    public function teamRole(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(TeamRole::class)->withoutGlobalScope('tenant');
     }
 
     /**
@@ -81,7 +128,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     protected $fillable = [
-        'tenant_id', 'name', 'email', 'phone', 'password', 'role', 'is_active',
+        'tenant_id', 'name', 'email', 'phone', 'password', 'role', 'team_role_id', 'is_active',
     ];
 
     /**

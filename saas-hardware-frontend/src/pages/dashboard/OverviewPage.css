@@ -342,3 +342,19 @@
   background: rgba(244, 63, 94, 0.15);
   color: var(--danger);
 }
+/* MOD-21: el saludo de quien no tiene el permiso del resumen. */
+:where(.page-overview) .overview-sin-resumen {
+  max-width: 640px;
+  margin: 2rem auto;
+  text-align: center;
+}
+:where(.page-overview) .overview-sin-resumen-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+:where(.page-overview) .overview-sin-resumen-enlaces a {
+  text-decoration: none;
+}

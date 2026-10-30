@@ -27,7 +27,7 @@ import NewOrderModal from '../../components/dashboard/NewOrderModal';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFecha, formatearFechaHora } from '../../utils/fechas';
-import { useEsAdmin } from '../../stores/authStore';
+import { usePuede } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import Dialogo from '../../components/ui/Dialogo';
 import { nombreConVariante } from '../../utils/variants';
@@ -40,7 +40,12 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const puedeAdministrar = useEsAdmin() !== false;
+  // MOD-21: cada acción con su permiso, `!== false` mientras getMe() no
+  // responde (lo normal es ser admin; el backend manda igual).
+  const puedeGestionar = usePuede('pedidos.gestionar') !== false;
+  const puedeBorrar = usePuede('pedidos.borrar') !== false;
+  const puedeExportar = usePuede('pedidos.exportar') !== false;
+  const puedeVerCostos = usePuede('costos.ver') !== false;
   const [exportando, setExportando] = useState(false);
 
   const handleExport = async () => {
@@ -188,14 +193,16 @@ export default function OrdersPage() {
         <div className="page-header-buttons">
           {/* MOD-7: con el filtro de estado puesto, que es como se exporta para
               cuadrar cuentas ("los atendidos de este mes"). */}
-          {puedeAdministrar && (
+          {puedeExportar && (
             <button type="button" className="btn-secondary" onClick={handleExport} disabled={exportando}>
               <Download size={16} /> {exportando ? 'Exportando…' : 'Exportar CSV'}
             </button>
           )}
-          <button type="button" className="btn-primary" onClick={() => setIsNewOrderOpen(true)}>
-            <Plus size={16} /> Nueva venta
-          </button>
+          {puedeGestionar && (
+            <button type="button" className="btn-primary" onClick={() => setIsNewOrderOpen(true)}>
+              <Plus size={16} /> Nueva venta
+            </button>
+          )}
         </div>
       </div>
 
@@ -302,7 +309,7 @@ export default function OrdersPage() {
                         <Eye size={16} />
                       </button>
 
-                      {order.status === 'pending' && (
+                      {puedeGestionar && order.status === 'pending' && (
                         <>
                           <button
                             onClick={() => handleUpdateStatus(order.id, 'processing')}
@@ -323,7 +330,7 @@ export default function OrdersPage() {
                         </>
                       )}
 
-                      {order.status === 'processing' && (
+                      {puedeGestionar && order.status === 'processing' && (
                         <>
                           <button
                             onClick={() => handleUpdateStatus(order.id, 'attended')}
@@ -345,8 +352,8 @@ export default function OrdersPage() {
                       )}
 
                       {/* FUN-4: borrar un pedido atendido devuelve su stock y
-                          borra la venta; es de admin, no de quien atiende. */}
-                      {puedeAdministrar && (
+                          borra la venta; no es atender, es su propio permiso. */}
+                      {puedeBorrar && (
                         <button
                           onClick={() => handleDelete(order.id, order.customer_name)}
                           className="btn-icon delete-btn"
@@ -522,10 +529,10 @@ export default function OrdersPage() {
                   <strong>{money(selectedOrder.total)}</strong>
                 </div>
 
-                {/* MOD-6: utilidad del pedido, solo para admin. `utilidad` a null
-                    es "ningún producto tenía costo", que NO es ganar cero: en ese
-                    caso se dice, en vez de pintar un 0. */}
-                {puedeAdministrar && selectedOrder.utilidad !== undefined && (
+                {/* MOD-6: utilidad del pedido, solo con `costos.ver`. `utilidad`
+                    a null es "ningún producto tenía costo", que NO es ganar cero:
+                    en ese caso se dice, en vez de pintar un 0. */}
+                {puedeVerCostos && selectedOrder.utilidad !== undefined && (
                   <div className="detail-total-row detail-profit-row">
                     <span>Utilidad</span>
                     {selectedOrder.utilidad === null ? (
@@ -561,7 +568,7 @@ export default function OrdersPage() {
               </div>
 
               {/* State updates inside details */}
-              {selectedOrder.status === 'pending' && (
+              {puedeGestionar && selectedOrder.status === 'pending' && (
                 <div className="dialogo-acciones">
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')}
@@ -578,7 +585,7 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              {selectedOrder.status === 'processing' && (
+              {puedeGestionar && selectedOrder.status === 'processing' && (
                 <div className="dialogo-acciones">
                   <button
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'attended')}

@@ -172,16 +172,16 @@ export default function PlatformTenantPage() {
             <div>
               <strong>Esta tienda se quedó sin ningún administrador activo.</strong>
               <span>
-                Nadie de su equipo puede entrar a Configuración, Categorías, Páginas ni Equipo, y
-                no hay a quién mandarle el enlace de recuperación. Nombra administrador a un
-                colaborador activo para que la tienda vuelva a poder gestionarse sola.
+                Nadie de su equipo puede gestionar el equipo ni sus roles, y no hay a quién
+                mandarle el enlace de recuperación. Nombra administrador a alguien activo del
+                equipo para que la tienda vuelva a poder gestionarse sola.
               </span>
             </div>
           </div>
 
           {candidatosRescate.length === 0 ? (
             <p className="tenant-rescue-vacio">
-              Tampoco tiene ningún colaborador activo: no hay a quién ascender desde aquí.
+              Tampoco tiene a nadie activo en el equipo: no hay a quién ascender desde aquí.
             </p>
           ) : (
             <div className="tenant-rescue-actions">
@@ -327,7 +327,10 @@ export default function PlatformTenantPage() {
                     <span className="equipo-mail">{u.email}</span>
                   </div>
                   <span className="equipo-tags">
-                    <span className="badge badge-neutral">{u.role}</span>
+                    {/* MOD-21: el rol del equipo de un staff, por su nombre. */}
+                    <span className="badge badge-neutral">
+                      {u.role === 'staff' && u.team_role ? `staff · ${u.team_role.name}` : u.role}
+                    </span>
                     {!u.is_active && <span className="badge badge-danger">Inactivo</span>}
                     {u.invitation_pending && <span className="badge badge-warning">Sin entrar</span>}
                   </span>

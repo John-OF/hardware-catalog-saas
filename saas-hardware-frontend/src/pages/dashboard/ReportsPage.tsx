@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { getReport, type Agrupacion, type PuntoDelReporte, type Reporte } from '../../api/reports';
 import { exportarReporte } from '../../api/exportaciones';
 import { useTenantStore } from '../../stores/tenantStore';
+import { usePuede } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 
 /**
@@ -41,6 +42,9 @@ export default function ReportsPage() {
   const [agrupacion, setAgrupacion] = useState<Agrupacion>('dia');
   const [comoTabla, setComoTabla] = useState(false);
   const [descargando, setDescargando] = useState(false);
+  // MOD-21: exportar es su propio permiso. Antes el botón salía también a
+  // quien la ruta le respondía 403.
+  const puedeExportar = usePuede('reportes.exportar') !== false;
 
   const { data, isLoading, isError, error } = useQuery<Reporte>({
     queryKey: ['reports', desde, hasta, agrupacion],
@@ -142,15 +146,17 @@ export default function ReportsPage() {
           </button>
         </div>
 
-        <button
-          type="button"
-          className="btn-primary exportar"
-          onClick={descargar}
-          disabled={descargando}
-        >
-          {descargando ? <Loader2 size={16} className="spinner" /> : <Download size={16} />}
-          <span>Exportar CSV</span>
-        </button>
+        {puedeExportar && (
+          <button
+            type="button"
+            className="btn-primary exportar"
+            onClick={descargar}
+            disabled={descargando}
+          >
+            {descargando ? <Loader2 size={16} className="spinner" /> : <Download size={16} />}
+            <span>Exportar CSV</span>
+          </button>
+        )}
       </div>
 
       {/* Las cifras del rango. */}

@@ -73,6 +73,11 @@ class BitacoraDeTiendaTest extends TestCase
         'PUT api/users/{user}'                         => ActivityLog::EQUIPO_EDITADO,
         'DELETE api/users/{user}'                      => ActivityLog::EQUIPO_BORRADO,
         'POST api/users/{user}/resend-invitation'      => ActivityLog::EQUIPO_REINVITADO,
+        // MOD-21: quién le dio a un rol permiso de borrar es una pregunta de
+        // equipo, como quién invitó a quién.
+        'POST api/team-roles'                          => ActivityLog::EQUIPO_ROL_CREADO,
+        'PUT api/team-roles/{team_role}'               => ActivityLog::EQUIPO_ROL_EDITADO,
+        'DELETE api/team-roles/{team_role}'            => ActivityLog::EQUIPO_ROL_BORRADO,
         'PUT api/tenant'                               => ActivityLog::CONFIGURACION_EDITADA,
         'POST api/tenant/custom-domain/verify'         => ActivityLog::CONFIGURACION_DOMINIO,
         // MOD-8: las tres escriben. Restaurar y purgar son tan reversibles o tan
@@ -157,6 +162,11 @@ class BitacoraDeTiendaTest extends TestCase
         $cupon->tenant_id = $this->tienda->id;
         $cupon->save();
 
+        // MOD-21: un rol sin nadie, para editarlo y borrarlo.
+        $rol = new \App\Models\TeamRole(['name' => 'Compras', 'permissions' => ['productos.ver']]);
+        $rol->tenant_id = $this->tienda->id;
+        $rol->save();
+
         $paraRestaurar = $this->crearProducto($this->tienda, 'En la papelera 1', 100, 1);
         $paraPurgar = $this->crearProducto($this->tienda, 'En la papelera 2', 100, 1);
         $paraRestaurar->delete();
@@ -189,6 +199,9 @@ class BitacoraDeTiendaTest extends TestCase
             'PUT api/users/{user}' => fn () => $this->como($this->admin)->putJson("/api/users/{$companiero->id}", ['role' => 'admin']),
             'POST api/users/{user}/resend-invitation' => fn () => $this->como($this->admin)->postJson("/api/users/{$companiero->id}/resend-invitation"),
             'DELETE api/users/{user}' => fn () => $this->como($this->admin)->deleteJson("/api/users/{$companiero->id}"),
+            'POST api/team-roles' => fn () => $this->como($this->admin)->postJson('/api/team-roles', ['name' => 'Caja', 'permissions' => ['pedidos.gestionar']]),
+            'PUT api/team-roles/{team_role}' => fn () => $this->como($this->admin)->putJson("/api/team-roles/{$rol->id}", ['permissions' => ['productos.editar']]),
+            'DELETE api/team-roles/{team_role}' => fn () => $this->como($this->admin)->deleteJson("/api/team-roles/{$rol->id}"),
             'PUT api/tenant' => fn () => $this->como($this->admin)->putJson('/api/tenant', ['name' => 'Tienda Renombrada', 'custom_domain' => 'tienda.example.com']),
             'POST api/tenant/custom-domain/verify' => fn () => $this->como($this->admin)->postJson('/api/tenant/custom-domain/verify'),
             'POST api/coupons' => fn () => $this->como($this->admin)->postJson('/api/coupons', ['code' => 'NUEVO', 'type' => 'percent', 'value' => 15]),

@@ -411,6 +411,7 @@ class PlatformController extends Controller
         // `where('tenant_id')` explícito es lo único que las acota (FUN-14).
         $equipo = User::where('tenant_id', $tenant->id)
             ->whereIn('role', User::ROLES_DE_PANEL)
+            ->with('teamRole')
             ->orderBy('role')
             ->orderBy('created_at')
             ->get();

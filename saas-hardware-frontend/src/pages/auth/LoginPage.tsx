@@ -1,6 +1,6 @@
 import './LoginPage.css';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff, Loader2, Cpu } from 'lucide-react';
@@ -8,6 +8,11 @@ import { loginUser } from '../../api/auth';
 import { avisarError } from '../../api/erroresDeFormulario';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
+import type { CuentaDePrueba } from '../../utils/cuentasDePrueba';
+
+// Sólo en desarrollo: en el build la rama es código muerto y el componente no
+// llega ni como archivo aparte (utils/cuentasDePrueba.ts).
+const CuentasDePrueba = import.meta.env.DEV ? lazy(() => import('../../components/dev/CuentasDePrueba')) : null;
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -57,17 +62,11 @@ export default function LoginPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      toast.error('Por favor completa todos los campos.');
-      return;
-    }
-
+  const entrar = async (correo: string, clave: string) => {
     setIsLoading(true);
     try {
-      const response = await loginUser({ email, password });
-      
+      const response = await loginUser({ email: correo, password: clave });
+
       // Guardar en Zustand
       setAuth(response.token, response.user);
       setTenant(response.tenant);
@@ -82,6 +81,23 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error('Por favor completa todos los campos.');
+      return;
+    }
+
+    void entrar(email, password);
+  };
+
+  /** Sólo en desarrollo: la lista de `CuentasDePrueba` entra con un clic. */
+  const entrarConCuentaDePrueba = (cuenta: CuentaDePrueba) => {
+    setEmail(cuenta.email);
+    setPassword(cuenta.password);
+    void entrar(cuenta.email, cuenta.password);
   };
 
   return (
@@ -158,6 +174,12 @@ export default function LoginPage() {
             ¿Aún no tienes tienda? <Link to="/register">Créala gratis</Link>
           </p>
         </form>
+
+        {CuentasDePrueba && (
+          <Suspense fallback={null}>
+            <CuentasDePrueba tipo="tienda" onElegir={entrarConCuentaDePrueba} ocupado={isLoading} />
+          </Suspense>
+        )}
       </div>
 
     </div>

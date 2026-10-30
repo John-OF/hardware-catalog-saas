@@ -1,0 +1,90 @@
+/* Estilos de <CuentasDePrueba>, la lista de cuentas para entrar con un clic en
+   desarrollo. Es un componente, así que su CSS es global (TEC-6); las clases
+   llevan el prefijo `cuentas-prueba` para no chocar con las de las páginas.
+
+   Sólo usa tokens que redefine el tema claro de las pantallas de login
+   (`.login-container`, `.auth-container` en index.css): `--bg-input` no está
+   entre ellos y ahí sale el gris del tema oscuro. */
+
+.cuentas-prueba {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.cuentas-prueba__titulo {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.cuentas-prueba__grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cuentas-prueba__subtitulo {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cuentas-prueba__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cuentas-prueba__cuenta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cuentas-prueba__cuenta:hover:not(:disabled),
+.cuentas-prueba__cuenta:focus-visible {
+  border-color: var(--border);
+  background: var(--bg-card);
+}
+
+.cuentas-prueba__cuenta:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.cuentas-prueba__nombre {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cuentas-prueba__correo {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
