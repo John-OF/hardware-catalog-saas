@@ -15,6 +15,7 @@ use App\Support\DosPasos;
 use App\Support\Paginacion;
 use App\Support\PlanGate;
 use App\Support\Suplantacion;
+use App\Support\Verticales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -231,12 +232,15 @@ class PlatformController extends Controller
         $data = $request->validate([
             'is_active' => 'sometimes|boolean',
             'plan'      => ['sometimes', 'string', Rule::in(['free', 'pro', 'enterprise'])],
+            // MOD-19: cambia lo que la tienda enseña, nunca lo que guarda.
+            'vertical'  => ['sometimes', 'string', Rule::in(array_keys(Verticales::disponibles()))],
         ]);
 
         // Se lee ANTES de escribir: la bitácora tiene que poder decir de qué
         // plan a cuál, y después del update el valor anterior ya no existe.
-        $planAnterior   = $tenant->plan;
-        $estabaActiva   = $tenant->is_active;
+        $planAnterior     = $tenant->plan;
+        $estabaActiva     = $tenant->is_active;
+        $verticalAnterior = Verticales::clave($tenant);
 
         $tenant->update($data);
 
@@ -249,7 +253,7 @@ class PlatformController extends Controller
             $tenant->forceFill(['trial_ends_at' => null])->save();
         }
 
-        $this->anotarCambio($request, $tenant, $data, $planAnterior, $estabaActiva);
+        $this->anotarCambio($request, $tenant, $data, $planAnterior, $estabaActiva, $verticalAnterior);
 
         // La caché pública guarda el tenant 5 minutos; sin esto una tienda
         // suspendida seguiría sirviéndose desde caché.
@@ -431,6 +435,10 @@ class PlatformController extends Controller
                 'limites' => $limites,
                 'uso'     => $uso,
             ],
+
+            // MOD-19: para el selector de rubro, con su nombre en pantalla. La
+            // lista sale de la config; el navegador no tiene copia.
+            'verticales' => Verticales::disponibles(),
 
             'equipo' => UserResource::collection($equipo),
 
@@ -629,6 +637,7 @@ class PlatformController extends Controller
         array $data,
         ?string $planAnterior,
         bool $estabaActiva,
+        string $verticalAnterior,
     ): void {
         $operador = $request->user();
 
@@ -653,6 +662,19 @@ class PlatformController extends Controller
                 $tenant,
                 $operador,
                 ['antes' => $planAnterior, 'despues' => $data['plan']],
+                $request,
+            );
+        }
+
+        if (array_key_exists('vertical', $data) && $data['vertical'] !== $verticalAnterior) {
+            $nombres = Verticales::disponibles();
+
+            ActivityLog::registrar(
+                ActivityLog::TIENDA_VERTICAL,
+                "Cambió el rubro de {$tenant->name}: {$nombres[$verticalAnterior]} → {$nombres[$data['vertical']]}.",
+                $tenant,
+                $operador,
+                ['antes' => $verticalAnterior, 'despues' => $data['vertical']],
                 $request,
             );
         }

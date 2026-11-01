@@ -74,9 +74,13 @@ export default function PlatformTenantPage() {
   };
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { is_active?: boolean; plan?: string }) => updatePlatformTenant(id, payload),
-    onSuccess: (tenant) => {
+    mutationFn: (payload: { is_active?: boolean; plan?: string; vertical?: string }) => updatePlatformTenant(id, payload),
+    onSuccess: (tenant, payload) => {
       refrescar();
+      if (payload.vertical) {
+        toast.success(`${tenant.name} cambió de rubro`);
+        return;
+      }
       toast.success(tenant.is_active ? `${tenant.name} está activa` : `${tenant.name} quedó suspendida`);
     },
     onError: (error) => {
@@ -231,6 +235,20 @@ export default function PlatformTenantPage() {
           >
             {PLANES.map((p) => (
               <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          {/* MOD-19: el rubro decide qué enseña la tienda (el armador, la ficha
+              técnica), nunca qué guarda: cambiarlo no borra nada. */}
+          <select
+            className="premium-input plan-select"
+            aria-label="Rubro de la tienda"
+            value={tenant.vertical ?? ''}
+            disabled={updateMutation.isPending}
+            onChange={(e) => updateMutation.mutate({ vertical: e.target.value })}
+          >
+            {Object.entries(data.verticales).map(([clave, nombre]) => (
+              <option key={clave} value={clave}>{nombre}</option>
             ))}
           </select>
 

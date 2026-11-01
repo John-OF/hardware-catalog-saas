@@ -51,6 +51,7 @@ import { tramosDeVenta } from '../../utils/preciosPorCantidad';
 import { specsParaMostrar } from '../../utils/specsFijas';
 import { enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
+import { tieneModulo } from '../../utils/verticales';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -283,7 +284,8 @@ export default function ProductDetailPage() {
   });
 
   // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo.
-  const { data: definicionDeSpecs } = useSpecsFijas();
+  // MOD-19: sin ficha técnica, cada spec sale con la clave que escribió la tienda.
+  const { data: definicionDeSpecs } = useSpecsFijas(tieneModulo(tenant, 'ficha_tecnica'));
 
   // Título, favicon y SEO metadata de la pestaña: "Producto · Mi Tienda"
   useTenantBranding(tenant, product?.name, product?.description, product?.images?.[0]?.image_url || product?.image_url);

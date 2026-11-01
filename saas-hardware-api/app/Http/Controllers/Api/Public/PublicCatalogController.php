@@ -15,6 +15,7 @@ use App\Support\Busqueda;
 use App\Support\Cupones;
 use App\Support\Impuesto;
 use App\Support\PlantillasWhatsapp;
+use App\Support\Verticales;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderPlacedNotification;
@@ -56,6 +57,10 @@ class PublicCatalogController extends Controller
         // MOD-25: se lee para resolver las plantillas del comprador y no sale
         // en crudo (es `$hidden` en el modelo): ver `conPlantillasDelComprador()`.
         'whatsapp_templates',
+        // MOD-19: de aquí salen los `modulos` que el modelo añade al
+        // serializarse (el armador, la ficha técnica). Sin la columna en el
+        // select, toda tienda se leería como de la vertical por defecto.
+        'vertical',
     ];
 
     public function resolveDomain(Request $request): JsonResponse
@@ -113,6 +118,10 @@ class PublicCatalogController extends Controller
         // son lo correcto ahí: nadie pudo cambiarlas antes de existir la
         // columna, y guardar una borra esta caché.
         $tenant['plantillas_whatsapp'] ??= PlantillasWhatsapp::deFabrica(PlantillasWhatsapp::GRUPO_COMPRADOR);
+
+        // MOD-19, mismo caso: lo cacheado antes de existir la columna no trae
+        // los módulos, y entonces toda tienda era de la vertical por defecto.
+        $tenant['modulos'] ??= Verticales::modulos($tenant['vertical'] ?? null);
 
         return response()->json($tenant);
     }
@@ -505,7 +514,12 @@ class PublicCatalogController extends Controller
         // una lista de nombres esperados, así que una tienda que llamara "CPU" a
         // sus procesadores se quedaba sin cross-selling y sin ningún aviso — el
         // mismo fallo silencioso que el enum cerró en el armador.
-        $tipo = $product->category?->component_type;
+        //
+        // MOD-19: van con el armador, porque salen de sus mismas parejas de
+        // tipos. Una tienda que pasó a otra vertical conserva el tipo de sus
+        // categorías y, sin esto, seguiría sugiriendo «la placa de este
+        // procesador».
+        $tipo = Verticales::tiene($tenant, Verticales::ARMADOR) ? $product->category?->component_type : null;
         $tiposComplementarios = $tipo ? $tipo->complementarios() : [];
 
         $complementaryProducts = collect();

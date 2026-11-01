@@ -143,7 +143,7 @@ export const getPlatformTenants = async (params?: {
 
 export const updatePlatformTenant = async (
   id: string,
-  payload: { is_active?: boolean; plan?: string },
+  payload: { is_active?: boolean; plan?: string; vertical?: string },
 ): Promise<PlatformTenant> => {
   const { data } = await platformApi.put<PlatformTenant>(`/platform/tenants/${id}`, payload);
   return data;
@@ -213,6 +213,11 @@ export interface PlatformTenantDetail {
     /** Consumo actual, con las mismas claves que `limites`. */
     uso: Record<string, number>;
   };
+  /**
+   * Los rubros que se pueden asignar (MOD-19), clave => nombre en pantalla.
+   * Salen de `config/verticales.php`; el navegador no tiene copia.
+   */
+  verticales: Record<string, string>;
   equipo: User[];
   /** Clientes registrados del catálogo: comparten tabla con el equipo pero no cuentan para el plan. */
   clientes: number;

@@ -158,8 +158,13 @@ class Seo
 
         $urls = [
             ['loc' => $base, 'lastmod' => $tenant->updated_at?->toAtomString()],
-            ['loc' => $base.'/builder', 'lastmod' => null],
         ];
+
+        // MOD-19: solo si la tienda tiene armador; si no, esa URL lleva al
+        // catálogo y no es una página propia que indexar.
+        if (Verticales::tiene($tenant, Verticales::ARMADOR)) {
+            $urls[] = ['loc' => $base.'/builder', 'lastmod' => null];
+        }
 
         foreach (self::paginasDe($tenant, $base) as $pagina) {
             $urls[] = ['loc' => $pagina['url'], 'lastmod' => $pagina['lastmod']];

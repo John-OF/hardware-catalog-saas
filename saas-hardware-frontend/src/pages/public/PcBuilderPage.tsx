@@ -1,7 +1,7 @@
 import './PcBuilderPage.css';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   Cpu,
@@ -41,6 +41,7 @@ import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 import { specsParaMostrar } from '../../utils/specsFijas';
 import { armadoDesdeElEnlace, escribirArmadoEnElEnlace, leerArmadoDelEnlace } from '../../utils/armadoCompartido';
 import { enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
+import { tieneModulo } from '../../utils/verticales';
 
 /**
  * Pasos predefinidos para armar la PC.
@@ -121,7 +122,11 @@ export default function PcBuilderPage() {
     },
   });
 
-  const resolvedSlug = tenant?.slug;
+  // MOD-19: sin armador en la vertical de la tienda, esta página no existe.
+  // Sin slug resuelto ninguna consulta de abajo sale, y el render la devuelve
+  // al catálogo (ver el `Navigate` tras la carga).
+  const conArmador = tieneModulo(tenant, 'armador');
+  const resolvedSlug = conArmador ? tenant?.slug : undefined;
 
   const getPublicPath = (path: string) => {
     if (isCustomDomain) {
@@ -143,7 +148,7 @@ export default function PcBuilderPage() {
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo.
-  const { data: definicionDeSpecs } = useSpecsFijas();
+  const { data: definicionDeSpecs } = useSpecsFijas(conArmador);
 
   // MOD-20: las piezas del enlace, con la misma forma que las del cajón.
   const { data: piezasDelEnlace, isError: errorDelEnlace } = useQuery({
@@ -396,6 +401,10 @@ export default function PcBuilderPage() {
         <p>Cargando armador...</p>
       </div>
     );
+  }
+
+  if (tenant && !conArmador) {
+    return <Navigate to={isCustomDomain ? '/' : `/${tenant.slug}`} replace />;
   }
 
   return (

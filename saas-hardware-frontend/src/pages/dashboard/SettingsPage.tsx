@@ -43,6 +43,8 @@ import { DEFAULT_NEUTRAL, NEUTRALS, neutralClass } from '../../utils/neutrals';
 import {
   DEFAULT_HERO_STYLE,
   HERO_STYLES,
+  SUBTITULO_DE_PORTADA_POR_DEFECTO,
+  TITULO_DE_PORTADA_POR_DEFECTO,
 } from '../../utils/hero';
 import {
   CARD_STYLES,
@@ -555,7 +557,7 @@ export default function SettingsPage() {
               className="premium-input" 
               value={customDomain} 
               onChange={(e) => setCustomDomain(e.target.value.toLowerCase().trim())} 
-              placeholder="ejemplo.com o tienda.componentespc.com" 
+              placeholder="ejemplo.com o tienda.mimarca.com"
               maxLength={255} 
             />
             <span className="helper-text">
@@ -1340,11 +1342,11 @@ export default function SettingsPage() {
           </div>
           <div className="form-group full">
             <label>Título del hero</label>
-            <input className="premium-input" value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} placeholder="Encuentra las mejores piezas de hardware" maxLength={120} />
+            <input className="premium-input" value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} placeholder={TITULO_DE_PORTADA_POR_DEFECTO} maxLength={120} />
           </div>
           <div className="form-group full">
             <label>Subtítulo del hero</label>
-            <textarea className="premium-input" value={heroSubtitle} onChange={(e) => setHeroSubtitle(e.target.value)} rows={2} maxLength={240} placeholder="Explora nuestro catálogo en tiempo real..." />
+            <textarea className="premium-input" value={heroSubtitle} onChange={(e) => setHeroSubtitle(e.target.value)} rows={2} maxLength={240} placeholder={SUBTITULO_DE_PORTADA_POR_DEFECTO} />
           </div>
           <div className="form-group full">
             <ImageSourceField

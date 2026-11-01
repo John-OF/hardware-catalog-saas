@@ -6,6 +6,7 @@ use App\Enums\ComponentType;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Support\Compatibilidad;
+use App\Support\Verticales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -34,6 +35,14 @@ class PublicBuilderController extends Controller
 
     public function compatibilidad(Request $request): JsonResponse
     {
+        // MOD-19: una tienda sin armador no tiene armado que evaluar. 404 y no
+        // 403: para quien pregunta, la página no existe.
+        abort_unless(
+            Verticales::tiene(app('currentTenant'), Verticales::ARMADOR),
+            404,
+            'Esta tienda no tiene armador de PC.',
+        );
+
         $pasos = array_map(fn (ComponentType $t) => $t->value, ComponentType::deArmador());
 
         $datos = $request->validate([

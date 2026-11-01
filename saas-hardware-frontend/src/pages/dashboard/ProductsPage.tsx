@@ -55,7 +55,7 @@ import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { exportarCatalogo } from '../../api/exportaciones';
 import type { Product, Category, PaginatedResponse } from '../../types';
-import { useTenantStore } from '../../stores/tenantStore';
+import { useModulo, useTenantStore } from '../../stores/tenantStore';
 import { usePuede } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import { aceptaDe, conRecuentoDeArchivos, formatosDe, LIMITES_DE_SUBIDA, pistaDe, problemaDelArchivo, tamanoLegible } from '../../utils/subidas';
@@ -195,7 +195,12 @@ export default function ProductsPage() {
 
   // FUN-8: qué campos fijos pregunta la categoría elegida. La lista viene de la
   // API (`config/component_specs.php`); aquí no hay ninguna copia.
-  const { data: definicionDeSpecs } = useSpecsFijas();
+  //
+  // MOD-19: sin el módulo de ficha técnica no hay definición, así que no hay
+  // campos fijos y todas las specs van a filas libres, aunque la categoría
+  // conserve un tipo de cuando la tienda era de otra vertical.
+  const conFicha = useModulo('ficha_tecnica');
+  const { data: definicionDeSpecs } = useSpecsFijas(conFicha);
   const tipoDelFormulario = categories.find((c) => c.id === categoryId)?.component_type ?? null;
   const camposDelTipo = useMemo(
     () => camposDe(definicionDeSpecs, tipoDelFormulario),
@@ -627,10 +632,16 @@ export default function ProductsPage() {
     const categoriaDe = (tipo: Category['component_type']) =>
       comoCeldaCsv(categories.find((c) => c.component_type === tipo)?.name ?? '');
 
+    //
+    // MOD-19: sin ficha técnica, un ejemplo de otro rubro con specs libres. La
+    // categoría es la primera de la tienda, por el mismo motivo de FUN-18.
     const headers = "nombre;marca;variante;precio;precio_oferta;stock;categoria;descripcion;especificaciones\n";
-    const row = `Intel Core i7-14700K;Intel;;409.99;389.99;15;${categoriaDe('cpu')};"Procesador de alto rendimiento para socket LGA1700";"socket:LGA1700|tdp:125|graficos_integrados:si|incluye_disipador:no|nucleos:20|hilos:28|Frecuencia:3.4 GHz"\n`
-      + `Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;${categoriaDe('ssd')};"SSD NVMe Gen4";"interfaz:M.2 NVMe"\n`
-      + 'Kingston NV3;;Capacidad: 2 TB;499.99;;3;;;\n';
+    const row = conFicha
+      ? `Intel Core i7-14700K;Intel;;409.99;389.99;15;${categoriaDe('cpu')};"Procesador de alto rendimiento para socket LGA1700";"socket:LGA1700|tdp:125|graficos_integrados:si|incluye_disipador:no|nucleos:20|hilos:28|Frecuencia:3.4 GHz"\n`
+        + `Kingston NV3;Kingston;Capacidad: 1 TB;289.99;;8;${categoriaDe('ssd')};"SSD NVMe Gen4";"interfaz:M.2 NVMe"\n`
+        + 'Kingston NV3;;Capacidad: 2 TB;499.99;;3;;;\n'
+      : `Camiseta básica;Mi Marca;Talla: M;39.90;34.90;20;${comoCeldaCsv(categories[0]?.name ?? '')};"Camiseta de algodón, corte recto";"Material:Algodón|Color:Blanco"\n`
+        + 'Camiseta básica;;Talla: L;39.90;34.90;12;;;\n';
 
     // BOM para que Excel lo abra como UTF-8; sin él "Núcleos" se ve como
     // "NÃºcleos" y el dueño acaba reimportando esa basura.
@@ -1396,7 +1407,7 @@ export default function ProductsPage() {
                 <textarea
                   id="prod-desc"
                   rows={4}
-                  placeholder="Describe las características principales del componente..."
+                  placeholder="Describe las características principales del producto..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="premium-input textarea-input"
@@ -1422,7 +1433,7 @@ export default function ProductsPage() {
                 </div>
                 
                 {specsList.length === 0 ? (
-                  <p className="no-specs-text">No hay especificaciones. Añade filas para detallar cores, frecuencia, capacidad, etc.</p>
+                  <p className="no-specs-text">No hay especificaciones. Añade filas para detallar medidas, materiales, capacidad, etc.</p>
                 ) : (
                   <div className="specs-list">
                     {specsList.map((spec, idx) => (
@@ -1495,7 +1506,7 @@ export default function ProductsPage() {
       {isImportModalOpen && (
         <Dialogo
           titulo="Importación Masiva de Productos (CSV)"
-          subtitulo="Sube una plantilla CSV para dar de alta componentes rápidamente."
+          subtitulo="Sube una plantilla CSV para dar de alta productos rápidamente."
           onCerrar={() => { setIsImportModalOpen(false); setImportReport(null); setImportFile(null); }}
           ancho={650}
           className="page-products"

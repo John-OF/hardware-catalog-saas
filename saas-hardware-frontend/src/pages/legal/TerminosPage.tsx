@@ -12,8 +12,8 @@ export default function TerminosPage() {
     <PaginaLegal titulo="Términos y condiciones">
       <p>
         Estos términos regulan el uso de <strong>{NOMBRE_DEL_SERVICIO}</strong> (en adelante, «el
-        servicio»), una plataforma para crear y administrar el catálogo en línea de una tienda de
-        componentes de computadora. Al crear una tienda o usar el servicio aceptas estos términos. Si no
+        servicio»), una plataforma para crear y administrar el catálogo en línea de una tienda. Al crear
+        una tienda o usar el servicio aceptas estos términos. Si no
         estás de acuerdo con ellos, no uses el servicio.
       </p>
 
@@ -25,9 +25,10 @@ export default function TerminosPage() {
 
       <h2>2. Qué es el servicio</h2>
       <p>
-        El servicio te da un catálogo público para tu tienda, con buscador, comparador, armador de PC y
-        carrito, y un panel para administrar productos, categorías, pedidos, clientes, cupones,
-        reportes y a tu equipo.
+        El servicio te da un catálogo público para tu tienda, con buscador, comparador y carrito, y un
+        panel para administrar productos, categorías, pedidos, clientes, cupones, reportes y a tu
+        equipo. Las tiendas de componentes de PC tienen además un armador que comprueba la
+        compatibilidad de las piezas.
       </p>
       <p>
         <strong>El servicio no cobra a tus compradores ni interviene en tus ventas.</strong> Un pedido

@@ -13,6 +13,7 @@ const ACCIONES: Record<string, string> = {
   'tenant.suspendida': 'Suspensiones',
   'tenant.reactivada': 'Reactivaciones',
   'tenant.plan': 'Cambios de plan',
+  'tenant.vertical': 'Cambios de rubro',
   'tenant.reset_password': 'Rescates de acceso',
   'tenant.soporte': 'Entradas como soporte',
   // Faltaban desde que se crearon: la línea salía en la lista, pero no se

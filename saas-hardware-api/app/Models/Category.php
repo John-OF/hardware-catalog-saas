@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\BelongsToTenant;
+use App\Support\Verticales;
 
 class Category extends Model
 {
@@ -34,9 +35,15 @@ class Category extends Model
         // sin tipo se cae del armador en silencio, que es justo el fallo que
         // FUN-8 viene a cerrar. Lo deducido es un punto de partida: el dueño lo
         // corrige desde el panel.
+        //
+        // MOD-19: solo en las tiendas cuya vertical pregunta el tipo. En las
+        // demás nace como «otro»: una tienda de ropa con una categoría «Memorias
+        // USB» no tiene por qué acabar con un tipo de RAM que nadie le enseña.
         static::creating(function ($category) {
             if ($category->component_type === null) {
-                $category->component_type = ComponentType::inferirDeNombre($category->name);
+                $category->component_type = Verticales::tiene($category->tenant, Verticales::TIPO_DE_COMPONENTE)
+                    ? ComponentType::inferirDeNombre($category->name)
+                    : ComponentType::Other;
             }
 
             // El icono no es un dato aparte del tipo, es su dibujo. Sólo se

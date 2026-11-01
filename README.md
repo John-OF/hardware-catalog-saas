@@ -403,6 +403,10 @@ config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (IN
 config/salud.php       # URL de aviso de cada tarea programada (INF-18) y los umbrales de
                        # salud:comprobar (INF-19), incluidos los mínimos de PHP del README
 config/plans.php       # La matriz de planes y límites
+config/verticales.php  # El rubro de cada tienda (MOD-19): los módulos de PC (tipo de componente,
+                       # ficha técnica, armador), lo que requiere cada uno y qué enciende cada
+                       # vertical. Lo resuelve App\Support\Verticales; el frontend copia solo las
+                       # claves de los módulos (utils/verticales.ts)
 config/permisos.php    # Los permisos por acción del equipo, por área, con lo que requiere cada
                        # uno (MOD-21). El frontend copia solo las claves (utils/permisos.ts)
 config/component_specs.php # Las specs con nombre fijo de cada tipo de componente (FUN-8).
@@ -450,11 +454,11 @@ tests/Feature/         # 91 archivos, 983 tests (+1 en tests/Unit)
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/` | Datos y branding de la tienda (solo columnas públicas), con `plantillas_whatsapp`: los tres mensajes del comprador ya resueltos (MOD-25). Los de la tienda nunca salen aquí; `resolve-domain` devuelve lo mismo |
+| GET | `/` | Datos y branding de la tienda (solo columnas públicas), con `plantillas_whatsapp`: los tres mensajes del comprador ya resueltos (MOD-25; dos si la tienda no tiene armador), y `vertical` y `modulos`: qué partes de PC enseña (MOD-19). Los de la tienda nunca salen aquí; `resolve-domain` devuelve lo mismo |
 | GET | `/categories` | Categorías activas (con `component_type`) |
 | GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación. Con `ids[]`, solo esos productos y sin caché: las piezas de un armado compartido (MOD-20) |
 | GET | `/facets` | Valores de spec reales del catálogo, para los filtros |
-| GET | `/builder/compatibility` | Veredicto del armador de PC (`seleccion[paso]=id`): incidencias mientras se elige y al pedir, consumo estimado, y con `paso` y `candidatos[]`, la etiqueta de cada producto del cajón (FUN-8) |
+| GET | `/builder/compatibility` | Veredicto del armador de PC (`seleccion[paso]=id`): incidencias mientras se elige y al pedir, consumo estimado, y con `paso` y `candidatos[]`, la etiqueta de cada producto del cajón (FUN-8). 404 si la tienda no tiene armador (MOD-19) |
 | GET | `/products/{product}` | Ficha: galería, variantes, reseñas aprobadas, relacionados |
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
@@ -517,8 +521,8 @@ criterio están en `routes/api.php`:
 | GET | `/api/platform/me` · `/tenants` | Perfil (con `seguridad`: si tiene la verificación en dos pasos, si es obligatoria, desde cuándo y cuántos códigos le quedan) y listado de tiendas |
 | GET | `/api/platform/stats` | Resumen del negocio: altas, estados, reparto por plan y totales |
 | GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`); no incluye la actividad de las tiendas |
-| GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora |
-| PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar y cambiar plan |
+| GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora, y `verticales` (clave => nombre, para el selector de rubro, MOD-19) |
+| PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar, cambiar plan y cambiar `vertical` (una de `config/verticales.php`; se anota como `tenant.vertical`) |
 | POST | `/api/platform/tenants/{tenant}/password-reset` | Mandar recuperación al dueño |
 | POST | `/api/platform/tenants/{tenant}/impersonate` | Entrar como soporte: token de 15 min y **solo lectura** |
 | POST | `/api/platform/tenants/{tenant}/rescue-admin` | Nombrar admin a un colaborador cuando la tienda se quedó sin ninguno |
@@ -579,7 +583,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 1037 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 1059 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -751,7 +755,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 331 tests (Vitest + Testing Library, jsdom)
+npm test          # 335 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -790,6 +794,13 @@ tienen tests.
   golpe). El gate va **al principio del método**, antes de escribir o de subir archivos. En la
   matriz, un entero es un tope, `null` es *sin tope* y un booleano es una función incluida o no; un
   plan que no está en la lista **cae al plan por defecto y no a `null`**.
+- **Verticales (MOD-19)**: lo que solo tiene sentido en una tienda de PC pregunta por un **módulo**
+  (`Verticales::tiene($tienda, Verticales::ARMADOR)`; en el frontend `tieneModulo()` o `useModulo()`),
+  **nunca** `vertical === 'hardware'`. La tienda viaja con sus `modulos` ya resueltos (`$appends` de
+  `Tenant`); una consulta que seleccione columnas de `tenants` tiene que incluir `vertical` o leerá la
+  vertical por defecto. Esconder en la pantalla no basta: la API también lo apaga. Un módulo nuevo va
+  en `config/verticales.php` **y** en `utils/verticales.ts` (un test compara las dos), y la vertical
+  decide lo que se enseña, nunca lo que se guarda.
 - **Al añadir un sitio que cree algo limitado**, acordarse del gate; al añadir una consulta que mire
   por encima de las tiendas, `withoutTenant()` explícito.
 - **Los topes son de la creación, no del estado existente**: bajar de plan nunca borra nada.

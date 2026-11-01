@@ -33,6 +33,9 @@
 |     mal escrito le llegaria tal cual al cliente.
 |   - Una linea cuyas variables quedan TODAS vacias no se manda: asi "Nota:
 |     {nota}" desaparece cuando no hay nota, sin condicionales en el texto.
+|   - `modulo` (opcional, MOD-19) es el de config/verticales.php sin el que la
+|     plantilla no tiene sentido: una tienda que no lo tiene no la ve en el
+|     panel ni la recibe el catalogo. Lo que hubiera escrito se queda guardado.
 |
 */
 
@@ -82,6 +85,8 @@ return [
             'grupo'     => 'comprador',
             'etiqueta'  => 'Armado desde el armador de PC',
             'cuando'    => 'Lo envía el comprador desde el armador de PC, con las piezas que eligió.',
+            // MOD-19: solo existe para las tiendas con armador (config/verticales.php).
+            'modulo'    => 'armador',
             'variables' => ['tienda', 'piezas', 'total', 'consumo', 'enlace'],
             'texto'     => "*¡Hola! Armé una PC desde tu catálogo:*\n\n{piezas}\n\n*Total estimado:* {total}\n*Consumo del sistema:* {consumo}\n*Ver el armado:* {enlace}\n\nPor favor, confírmenme stock y disponibilidad. ¡Gracias!",
         ],

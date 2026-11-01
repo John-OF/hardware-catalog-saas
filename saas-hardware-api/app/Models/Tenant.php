@@ -42,7 +42,18 @@ class Tenant extends Model implements IsTenant
         'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
         // MOD-25: solo lo que la tienda cambió; lo demás sale de la config.
         'whatsapp_templates',
+        // MOD-19: solo lo escribe el operador (`PlatformController::updateTenant`);
+        // la pantalla de Configuración valida su propia lista y no la incluye.
+        'vertical',
     ];
+
+    /**
+     * MOD-19: los módulos de la vertical, ya resueltos, viajan con la tienda a
+     * todas partes —el catálogo público y las seis respuestas del panel que la
+     * devuelven—, así ninguna pantalla tiene que preguntar por el nombre de la
+     * vertical ni acordarse de pedirlos aparte.
+     */
+    protected $appends = ['modulos'];
 
     /**
      * MOD-25: lo guardado son solo los textos que la tienda cambió, y nadie
@@ -98,6 +109,17 @@ class Tenant extends Model implements IsTenant
     public function zonaHoraria(): string
     {
         return $this->timezone ?: 'UTC';
+    }
+
+    /**
+     * Qué módulos tiene esta tienda por su vertical (MOD-19). Ver
+     * `App\Support\Verticales`.
+     *
+     * @return array<string, bool>
+     */
+    public function getModulosAttribute(): array
+    {
+        return \App\Support\Verticales::modulos($this);
     }
 
     public const METODOS_DE_PAGO = ['yape', 'plin', 'transferencia', 'efectivo'];

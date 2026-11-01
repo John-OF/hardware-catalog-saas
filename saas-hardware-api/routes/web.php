@@ -237,10 +237,12 @@ Route::get('/{slug}/p/{pageSlug}', function ($slug, $pageSlug) {
 Route::get('/{slug}/builder', function ($slug) {
     if (isCrawler()) {
         $tenant = Tenant::publica()->where('slug', $slug)->first();
-        if (!$tenant) {
+        // MOD-19: sin armador, esta página no existe; a una persona el SPA la
+        // devuelve al catálogo, y a un buscador se le dice que no hay nada.
+        if (!$tenant || !\App\Support\Verticales::tiene($tenant, \App\Support\Verticales::ARMADOR)) {
             abort(404);
         }
-        
+
         // Mismo motivo que en las otras (AUD-4): el helper lee paginas y
         // productos, y sin tienda resuelta el scope no devolveria nada.
         $tenant->makeCurrent();
@@ -403,6 +405,11 @@ Route::group([
 
             if (!isCrawler()) {
                 return fallbackToSpaConSlug($tenant->slug, '/builder');
+            }
+
+            // MOD-19: igual que en la ruta por slug.
+            if (!\App\Support\Verticales::tiene($tenant, \App\Support\Verticales::ARMADOR)) {
+                abort(404);
             }
 
             $tenant->makeCurrent();

@@ -45,7 +45,7 @@ import StoreHeader from '../../components/public/StoreHeader';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { formatMoney } from '../../utils/money';
-import { heroStyleOf } from '../../utils/hero';
+import { heroStyleOf, SUBTITULO_DE_PORTADA_POR_DEFECTO, TITULO_DE_PORTADA_POR_DEFECTO } from '../../utils/hero';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
@@ -54,6 +54,7 @@ import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import { esHostDeLaPlataforma } from '../../utils/plataforma';
 import { etiquetaDeSpec, todosLosCampos, valorDeSpec } from '../../utils/specsFijas';
 import { enlaceDeWhatsapp } from '../../utils/plantillasWhatsapp';
+import { tieneModulo } from '../../utils/verticales';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function CatalogPage() {
@@ -290,7 +291,10 @@ export default function CatalogPage() {
   // FUN-8: con qué etiqueta y unidad se pintan las specs de nombre fijo, en los
   // filtros y en el comparador. El filtro sigue viajando con la clave y el valor
   // guardados: lo que cambia es solo cómo se leen.
-  const { data: definicionDeSpecs } = useSpecsFijas();
+  //
+  // MOD-19: sin el módulo de ficha técnica no hay specs fijas que traducir, y
+  // cada filtro sale con la clave que escribió la tienda.
+  const { data: definicionDeSpecs } = useSpecsFijas(tieneModulo(tenant, 'ficha_tecnica'));
   const camposDeSpecs = useMemo(() => todosLosCampos(definicionDeSpecs), [definicionDeSpecs]);
 
   const { data: facetsData } = useQuery<{ specs: Record<string, string[]> }>({
@@ -374,13 +378,16 @@ export default function CatalogPage() {
 
       {/* Header Store */}
       <StoreHeader tenant={tenant}>
-          <Link
-            to={getPublicPath('/builder')}
-            className="btn-secondary builder-header-btn"
-            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', fontSize: '0.85rem' }}
-          >
-            <Cpu size={16} /> Armador PC
-          </Link>
+          {/* MOD-19: solo en las tiendas cuya vertical tiene armador. */}
+          {tieneModulo(tenant, 'armador') && (
+            <Link
+              to={getPublicPath('/builder')}
+              className="btn-secondary builder-header-btn"
+              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', fontSize: '0.85rem' }}
+            >
+              <Cpu size={16} /> Armador PC
+            </Link>
+          )}
           <button
             type="button"
             className="cart-trigger"
@@ -451,8 +458,8 @@ export default function CatalogPage() {
                       CATÁLOGO VIRTUAL
                     </span>
                   )}
-                  <h1>{tenant.theme?.hero_title || 'Encuentra las mejores piezas de hardware'}</h1>
-                  <p>{tenant.theme?.hero_subtitle || 'Explora nuestro catálogo en tiempo real, filtra por componentes y consulta existencias directamente por WhatsApp.'}</p>
+                  <h1>{tenant.theme?.hero_title || TITULO_DE_PORTADA_POR_DEFECTO}</h1>
+                  <p>{tenant.theme?.hero_subtitle || SUBTITULO_DE_PORTADA_POR_DEFECTO}</p>
                 </div>
                 {bannerAlLado && (
                   <div className="hero-figure" style={{ backgroundImage: `url(${banner})` }} />
@@ -644,12 +651,12 @@ export default function CatalogPage() {
                   {isLoadingProducts ? (
                     <div className="inner-loader">
                       <Loader2 className="spinner" size={32} />
-                      <p>Buscando componentes...</p>
+                      <p>Buscando productos...</p>
                     </div>
                   ) : products.length === 0 ? (
                     <div className="empty-catalog glass-card">
                       <FolderOpen size={44} className="empty-icon" />
-                      <h3>No se encontraron componentes</h3>
+                      <h3>No se encontraron productos</h3>
                       <p>Intenta cambiar los filtros o el texto de búsqueda.</p>
                     </div>
                   ) : (

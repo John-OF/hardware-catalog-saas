@@ -27,10 +27,24 @@ class PlantillasWhatsapp
     /** `{cliente}`, `{pedido}`… La misma forma que lee el navegador. */
     private const PATRON_VARIABLE = '/\{([a-z_]+)\}/';
 
-    /** @return array<string, array{grupo: string, etiqueta: string, cuando: string, variables: list<string>, texto: string}> */
+    /** @return array<string, array{grupo: string, etiqueta: string, cuando: string, variables: list<string>, texto: string, modulo?: string}> */
     public static function catalogo(): array
     {
         return config('plantillas_whatsapp.plantillas');
+    }
+
+    /**
+     * Las plantillas que existen para esta tienda (MOD-19): sin las que
+     * dependen de un módulo que su vertical no tiene, como la del armador.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function deLaTienda(Tenant $tenant): array
+    {
+        return array_filter(
+            self::catalogo(),
+            fn (array $plantilla) => ! isset($plantilla['modulo']) || Verticales::tiene($tenant, $plantilla['modulo']),
+        );
     }
 
     /** @return list<string> */
@@ -57,7 +71,7 @@ class PlantillasWhatsapp
     {
         $propias = is_array($tenant->whatsapp_templates) ? $tenant->whatsapp_templates : [];
 
-        return collect(self::catalogo())
+        return collect(self::deLaTienda($tenant))
             ->filter(fn (array $plantilla) => $grupo === null || $plantilla['grupo'] === $grupo)
             ->map(fn (array $plantilla, string $clave) => is_string($propias[$clave] ?? null) && $propias[$clave] !== ''
                 ? $propias[$clave]
@@ -93,7 +107,7 @@ class PlantillasWhatsapp
         return [
             'max'        => self::maximo(),
             'variables'  => config('plantillas_whatsapp.variables'),
-            'plantillas' => collect(self::catalogo())
+            'plantillas' => collect(self::deLaTienda($tenant))
                 ->map(fn (array $plantilla, string $clave) => [
                     'clave'         => $clave,
                     'grupo'         => $plantilla['grupo'],

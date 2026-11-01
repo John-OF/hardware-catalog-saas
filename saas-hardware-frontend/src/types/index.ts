@@ -81,6 +81,16 @@ export interface Tenant {
   theme: TenantTheme | null;
   whatsapp_number: string;
   plan: 'free' | 'pro' | 'enterprise';
+  /**
+   * El rubro de la tienda (MOD-19): `hardware`, `general`… Solo para enseñarlo
+   * (el panel de plataforma); para decidir qué se ve se usa `modulos`.
+   */
+  vertical?: string;
+  /**
+   * Qué partes del sistema enseña esta tienda por su vertical (MOD-19), ya
+   * resueltas por la API. Se leen con `tieneModulo()` de `utils/verticales.ts`.
+   */
+  modulos?: Partial<Record<import('../utils/verticales').ModuloDeVertical, boolean>>;
   is_active: boolean;
   /**
    * Si el catalogo publico se ve (FUN-5). NO es lo mismo que tener el correo

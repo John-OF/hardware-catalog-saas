@@ -42,6 +42,16 @@ export const HERO_STYLES: HeroStyleDef[] = [
 export const DEFAULT_HERO_STYLE: TenantHeroStyle = 'classic';
 
 /**
+ * Lo que dice la portada mientras la tienda no escriba lo suyo (MOD-19).
+ * Neutro a propósito: lo leen tiendas de cualquier rubro, y una tienda de ropa
+ * no puede abrir con «las mejores piezas de hardware». Sale en el catálogo y
+ * como ejemplo en Configuración, así que vive aquí y no en cada pantalla.
+ */
+export const TITULO_DE_PORTADA_POR_DEFECTO = 'Encuentra lo que buscas';
+export const SUBTITULO_DE_PORTADA_POR_DEFECTO =
+  'Explora nuestro catálogo en tiempo real, filtra lo que necesitas y consulta existencias directamente por WhatsApp.';
+
+/**
  * Definición del estilo, con caída al de por defecto ante un valor desconocido.
  *
  * `theme` es una columna JSON y puede traer lo que guardó una versión anterior;

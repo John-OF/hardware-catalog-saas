@@ -52,7 +52,10 @@ trait ValidaSpecsFijas
 
             // Si la categoría no es de esta tienda, el scope la deja fuera y no
             // hay tipo: la regla `category_id` ya rechaza la petición por su lado.
-            $this->tipoDeLasSpecs = $id ? Category::query()->whereKey($id)->first()?->component_type : null;
+            $this->tipoDeLasSpecs = SpecsFijas::tipoEnLaTienda(
+                app('currentTenant'),
+                $id ? Category::query()->whereKey($id)->first()?->component_type : null,
+            );
             $this->tipoDeLasSpecsResuelto = true;
         }
 

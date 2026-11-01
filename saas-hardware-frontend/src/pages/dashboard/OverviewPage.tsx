@@ -121,7 +121,7 @@ export default function OverviewPage() {
     <div className="overview-page animate-fade-in page-overview">
       <div className="overview-welcome">
         <p className="page-description">
-          Monitorea el rendimiento de tu catálogo, visitas de clientes y flujo de pedidos de hardware en tiempo real.
+          Monitorea el rendimiento de tu catálogo, visitas de clientes y flujo de pedidos en tiempo real.
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export default function OverviewPage() {
         {/* Most Viewed Products */}
         <div className="split-column glass-card">
           <div className="column-header">
-            <h4>Componentes Más Vistos</h4>
+            <h4>Productos más vistos</h4>
             <Link to="/dashboard/products" className="view-all-link">
               Ver inventario <ArrowRight size={14} />
             </Link>

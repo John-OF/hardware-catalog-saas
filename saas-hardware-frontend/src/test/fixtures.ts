@@ -24,6 +24,9 @@ export const unaTienda = (datos: Partial<Tenant> = {}): Tenant => ({
   theme: null,
   whatsapp_number: '+51 999 888 777',
   plan: 'pro',
+  // MOD-19: como toda tienda de hoy, de la vertical por defecto y con todo.
+  vertical: 'hardware',
+  modulos: { tipo_de_componente: true, ficha_tecnica: true, armador: true },
   is_active: true,
   is_published: true,
   custom_domain: null,

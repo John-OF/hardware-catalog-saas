@@ -55,6 +55,7 @@ class ActivityLog extends Model
     public const TIENDA_SUSPENDIDA = 'tenant.suspendida';
     public const TIENDA_REACTIVADA = 'tenant.reactivada';
     public const TIENDA_PLAN = 'tenant.plan';
+    public const TIENDA_VERTICAL = 'tenant.vertical';
     public const TIENDA_RESET = 'tenant.reset_password';
     public const TIENDA_SOPORTE = 'tenant.soporte';
     public const TIENDA_RESCATE_ADMIN = 'tenant.rescate_admin';

@@ -26,6 +26,7 @@ import {
 import CategoryIcon from '../../components/ui/CategoryIcon';
 import Dialogo from '../../components/ui/Dialogo';
 import { COMPONENT_TYPES, iconOfComponentType } from '../../utils/componentTypes';
+import { useModulo } from '../../stores/tenantStore';
 import type { Category, ComponentType } from '../../types';
 
 /** Etiqueta legible del tipo; una categoria vieja sin tipo cae en "Otros". */
@@ -43,11 +44,18 @@ export default function CategoriesPage() {
   // de aqui: eran la misma lista, pero como icono era opcional y nadie sabia
   // que el armador dependia de ella.
   const [componentType, setComponentType] = useState<ComponentType>('other');
+  // MOD-19: el tipo solo se pregunta en las tiendas cuya vertical lo usa.
+  const conTipo = useModulo('tipo_de_componente');
   const [sortOrder, setSortOrder] = useState('0');
   const [isActive, setIsActive] = useState(true);
 
   // Fetch categories
-  const { data: categories = [], isLoading } = useQuery<Category[]>({
+  //
+  // Sin `= []` a propósito: un arreglo por defecto es uno NUEVO en cada render
+  // mientras carga, y el efecto de abajo lo copia al estado, que vuelve a
+  // renderizar: un bucle hasta que llegan los datos (y para siempre en un test,
+  // que espera a que la pantalla se asiente). Lo destapó el test de MOD-19.
+  const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: getCategories,
   });
@@ -174,11 +182,16 @@ export default function CategoriesPage() {
 
     const payload = {
       name,
-      component_type: componentType,
-      // El icono va detras del tipo y no al reves. Se manda ya resuelto porque
-      // el backend solo lo deduce al crear: sin esto, cambiar el tipo de una
-      // categoria existente dejaria el dibujo antiguo.
-      icon: iconOfComponentType(componentType),
+      // MOD-19: sin el selector, el tipo y el icono no viajan —ausente es «no lo
+      // toques»—. Una categoría nueva nace como «otro» en la API, y una que ya
+      // tenía tipo (la tienda fue de otra vertical) lo conserva.
+      ...(conTipo ? {
+        component_type: componentType,
+        // El icono va detras del tipo y no al reves. Se manda ya resuelto porque
+        // el backend solo lo deduce al crear: sin esto, cambiar el tipo de una
+        // categoria existente dejaria el dibujo antiguo.
+        icon: iconOfComponentType(componentType),
+      } : {}),
       sort_order: parseInt(sortOrder) || 0,
       is_active: isActive
     };
@@ -201,7 +214,7 @@ export default function CategoriesPage() {
   return (
     <div className="categories-page animate-fade-in page-categories">
       <div className="page-header-actions">
-        <p className="page-description">Organiza tus componentes de PC para que los clientes exploren tu catálogo fácilmente.</p>
+        <p className="page-description">Organiza tu catálogo en categorías para que los clientes encuentren lo que buscan.</p>
         <button onClick={openCreateModal} className="btn-primary">
           <Plus size={18} />
           <span>Nueva Categoría</span>
@@ -217,7 +230,10 @@ export default function CategoriesPage() {
         <div className="empty-state glass-card">
           <FolderPlus size={48} className="empty-icon" />
           <h3>No hay categorías creadas</h3>
-          <p>Crea tu primera categoría (ej. Procesadores, Tarjetas Gráficas) para empezar a clasificar tus componentes.</p>
+          <p>
+            Crea tu primera categoría ({conTipo ? 'ej. Procesadores, Tarjetas Gráficas' : 'ej. Novedades, Ofertas'})
+            para empezar a clasificar tus productos.
+          </p>
           <button onClick={openCreateModal} className="btn-primary">
             <Plus size={18} />
             <span>Crear Categoría</span>
@@ -259,10 +275,12 @@ export default function CategoriesPage() {
                     <Sliders size={14} />
                     <span>Orden: {category.sort_order}</span>
                   </div>
-                  <div className="meta-item">
-                    <Cpu size={14} />
-                    <span>{labelDeTipo(category.component_type)}</span>
-                  </div>
+                  {conTipo && (
+                    <div className="meta-item">
+                      <Cpu size={14} />
+                      <span>{labelDeTipo(category.component_type)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -292,7 +310,7 @@ export default function CategoriesPage() {
                 <input
                   id="cat-name"
                   type="text"
-                  placeholder="ej. Tarjetas de Video"
+                  placeholder={conTipo ? 'ej. Tarjetas de Video' : 'ej. Novedades'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="premium-input"
@@ -300,6 +318,7 @@ export default function CategoriesPage() {
                 />
               </div>
 
+              {conTipo && (
               <div className="form-group">
                 <label htmlFor="cat-type">¿Qué vende esta categoría?</label>
                 <div className="category-type-row">
@@ -323,6 +342,7 @@ export default function CategoriesPage() {
                   que vendas.
                 </p>
               </div>
+              )}
 
               <div className="form-row">
                 <div className="form-group half">

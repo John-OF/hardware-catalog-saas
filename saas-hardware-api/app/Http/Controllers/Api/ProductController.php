@@ -438,7 +438,7 @@ class ProductController extends Controller
             foreach (Category::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'component_type']) as $categoria) {
                 $categorias[$this->claveDeNombre($categoria->name)] ??= $categoria->id;
                 $nombresDeCategoria[$categoria->id] = $categoria->name;
-                $tiposDeCategoria[$categoria->id] = $categoria->component_type;
+                $tiposDeCategoria[$categoria->id] = SpecsFijas::tipoEnLaTienda(app('currentTenant'), $categoria->component_type);
             }
 
             while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
@@ -1010,7 +1010,7 @@ class ProductController extends Controller
         // FUN-8: si la fila no traia categoria, sus specs se leyeron sin tipo;
         // se guardan con la que ya tiene el producto, asi que se miran con ella.
         if (isset($cambios['specs']) && ! isset($cambios['category_id'])) {
-            $tipo = $producto->category?->component_type;
+            $tipo = SpecsFijas::tipoEnLaTienda(app('currentTenant'), $producto->category?->component_type);
             $cambios['specs'] = SpecsFijas::normalizar($cambios['specs'], $tipo);
             $specsQueNoValen = SpecsFijas::errores($cambios['specs'], $tipo);
 

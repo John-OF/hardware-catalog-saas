@@ -32,6 +32,20 @@ final class SpecsFijas
     private const MAX_CIFRAS = 6;
 
     /**
+     * El tipo con el que se leen las specs de una categoría en esta tienda.
+     *
+     * MOD-19: sin el módulo de ficha técnica no hay campos fijos, aunque la
+     * categoría conserve su tipo de cuando la tienda era de otra vertical. Sin
+     * esto, el panel escondería la ficha y la API seguiría validando unos
+     * campos que nadie ve. Lo usan las tres puertas que guardan specs: el
+     * formulario de producto, el import CSV y su modo «actualizar».
+     */
+    public static function tipoEnLaTienda(\App\Models\Tenant|null $tienda, ComponentType|string|null $tipo): ComponentType|string|null
+    {
+        return Verticales::tiene($tienda, Verticales::FICHA_TECNICA) ? $tipo : null;
+    }
+
+    /**
      * Los campos de un tipo, en orden y con las opciones ya resueltas.
      *
      * @return array<string, array{etiqueta: string, tipo: string, unidad: ?string, opciones: list<string>, armador: bool, ayuda: ?string}>
