@@ -69,6 +69,7 @@ const UsersPage = lazy(() => import('../pages/dashboard/UsersPage'));
 const ActivityPage = lazy(() => import('../pages/dashboard/ActivityPage'));
 const TrashPage = lazy(() => import('../pages/dashboard/TrashPage'));
 const CouponsPage = lazy(() => import('../pages/dashboard/CouponsPage'));
+const WhatsappPage = lazy(() => import('../pages/dashboard/WhatsappPage'));
 
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
@@ -157,6 +158,8 @@ export const router = createBrowserRouter([
       { path: 'waitlist',   element: <ConPermiso permiso="espera.gestionar"><WaitlistPage /></ConPermiso> },
       { path: 'categories', element: <ConPermiso permiso="categorias.gestionar"><CategoriesPage /></ConPermiso> },
       { path: 'settings',   element: <ConPermiso permiso="tienda.configurar"><SettingsPage /></ConPermiso> },
+      // MOD-25: lo que la tienda dice por WhatsApp es configuración.
+      { path: 'whatsapp',   element: <ConPermiso permiso="tienda.configurar"><WhatsappPage /></ConPermiso> },
       { path: 'pages',      element: <ConPermiso permiso="paginas.gestionar"><PagesPage /></ConPermiso> },
       { path: 'activity',   element: <ConPermiso permiso="actividad.ver"><ActivityPage /></ConPermiso> },
       { path: 'trash',      element: <ConPermiso permiso="papelera.gestionar"><TrashPage /></ConPermiso> },

@@ -80,6 +80,8 @@ class BitacoraDeTiendaTest extends TestCase
         'DELETE api/team-roles/{team_role}'            => ActivityLog::EQUIPO_ROL_BORRADO,
         'PUT api/tenant'                               => ActivityLog::CONFIGURACION_EDITADA,
         'POST api/tenant/custom-domain/verify'         => ActivityLog::CONFIGURACION_DOMINIO,
+        // MOD-25: lo que la tienda le dice a sus clientes es configuración.
+        'PUT api/whatsapp-templates'                   => ActivityLog::CONFIGURACION_EDITADA,
         // MOD-8: las tres escriben. Restaurar y purgar son tan reversibles o tan
         // definitivas como borrar, y vaciar la papelera lo es más que nada.
         // MOD-4: un cupon es dinero que se deja de cobrar; quien lo crea o lo
@@ -204,6 +206,9 @@ class BitacoraDeTiendaTest extends TestCase
             'DELETE api/team-roles/{team_role}' => fn () => $this->como($this->admin)->deleteJson("/api/team-roles/{$rol->id}"),
             'PUT api/tenant' => fn () => $this->como($this->admin)->putJson('/api/tenant', ['name' => 'Tienda Renombrada', 'custom_domain' => 'tienda.example.com']),
             'POST api/tenant/custom-domain/verify' => fn () => $this->como($this->admin)->postJson('/api/tenant/custom-domain/verify'),
+            'PUT api/whatsapp-templates' => fn () => $this->como($this->admin)->putJson('/api/whatsapp-templates', [
+                'plantillas' => ['pedido_listo' => '¡Hola {cliente}! Tu pedido {pedido} ya está listo.'],
+            ]),
             'POST api/coupons' => fn () => $this->como($this->admin)->postJson('/api/coupons', ['code' => 'NUEVO', 'type' => 'percent', 'value' => 15]),
             'PUT api/coupons/{coupon}' => fn () => $this->como($this->admin)->putJson("/api/coupons/{$cupon->id}", ['value' => 20]),
             'DELETE api/coupons/{coupon}' => fn () => $this->como($this->admin)->deleteJson("/api/coupons/{$cupon->id}"),

@@ -44,6 +44,7 @@ class PermisosPorAccionTest extends TestCase
         'POST api/auth/email/resend' => 'reenvía el correo de verificación a uno mismo',
         'GET api/tenant'             => 'el panel necesita la moneda, el slug y si la tienda está publicada',
         'GET api/plan'               => 'los avisos de prueba y de tope salen en todo el panel',
+        'GET api/whatsapp-templates' => 'Pedidos y Lista de espera arman sus mensajes con ellas; son textos sin datos de nadie (MOD-25)',
         'GET api/categories'         => 'el formulario de producto las necesita, y son las del catálogo público',
         'GET api/categories/{category}' => 'mismo motivo que la lista',
     ];

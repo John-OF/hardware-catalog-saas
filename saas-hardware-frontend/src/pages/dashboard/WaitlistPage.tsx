@@ -25,6 +25,8 @@ import type { StockNotification, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFecha } from '../../utils/fechas';
 import { nombreConVariante } from '../../utils/variants';
+import { getPlantillasWhatsapp, textoDePlantilla } from '../../api/plantillasWhatsapp';
+import { enlaceDeProducto, enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 import './WaitlistPage.css';
 
 /**
@@ -100,16 +102,25 @@ export default function WaitlistPage() {
 
   const esCorreo = (contacto: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contacto.trim());
 
+  // MOD-25: el texto es la plantilla «Volvió el stock» de la tienda.
+  const { data: plantillas } = useQuery({
+    queryKey: ['plantillas-whatsapp'],
+    queryFn: getPlantillasWhatsapp,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const escribirPorWhatsapp = (espera: StockNotification) => {
-    const telefono = espera.customer_contact.replace(/[^0-9]/g, '');
-    const producto = espera.product
-      ? nombreConVariante(espera.product.name, espera.variant?.nombre)
-      : 'el producto que esperabas';
-    const mensaje = encodeURIComponent(
-      `Hola ${espera.customer_name}, te escribimos porque ${producto} volvio a estar disponible. ` +
-      `Avisanos si todavia lo quieres y te lo separamos.`
-    );
-    window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
+    const mensaje = rellenarPlantilla(textoDePlantilla(plantillas, 'stock_disponible'), {
+      cliente: espera.customer_name,
+      tienda: tenant?.name,
+      producto: espera.product
+        ? nombreConVariante(espera.product.name, espera.variant?.nombre)
+        : 'el producto que esperabas',
+      // Sin producto (se borró del todo) no hay ficha a la que mandarlo.
+      enlace: espera.product ? enlaceDeProducto(tenant, espera.product.id) : '',
+    });
+
+    window.open(enlaceDeWhatsapp(espera.customer_contact, mensaje), '_blank');
   };
 
   const handleBorrar = (espera: StockNotification) => {
@@ -246,6 +257,8 @@ export default function WaitlistPage() {
                               className="btn-whatsapp"
                               onClick={() => escribirPorWhatsapp(espera)}
                               title="Escribir por WhatsApp"
+                              // MOD-25: sin la plantilla todavía, abriría el chat vacío.
+                              disabled={!plantillas}
                             >
                               <Phone size={13} /> WhatsApp
                             </button>

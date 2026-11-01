@@ -1,6 +1,7 @@
 import './OrdersPage.css';
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
@@ -30,7 +31,15 @@ import { formatearFecha, formatearFechaHora } from '../../utils/fechas';
 import { usePuede } from '../../stores/authStore';
 import { formatMoney } from '../../utils/money';
 import Dialogo from '../../components/ui/Dialogo';
-import { nombreConVariante } from '../../utils/variants';
+import { getPlantillasWhatsapp, textoDePlantilla } from '../../api/plantillasWhatsapp';
+import {
+  enlaceDeWhatsapp,
+  plantillaDelEstado,
+  PLANTILLAS_DE_PEDIDO,
+  rellenarPlantilla,
+  valoresDePedido,
+  type PlantillaDePedido,
+} from '../../utils/plantillasWhatsapp';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
@@ -147,41 +156,38 @@ export default function OrdersPage() {
     return 'Pendiente';
   };
 
-  const getWhatsappMessageForStatus = (order: Order, type: 'status' | 'general' = 'status') => {
-    const totalFormatted = money(order.total);
-    const tenantName = tenant?.name || 'nuestra tienda';
-    const itemsDescription = order.items && order.items.length > 0
-      ? order.items.map(item => `${item.quantity}x ${nombreConVariante(item.product_name, item.variant_name)}`).join(', ')
-      : 'productos';
-    
-    // FUN-3: el número va en todos los mensajes porque es el que el cliente ya
-    // tiene —se lo llevó en el mensaje de WhatsApp al pedir— y el que el dueño
-    // puede buscar en esta misma pantalla cuando el cliente lo repita.
-    const ref = `#${order.number}`;
+  /**
+   * El mensaje de WhatsApp del detalle (MOD-25), con las plantillas de la
+   * tienda. Sale elegido el del estado del pedido; el dueño puede cambiarlo
+   * por otro (el recordatorio de pago, el contacto general…) y ve el texto
+   * antes de abrir WhatsApp.
+   *
+   * La elección va atada al pedido: al abrir otro, vuelve a salir la de su
+   * estado sin tener que limpiar nada al cerrar.
+   */
+  const { data: plantillas, isError: errorEnPlantillas } = useQuery({
+    queryKey: ['plantillas-whatsapp'],
+    queryFn: getPlantillasWhatsapp,
+    staleTime: 5 * 60 * 1000,
+  });
+  const [eleccion, setEleccion] = useState<{ pedido: string; clave: PlantillaDePedido } | null>(null);
+  const puedeEditarMensajes = usePuede('tienda.configurar') !== false;
 
-    if (type === 'general') {
-      return `Hola ${order.customer_name}, te contacto de la tienda ${tenantName} por tu pedido ${ref} (${itemsDescription}).`;
-    }
+  const mensajeElegido: PlantillaDePedido | null = selectedOrder
+    ? (eleccion?.pedido === selectedOrder.id ? eleccion.clave : plantillaDelEstado(selectedOrder.status))
+    : null;
 
-    switch (order.status) {
-      case 'processing':
-        return `Hola ${order.customer_name}, tu pedido ${ref} (${itemsDescription}) ya se encuentra en preparación en ${tenantName}. Te avisaremos apenas esté listo.`;
-      case 'attended':
-        return `¡Hola ${order.customer_name}! Tu pedido ${ref} (${itemsDescription}) por un total de ${totalFormatted} ya está listo en ${tenantName} para ser retirado o entregado. ¡Muchas gracias por tu compra!`;
-      case 'cancelled':
-        return `Hola ${order.customer_name}, tu pedido ${ref} (${itemsDescription}) ha sido cancelado en ${tenantName}. Si tienes alguna duda o consulta, por favor escríbenos por aquí.`;
-      default:
-        return `Hola ${order.customer_name}, hemos recibido tu pedido ${ref} (${itemsDescription}) en ${tenantName} por un total de ${totalFormatted}. Pronto iniciaremos su preparación.`;
-    }
-  };
+  const mensajeDelPedido = selectedOrder && mensajeElegido
+    ? rellenarPlantilla(textoDePlantilla(plantillas, mensajeElegido), valoresDePedido(selectedOrder, tenant))
+    : '';
 
-  const handleWhatsappContact = (order: Order, type: 'status' | 'general' = 'status') => {
+  const etiquetaDeMensaje = (clave: PlantillaDePedido) =>
+    plantillas?.plantillas.find((p) => p.clave === clave)?.etiqueta ?? clave;
+
+  const escribirPorWhatsapp = () => {
     // Desde 7.5 el telefono es opcional: una venta de mostrador puede no tenerlo.
-    if (!order.customer_phone) return;
-    const cleanPhone = order.customer_phone.replace(/[^0-9]/g, '');
-    const textMessage = getWhatsappMessageForStatus(order, type);
-    const msg = encodeURIComponent(textMessage);
-    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+    if (!selectedOrder?.customer_phone || !mensajeDelPedido) return;
+    window.open(enlaceDeWhatsapp(selectedOrder.customer_phone, mensajeDelPedido), '_blank');
   };
 
   return (
@@ -420,22 +426,9 @@ export default function OrdersPage() {
                   </div>
                   <div>
                     <label>Teléfono:</label>
-                    <div className="phone-row" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <p style={{ margin: 0, marginRight: '0.5rem', fontWeight: 600 }}>
-                        {selectedOrder.customer_phone || 'Venta de mostrador (sin teléfono)'}
-                      </p>
-                      {/* Sin numero no hay a quien escribir: los botones sobran. */}
-                      {selectedOrder.customer_phone && (
-                        <>
-                          <button onClick={() => handleWhatsappContact(selectedOrder, 'status')} className="btn-whatsapp" title="Enviar notificación automática de acuerdo al estado actual">
-                            <Phone size={13} /> Notificar Estado
-                          </button>
-                          <button onClick={() => handleWhatsappContact(selectedOrder, 'general')} className="btn-whatsapp-secondary" title="Enviar mensaje de contacto general">
-                            Contacto General
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                      {selectedOrder.customer_phone || 'Venta de mostrador (sin teléfono)'}
+                    </p>
                   </div>
                   <div>
                     <label>Correo:</label>
@@ -459,6 +452,38 @@ export default function OrdersPage() {
                     </div>
                   )}
                 </div>
+
+                {/* MOD-25. Sin número no hay a quién escribir: no sale. */}
+                {selectedOrder.customer_phone && mensajeElegido && (
+                  <div className="whatsapp-composer">
+                    {/* En el orden en que se usa: elegir, leer y mandar. */}
+                    <label htmlFor="mensaje-whatsapp">Mensaje de WhatsApp:</label>
+                    <select
+                      id="mensaje-whatsapp"
+                      className="premium-input"
+                      value={mensajeElegido}
+                      onChange={(e) => setEleccion({ pedido: selectedOrder.id, clave: e.target.value as PlantillaDePedido })}
+                    >
+                      {PLANTILLAS_DE_PEDIDO.map((clave) => (
+                        <option key={clave} value={clave}>
+                          {etiquetaDeMensaje(clave)}
+                          {clave === plantillaDelEstado(selectedOrder.status) ? ' (por su estado)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="whatsapp-preview">
+                      {mensajeDelPedido || (errorEnPlantillas ? 'No se pudieron cargar los mensajes. Recarga la página.' : 'Cargando el mensaje…')}
+                    </p>
+                    <div className="whatsapp-composer-actions">
+                      {puedeEditarMensajes
+                        ? <Link to="/dashboard/whatsapp" className="whatsapp-composer-link">Cambiar estos mensajes</Link>
+                        : <span />}
+                      <button type="button" className="btn-whatsapp" onClick={escribirPorWhatsapp} disabled={!mensajeDelPedido}>
+                        <Phone size={13} /> Escribir por WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Items summary */}

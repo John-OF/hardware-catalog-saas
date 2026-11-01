@@ -40,7 +40,19 @@ class Tenant extends Model implements IsTenant
         // MOD-2. `tax_included` decide si el porcentaje se saca del precio o se
         // suma al final, y cambia la aritmética entera: ver `App\Support\Impuesto`.
         'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
+        // MOD-25: solo lo que la tienda cambió; lo demás sale de la config.
+        'whatsapp_templates',
     ];
+
+    /**
+     * MOD-25: lo guardado son solo los textos que la tienda cambió, y nadie
+     * fuera de `App\Support\PlantillasWhatsapp` debería leerlo así: el panel
+     * recibe las diez resueltas por `GET /api/whatsapp-templates` y el
+     * catálogo, solo las del comprador. Oculto, ni el `GET /api/tenant` ni el
+     * caché del catálogo se llevan el crudo, que incluye los mensajes que la
+     * tienda manda a sus clientes.
+     */
+    protected $hidden = ['whatsapp_templates'];
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -55,6 +67,7 @@ class Tenant extends Model implements IsTenant
         'tax_enabled' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_included' => 'boolean',
+        'whatsapp_templates' => 'array',
         'custom_domain_requested_at' => 'datetime',
         'custom_domain_verified_at' => 'datetime',
         'trial_ends_at' => 'datetime',

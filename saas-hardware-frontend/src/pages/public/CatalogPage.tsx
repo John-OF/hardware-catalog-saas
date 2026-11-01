@@ -53,6 +53,7 @@ import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
 import { esHostDeLaPlataforma } from '../../utils/plataforma';
 import { etiquetaDeSpec, todosLosCampos, valorDeSpec } from '../../utils/specsFijas';
+import { enlaceDeWhatsapp } from '../../utils/plantillasWhatsapp';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function CatalogPage() {
@@ -402,7 +403,7 @@ export default function CatalogPage() {
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </button>
           <a
-            href={`https://wa.me/${tenant.whatsapp_number?.replace('+', '') ?? ''}`}
+            href={enlaceDeWhatsapp(tenant.whatsapp_number)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary whatsapp-header-btn"

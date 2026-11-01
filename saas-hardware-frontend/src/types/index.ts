@@ -124,6 +124,14 @@ export interface Tenant {
    * poder editarlos. `null` es "nunca configuró ninguno".
    */
   payment_methods: PaymentMethods | null;
+  /**
+   * Los mensajes de WhatsApp que escribe el comprador (MOD-25), ya resueltos:
+   * el de la tienda si lo cambió y si no el de fábrica. **Solo llega por el
+   * catálogo público**, y solo con estos tres; los que la tienda manda a sus
+   * clientes los lee el panel por `GET /api/whatsapp-templates`. Se rellenan
+   * con `utils/plantillasWhatsapp.ts`.
+   */
+  plantillas_whatsapp?: Partial<Record<'pedido_nuevo' | 'consulta_producto' | 'armado_pc', string>>;
   /** Envío a domicilio (MOD-1): un precio fijo, sin zonas. Si está apagado, la única opción es recojo en tienda. */
   delivery_enabled: boolean;
   delivery_cost: number | string;

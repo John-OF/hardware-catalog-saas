@@ -17,6 +17,7 @@ import type { Tenant, Page } from '../../types';
 import { useTenantBranding } from '../../hooks/useTenantBranding';
 import { useTenantTheme } from '../../hooks/useTenantTheme';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import { enlaceDeWhatsapp } from '../../utils/plantillasWhatsapp';
 
 export default function PageDetailPage() {
   const { slug, pageSlug } = useParams<{ slug: string; pageSlug: string }>();
@@ -97,7 +98,7 @@ export default function PageDetailPage() {
             <ArrowLeft size={16} /> Volver al Catálogo
           </Link>
           <a
-            href={`https://wa.me/${tenant.whatsapp_number?.replace('+', '') ?? ''}`}
+            href={enlaceDeWhatsapp(tenant.whatsapp_number)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary whatsapp-header-btn"

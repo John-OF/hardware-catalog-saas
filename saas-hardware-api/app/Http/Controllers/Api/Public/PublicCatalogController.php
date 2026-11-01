@@ -14,6 +14,7 @@ use App\Models\Tenant;
 use App\Support\Busqueda;
 use App\Support\Cupones;
 use App\Support\Impuesto;
+use App\Support\PlantillasWhatsapp;
 use App\Models\User;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderPlacedNotification;
@@ -52,6 +53,9 @@ class PublicCatalogController extends Controller
         // impuesto sumándose al final el comprador TIENE que ver que el total no
         // es la suma del carrito.
         'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
+        // MOD-25: se lee para resolver las plantillas del comprador y no sale
+        // en crudo (es `$hidden` en el modelo): ver `conPlantillasDelComprador()`.
+        'whatsapp_templates',
     ];
 
     public function resolveDomain(Request $request): JsonResponse
@@ -88,7 +92,7 @@ class PublicCatalogController extends Controller
         // lo probó y se arrepintió; no es asunto de nadie fuera del panel.
         $tenant->payment_methods = $tenant->metodosDePagoActivos();
 
-        return response()->json($tenant);
+        return response()->json($this->conPlantillasDelComprador($tenant));
     }
 
     public function tenant(string $slug): JsonResponse
@@ -101,10 +105,32 @@ class PublicCatalogController extends Controller
 
             $modelo->payment_methods = $modelo->metodosDePagoActivos();
 
-            return $modelo->toArray();
+            return $this->conPlantillasDelComprador($modelo);
         });
 
+        // Lo que estaba en caché desde antes de MOD-25 no las trae, y durante
+        // esos minutos el catálogo abriría WhatsApp sin texto. Las de fábrica
+        // son lo correcto ahí: nadie pudo cambiarlas antes de existir la
+        // columna, y guardar una borra esta caché.
+        $tenant['plantillas_whatsapp'] ??= PlantillasWhatsapp::deFabrica(PlantillasWhatsapp::GRUPO_COMPRADOR);
+
         return response()->json($tenant);
+    }
+
+    /**
+     * La tienda pública con sus mensajes de WhatsApp (MOD-25): **solo los que
+     * escribe el comprador**, ya resueltos. Los que la tienda manda a sus
+     * clientes (el recordatorio de pago, el de pedido cancelado…) no son
+     * asunto de nadie fuera del panel.
+     *
+     * @return array<string, mixed>
+     */
+    private function conPlantillasDelComprador(Tenant $tenant): array
+    {
+        $datos = $tenant->toArray();
+        $datos['plantillas_whatsapp'] = PlantillasWhatsapp::resueltas($tenant, PlantillasWhatsapp::GRUPO_COMPRADOR);
+
+        return $datos;
     }
 
     public function products(Request $request, string $slug, ViewCounter $vistas): JsonResponse

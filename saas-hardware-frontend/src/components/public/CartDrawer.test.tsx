@@ -119,6 +119,29 @@ describe('CartDrawer (checkout)', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('con un mensaje propio de la tienda, WhatsApp se abre con ese texto (MOD-25)', async () => {
+    const user = userEvent.setup();
+    const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue(pedidoCreado(8, 200));
+    useCartStore.getState().addItem('tienda-demo', unProducto({ name: 'Torta de chocolate', price: 200 }));
+    render(
+      <CartDrawer
+        open
+        onClose={vi.fn()}
+        slug="tienda-demo"
+        tenant={unaTienda({ plantillas_whatsapp: { pedido_nuevo: 'Pedido {pedido} de {cliente}:\n{productos}\nNota: {nota}\nTotal {total}' } })}
+      />,
+    );
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(abrir).toHaveBeenCalled());
+    const url = new URL(abrir.mock.calls[0][0] as string);
+    // Sin nota, su línea no sale.
+    expect(url.searchParams.get('text')).toBe('Pedido #8 de Ana Compradora:\n• 1 x Torta de chocolate — $200.00\nTotal $200.00');
+  });
+
   it('manda el correo cuando se escribe', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'open').mockReturnValue(null);

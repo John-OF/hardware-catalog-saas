@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TeamRoleController;
 use App\Http\Controllers\Api\TrashController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WhatsappTemplateController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PlanController;
@@ -251,6 +252,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // equipo por lo mismo que /tenant: los avisos de prueba y de tope.
     Route::get('/plan',      [PlanController::class, 'show']);
 
+    // Mensajes de WhatsApp (MOD-25). Leerlos no pide permiso: Pedidos y Lista
+    // de espera arman sus botones con ellos. Cambiarlos es configurar la tienda.
+    Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
+
     // Estadísticas
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->middleware('permiso:resumen.ver');
 
@@ -322,6 +327,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     Route::middleware('permiso:tienda.configurar')->group(function () {
         Route::put('/tenant', [TenantController::class, 'update']);
         Route::post('/tenant/custom-domain/verify', [TenantController::class, 'verifyCustomDomain']);
+        Route::put('/whatsapp-templates', [WhatsappTemplateController::class, 'update']);
     });
 
     // Páginas informativas privadas

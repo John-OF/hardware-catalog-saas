@@ -292,10 +292,57 @@
   grid-column: span 2;
 }
 
-:where(.page-orders) .phone-row {
+/* El mensaje de WhatsApp del detalle (MOD-25): qué plantilla, cómo queda y el
+   botón que abre WhatsApp con ese texto. */
+:where(.page-orders) .whatsapp-composer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-orders) .whatsapp-composer label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+:where(.page-orders) .whatsapp-composer select {
+  width: 100%;
+}
+
+:where(.page-orders) .whatsapp-composer-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+:where(.page-orders) .whatsapp-composer-actions .btn-whatsapp {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8rem;
+}
+
+:where(.page-orders) .whatsapp-preview {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(var(--overlay-mix), 0.03);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--success);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+:where(.page-orders) .whatsapp-composer-link {
+  font-size: 0.8rem;
+  color: var(--primary);
 }
 
 :where(.page-orders) .btn-whatsapp {
@@ -313,9 +360,14 @@
   transition: var(--transition);
 }
 
-:where(.page-orders) .btn-whatsapp:hover {
+:where(.page-orders) .btn-whatsapp:hover:not(:disabled) {
   background: var(--success);
   color: #fff;
+}
+
+:where(.page-orders) .btn-whatsapp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 :where(.page-orders) .note-text {
@@ -432,26 +484,6 @@
   border-color: #0ea5e9;
   color: #0ea5e9;
   background: rgba(14, 165, 233, 0.1);
-}
-
-:where(.page-orders) .btn-whatsapp-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.3rem 0.6rem;
-  background: rgba(var(--overlay-mix), 0.03);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: var(--transition);
-}
-
-:where(.page-orders) .btn-whatsapp-secondary:hover {
-  background: rgba(var(--overlay-mix), 0.06);
-  color: var(--text-primary);
 }
 
 :where(.page-orders) .spinner-hover {

@@ -297,6 +297,9 @@ return [
         'tax_rate' => 'tasa del impuesto',
         'tax_included' => 'impuesto incluido en el precio',
         'payment_methods' => 'métodos de pago',
+        // MOD-25: cada mensaje lleva su nombre al validar (ver
+        // WhatsappTemplateController); este es el de la lista entera.
+        'plantillas' => 'mensajes de WhatsApp',
         'payment_methods.yape.phone' => 'teléfono de Yape',
         'payment_methods.yape.holder_name' => 'titular de Yape',
         'payment_methods.plin.phone' => 'teléfono de Plin',

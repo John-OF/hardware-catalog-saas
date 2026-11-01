@@ -369,6 +369,8 @@ app/
 │   └── DomainVerifier.php  # Comprueba el TXT del dominio propio
 └── Support/
     ├── PlanGate.php        # Aplica los límites del plan
+    ├── PlantillasWhatsapp.php # Los mensajes de WhatsApp de cada tienda (MOD-25): cuál toca, qué se
+    │                       # publica, qué se guarda y qué variables admite cada uno
     ├── Permisos.php        # Qué puede cada persona del panel (MOD-21): admin todo, staff su rol
     ├── Bitacora.php        # Anota en la actividad lo que hace el equipo desde el panel
     ├── Paginacion.php      # Filas por página de un listado, con tope de 100
@@ -405,6 +407,9 @@ config/permisos.php    # Los permisos por acción del equipo, por área, con lo 
                        # uno (MOD-21). El frontend copia solo las claves (utils/permisos.ts)
 config/component_specs.php # Las specs con nombre fijo de cada tipo de componente (FUN-8).
                        # Sin copia en el frontend: la sirve GET /api/public/component-specs
+config/plantillas_whatsapp.php # Los diez mensajes de WhatsApp de fábrica y las variables de
+                       # cada uno (MOD-25). Única copia de los textos: el frontend copia solo
+                       # las claves (utils/plantillasWhatsapp.ts) y un test compara las dos
 config/currencies.php  # Monedas que puede elegir una tienda y cómo se escribe cada una:
                        # separadores y patrón (FUN-23). Copia en utils/money.ts, y un
                        # test comprueba que no se separen.
@@ -445,7 +450,7 @@ tests/Feature/         # 91 archivos, 983 tests (+1 en tests/Unit)
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/` | Datos y branding de la tienda (solo columnas públicas) |
+| GET | `/` | Datos y branding de la tienda (solo columnas públicas), con `plantillas_whatsapp`: los tres mensajes del comprador ya resueltos (MOD-25). Los de la tienda nunca salen aquí; `resolve-domain` devuelve lo mismo |
 | GET | `/categories` | Categorías activas (con `component_type`) |
 | GET | `/products` | Búsqueda, filtros (`category_id`, `component_type`, `specs`, `in_stock`), orden y paginación. Con `ids[]`, solo esos productos y sin caché: las piezas de un armado compartido (MOD-20) |
 | GET | `/facets` | Valores de spec reales del catálogo, para los filtros |
@@ -480,6 +485,7 @@ criterio están en `routes/api.php`:
 | GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | `resumen.ver` |
 | GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **solo salen con `costos.ver`** (MOD-6) | `reportes.ver` |
 | GET | `/api/plan` | Plan, límites y consumo | — |
+| GET · PUT | `/api/whatsapp-templates` | Los diez mensajes de WhatsApp de la tienda (MOD-25): `GET` trae cada uno con `texto` (el que usa hoy), `de_fabrica`, `personalizada`, `grupo` (`comprador`/`tienda`) y las `variables` que admite, más `max` y la descripción de cada variable. `PUT {"plantillas": {"clave": "texto" \| null}}` guarda solo las que llegan; `null`, vacío o el texto de fábrica vuelven al de fábrica. Una variable que ese mensaje no admite, 422 con la lista de las que sí | `GET` —; `PUT` `tienda.configurar` |
 | GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | `GET` —; `PUT` `tienda.configurar` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | `tienda.configurar` |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe quien tiene `costos.ver`: si la clave no llega, el costo guardado **no se toca** (MOD-6). `archivos_enviados`: cuántas fotos manda el formulario; si llegan menos —PHP descarta en silencio las que pasan de `max_file_uploads`—, 422 y no se guarda nada (INF-12). Una foto que no cabría en la memoria de PHP al procesarla, 422 con sus medidas (INF-14). El listado trae `waitlist_count` —las esperas pendientes de la lista de espera— por producto y, desde FUN-25, por variante: el formulario lo usa para avisar antes de quitar una variante con gente esperando, porque al guardar se borran con ella | `productos.ver` (leer) · `productos.editar` (alta, edición, duplicar, reordenar) · `productos.borrar` (`DELETE`) |
@@ -573,7 +579,7 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 1018 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 1037 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
@@ -617,6 +623,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/dashboard/activity` | Actividad del panel (filtros en la URL: `area`, `persona`, `pagina`) |
 | `/dashboard/trash` | Papelera de productos y pedidos (`MOD-8`; el tipo va en la URL: `tipo`, `pagina`) |
 | `/dashboard/coupons` | Cupones de descuento (`MOD-4`) |
+| `/dashboard/whatsapp` | Mensajes de WhatsApp de la tienda, con variables y vista previa (`MOD-25`; permiso `tienda.configurar`) |
 | `/dashboard/settings` | Branding, tema, portada, dominio, favicon |
 
 Cada pantalla del panel menos el resumen y Equipo pide el permiso de «ver» de su área
@@ -641,7 +648,7 @@ src/
 │   ├── auth/       # Login, RegisterStore, ForgotPassword, ResetPassword
 │   ├── legal/      # Terminos, Privacidad, Reembolsos (INF-15) y su marco común, PaginaLegal
 │   ├── dashboard/  # Overview, Products, Categories, Orders, Pages, Reviews,
-│   │               # Waitlist, Users, Activity, Settings (layout en DashboardPage)
+│   │               # Waitlist, Users, Activity, Settings, Whatsapp (layout en DashboardPage)
 │   ├── platform/   # PlatformLogin, PlatformLayout, PlatformOverview, Platform (tiendas),
 │   │               # PlatformTenant (ficha), PlatformLogs
 │   └── public/     # Catalog, ProductDetail, PcBuilder, PageDetail
@@ -665,7 +672,8 @@ src/
 │                   # paymentMethods (qué mostrarle al comprador), subidas (qué se
 │                   # puede subir y cuánto, copia de config/subidas.php, UI-15),
 │                   # specsFijas (repartir y pintar las specs de FUN-8),
-│                   # armadoCompartido (el armado de PC en la URL, MOD-20)
+│                   # armadoCompartido (el armado de PC en la URL, MOD-20),
+│                   # plantillasWhatsapp (rellenar un mensaje y el enlace wa.me, MOD-25)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -743,7 +751,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 309 tests (Vitest + Testing Library, jsdom)
+npm test          # 331 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -832,6 +840,14 @@ tienen tests.
   servidor y `specsParaMostrar()` (`utils/specsFijas.ts`) en el navegador, nunca la clave a pelo.
   **Renombrar una clave deja huérfano lo guardado con la vieja**, como renombrar una columna; la
   etiqueta se cambia libre.
+- **Mensajes de WhatsApp** (`MOD-25`): ningún texto de un mensaje se escribe en una pantalla. Los de
+  fábrica viven en `config/plantillas_whatsapp.php` (con las variables que admite cada uno) y llegan
+  ya resueltos: el catálogo, con la tienda; el panel, por `GET /api/whatsapp-templates`. El navegador
+  los rellena con `rellenarPlantilla()` y abre el chat con `enlaceDeWhatsapp()` (`utils/plantillasWhatsapp.ts`),
+  nunca con un `wa.me` armado a mano. Se rellenan en el navegador porque abrir WhatsApp después de
+  esperar una petición lo bloquea como ventana emergente. Un mensaje nuevo va en la config **y** en
+  `PLANTILLAS` de ese archivo (copia solo de las claves). **Renombrar una clave deja huérfano** lo que
+  una tienda ya escribió. Una línea cuyas variables quedan todas vacías no se envía.
 - **Las reglas del armador viven solo en `App\Support\Compatibilidad`** y leen solo las specs con
   nombre fijo: una spec libre ("Socket: AM5" escrita a mano) cuenta como dato que falta, y se dice.
   El navegador pregunta a `GET /api/public/{slug}/builder/compatibility` y pinta; no tiene copia de

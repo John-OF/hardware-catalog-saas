@@ -317,8 +317,14 @@
   transition: var(--transition);
 }
 
-:where(.page-waitlist) .btn-whatsapp:hover {
+:where(.page-waitlist) .btn-whatsapp:hover:not(:disabled) {
   background: rgba(37, 211, 102, 0.18);
+}
+
+/* MOD-25: mientras no llega la plantilla «Volvió el stock». */
+:where(.page-waitlist) .btn-whatsapp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Paginacion */

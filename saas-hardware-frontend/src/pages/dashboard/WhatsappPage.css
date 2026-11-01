@@ -1,0 +1,218 @@
+/* Estilos de <WhatsappPage> (MOD-25).
+
+   Acotados con :where(.page-whatsapp), como las demas paginas del panel (TEC-6).
+   `.glass-card`, `.premium-input`, `.btn-primary`, `.btn-secondary`, `.badge`
+   y `.state-card` son del sistema de diseno y no se redefinen aqui (UI-5). */
+
+:where(.page-whatsapp).whatsapp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+:where(.page-whatsapp) .page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+:where(.page-whatsapp) .page-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 75ch;
+  line-height: 1.5;
+}
+
+:where(.page-whatsapp) code {
+  font-size: 0.85em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: rgba(var(--overlay-mix), 0.06);
+}
+
+/* Grupos: lo que manda la tienda y lo que manda el comprador */
+
+:where(.page-whatsapp) .whatsapp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+:where(.page-whatsapp) .whatsapp-group h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+:where(.page-whatsapp) .whatsapp-group-description {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: -0.6rem 0 0;
+}
+
+/* Una tarjeta por mensaje */
+
+:where(.page-whatsapp) .whatsapp-card {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+:where(.page-whatsapp) .whatsapp-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+:where(.page-whatsapp) .whatsapp-card-head h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem;
+}
+
+:where(.page-whatsapp) .whatsapp-card-head p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+:where(.page-whatsapp) .whatsapp-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+:where(.page-whatsapp) .whatsapp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+:where(.page-whatsapp) .whatsapp-editor textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+:where(.page-whatsapp) .whatsapp-variables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+:where(.page-whatsapp) .whatsapp-variable {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(var(--overlay-mix), 0.03);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+:where(.page-whatsapp) .whatsapp-variable:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+:where(.page-whatsapp) .whatsapp-error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+:where(.page-whatsapp) .whatsapp-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-whatsapp) .whatsapp-count {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+:where(.page-whatsapp) .whatsapp-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-whatsapp) .whatsapp-restore,
+:where(.page-whatsapp) .whatsapp-save-one {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* La vista previa, como una burbuja de chat */
+
+:where(.page-whatsapp) .whatsapp-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+:where(.page-whatsapp) .whatsapp-preview-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+:where(.page-whatsapp) .whatsapp-bubble {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-md);
+  border-top-left-radius: 4px;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.25);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Guardar todos: al final. No va `sticky` porque en el panel no se pegaria a la
+   ventana sino a `.dashboard-main`, que tiene `overflow-y` y crece con la pagina;
+   por eso cada tarjeta trae su propio boton de guardar. */
+
+:where(.page-whatsapp) .whatsapp-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.25rem;
+}
+
+:where(.page-whatsapp) .whatsapp-save-bar span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 860px) {
+  :where(.page-whatsapp) .whatsapp-card-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

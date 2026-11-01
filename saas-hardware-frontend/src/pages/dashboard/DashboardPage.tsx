@@ -29,6 +29,8 @@ import {
   Trash2,
   // Cupones (MOD-4).
   Ticket,
+  // Mensajes de WhatsApp (MOD-25). `MessageSquare` ya es Reseñas.
+  MessageCircle,
   Sun,
   Moon
 } from 'lucide-react';
@@ -164,6 +166,7 @@ export default function DashboardPage() {
     if (location.pathname.includes('/dashboard/activity')) return 'Actividad';
     if (location.pathname.includes('/dashboard/trash')) return 'Papelera';
     if (location.pathname.includes('/dashboard/coupons')) return 'Cupones';
+    if (location.pathname.includes('/dashboard/whatsapp')) return 'Mensajes de WhatsApp';
     return 'Dashboard';
   };
 
@@ -369,9 +372,23 @@ export default function DashboardPage() {
             </NavLink>
           )}
 
+          {/* MOD-25: junto a Configuración, que es el mismo permiso y el mismo
+              tipo de cosa: lo que la tienda decide una vez y luego usa sola. */}
           {ve('tienda.configurar') && (
             <NavLink
-              to="/dashboard/settings" 
+              to="/dashboard/whatsapp"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <MessageCircle size={20} />
+              <span>Mensajes de WhatsApp</span>
+              <ChevronRight className="nav-arrow" size={16} />
+            </NavLink>
+          )}
+
+          {ve('tienda.configurar') && (
+            <NavLink
+              to="/dashboard/settings"
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               onClick={() => setIsSidebarOpen(false)}
             >

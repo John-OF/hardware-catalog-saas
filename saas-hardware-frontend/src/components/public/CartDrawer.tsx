@@ -12,6 +12,7 @@ import { mensajeDeError } from '../../api/erroresDeFormulario';
 import type { Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { metodosDePagoActivos } from '../../utils/paymentMethods';
+import { enlaceDeWhatsapp, lineaDeProducto, rellenarPlantilla, textoDeEntrega, textoDePagos } from '../../utils/plantillasWhatsapp';
 import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
 import { claveDeLinea, datosDeVenta, nombreConVariante, precioVisible } from '../../utils/variants';
 import { tramoPara, tramosDeVenta } from '../../utils/preciosPorCantidad';
@@ -139,42 +140,35 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
   }, [isCustomerAuthenticated, user, open]);
 
   /**
+   * El mensaje del pedido, con la plantilla de la tienda (MOD-25).
+   *
    * `total` llega del pedido ya creado, no se recalcula aquí: es lo que de
    * verdad va a cobrar la tienda (incluido el envío, calculado en el
    * servidor) y no puede desalinearse de `totalConEnvio`.
    */
-  const buildWhatsappMessage = (orderNumber: number, total: number) => {
-    const lines = items.map((i) => {
-      // MOD-15: con la cantidad, o el mensaje diría un subtotal de línea que no
-      // cuadra con el total que acaba de cobrar el servidor.
-      const { precio } = datosDeVenta(i.product, i.variant, i.quantity);
-      return `• ${i.quantity} x ${nombreConVariante(i.product.name, i.variant?.nombre)} — ${money(precio * i.quantity)}`;
-    });
-
-    // MOD-1: solo se menciona si la tienda de verdad tiene envío. "Recojo en
-    // tienda" con una sola opción posible no le dice nada nuevo a nadie.
-    const lineaDeEnvio = conEnvio
-      ? `Entrega: ${deliveryMethod === 'delivery' ? `Delivery (${money(costoEnvio)})` : 'Recojo en tienda'}\n`
-      : '';
-
-    // MOD-3: cómo pagar, para que no tenga que preguntarlo por chat.
-    const lineaDePago = metodosDePago.length > 0
-      ? `\nFormas de pago: ${metodosDePago.map((m) => m.etiqueta + (m.detalle ? ` (${m.detalle})` : '')).join(', ')}\n`
-      : '';
-
-    return (
-      `Hola ${tenant.name}, quiero hacer este pedido:\n\n` +
-      `${lines.join('\n')}\n\n` +
-      `*Total: ${money(total)}*\n\n` +
-      `Nombre: ${name}\n` +
-      lineaDeEnvio +
-      (note ? `Nota: ${note}\n` : '') +
-      lineaDePago +
+  const buildWhatsappMessage = (orderNumber: number, total: number) =>
+    rellenarPlantilla(tenant.plantillas_whatsapp?.pedido_nuevo ?? '', {
+      tienda: tenant.name,
       // FUN-3: el correlativo de la tienda. Antes iba un trozo del UUID, que ni
       // el comprador podía leer en voz alta ni el dueño buscar en el panel.
-      `\n(Pedido #${orderNumber})`
-    );
-  };
+      pedido: `#${orderNumber}`,
+      productos: items
+        .map((i) => {
+          // MOD-15: con la cantidad, o el mensaje diría un subtotal de línea
+          // que no cuadra con el total que acaba de cobrar el servidor.
+          const { precio } = datosDeVenta(i.product, i.variant, i.quantity);
+          return lineaDeProducto(i.quantity, nombreConVariante(i.product.name, i.variant?.nombre), money(precio * i.quantity));
+        })
+        .join('\n'),
+      total: money(total),
+      cliente: name,
+      // MOD-1: vacía (y la línea no sale) si la tienda no tiene envío: "Recojo
+      // en tienda" con una sola opción posible no le dice nada nuevo a nadie.
+      entrega: conEnvio ? textoDeEntrega(deliveryMethod, money(costoEnvio)) : '',
+      nota: note,
+      // MOD-3: cómo pagar, para que no tenga que preguntarlo por chat.
+      pagos: textoDePagos(metodosDePago),
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,9 +193,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
       // El total del pedido creado, no `totalConEnvio`: es lo que el
       // servidor de verdad cobró.
-      const text = encodeURIComponent(buildWhatsappMessage(order.number, Number(order.total)));
-      const cleanPhone = tenant.whatsapp_number.replace(/[^0-9]/g, '');
-      window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+      window.open(enlaceDeWhatsapp(tenant.whatsapp_number, buildWhatsappMessage(order.number, Number(order.total))), '_blank');
 
       toast.success('Pedido enviado. Continúa la conversación por WhatsApp.');
       clear();

@@ -49,6 +49,7 @@ import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { claveDeLinea, datosDeVenta, nombreConVariante, precioEsDesde, precioVisible, tieneVariantes } from '../../utils/variants';
 import { tramosDeVenta } from '../../utils/preciosPorCantidad';
 import { specsParaMostrar } from '../../utils/specsFijas';
+import { enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function ProductDetailPage() {
@@ -368,19 +369,18 @@ export default function ProductDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLightboxOpen, slug, resolvedSlug, isCustomDomain, navigate]);
 
-  // Whatsapp redirect handler
+  // La consulta por WhatsApp, con la plantilla de la tienda (MOD-25).
   const handleWhatsappQuery = () => {
     if (!product || !tenant) return;
 
-    const currentUrl = window.location.href;
-    const finalPrice = datosDeVenta(product, varianteElegida).precio;
-    const baseMessage = `Hola, estoy interesado en el producto *${nombreConVariante(product.name, varianteElegida?.nombre)}* (Precio: ${money(finalPrice)}) de tu catálogo virtual. ¿Se encuentra disponible?\n\nEnlace del producto: ${currentUrl}`;
-    const encodedMessage = encodeURIComponent(baseMessage);
-    
-    // Quitar cualquier carácter que no sea numérico del teléfono
-    const cleanPhone = tenant.whatsapp_number.replace(/[^0-9]/g, '');
-    
-    window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
+    const mensaje = rellenarPlantilla(tenant.plantillas_whatsapp?.consulta_producto ?? '', {
+      tienda: tenant.name,
+      producto: nombreConVariante(product.name, varianteElegida?.nombre),
+      precio: money(datosDeVenta(product, varianteElegida).precio),
+      enlace: window.location.href,
+    });
+
+    window.open(enlaceDeWhatsapp(tenant.whatsapp_number, mensaje), '_blank');
   };
 
   if (isLoading) {

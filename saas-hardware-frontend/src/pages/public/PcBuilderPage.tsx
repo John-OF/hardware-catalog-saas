@@ -40,6 +40,7 @@ import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 import { specsParaMostrar } from '../../utils/specsFijas';
 import { armadoDesdeElEnlace, escribirArmadoEnElEnlace, leerArmadoDelEnlace } from '../../utils/armadoCompartido';
+import { enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 
 /**
  * Pasos predefinidos para armar la PC.
@@ -352,23 +353,24 @@ export default function PcBuilderPage() {
     }
     if (!confirmarAlPedir()) return;
 
-    let message = `*Hola! He armado una PC desde tu catálogo virtual:*\n\n`;
-    items.forEach(([key, prod]) => {
-      const step = BUILDER_STEPS.find(s => s.key === key);
-      const variante = variantesElegidas[key];
-      message += `• *${step?.name}:* ${nombreConVariante(prod.name, variante?.nombre)} (${money(datosDeVenta(prod, variante).precio)})\n`;
+    // MOD-25: con la plantilla de la tienda.
+    const message = rellenarPlantilla(tenant?.plantillas_whatsapp?.armado_pc ?? '', {
+      tienda: tenant?.name,
+      piezas: items
+        .map(([key, prod]) => {
+          const step = BUILDER_STEPS.find(s => s.key === key);
+          const variante = variantesElegidas[key];
+          return `• *${step?.name}:* ${nombreConVariante(prod.name, variante?.nombre)} (${money(datosDeVenta(prod, variante).precio)})`;
+        })
+        .join('\n'),
+      total: money(totalPrice),
+      // Vacío (y la línea no sale) mientras el servidor no ha dicho el consumo.
+      consumo: consumo ? `${consumo.estimado}W (recomendado: ${consumo.recomendado}W)` : '',
+      // MOD-20: con el enlace, la tienda abre exactamente este armado.
+      enlace: window.location.href,
     });
 
-    message += `\n*Total Estimado:* ${money(totalPrice)}\n`;
-    if (consumo) {
-      message += `*Consumo del Sistema:* ${consumo.estimado}W (Recomendado: ${consumo.recomendado}W)\n`;
-    }
-    // MOD-20: con el enlace, la tienda abre exactamente este armado.
-    message += `*Ver el armado:* ${window.location.href}\n`;
-    message += `\nPor favor, confírmenme stock y disponibilidad. Gracias!`;
-
-    const url = `https://wa.me/${tenant?.whatsapp_number?.replace('+', '') ?? ''}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    window.open(enlaceDeWhatsapp(tenant?.whatsapp_number, message), '_blank');
   };
 
   /**
