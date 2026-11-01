@@ -587,7 +587,7 @@ php artisan bitacora:purgar          # Borra la actividad de tienda de +365 día
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
 php artisan platform:quitar-dos-pasos {email}  # Quita la verificación en dos pasos a un operador y le cierra las sesiones (SEC-9)
 vendor/bin/pint         # Formateo (Laravel Pint)
-composer dev            # serve + queue:listen + pail + vite en paralelo
+composer dev            # API (8000) + queue:listen + Vite del frontend (5173), en paralelo y sin pail
 composer setup          # install + .env + key + migrate + build
 ```
 

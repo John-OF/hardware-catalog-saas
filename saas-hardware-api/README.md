@@ -22,5 +22,5 @@ php artisan queue:work        # OJO: sin esto no sale ningún correo
 ```bash
 php artisan test        # Tests (el recuento, en el README de la raíz)
 vendor/bin/pint         # Formateo
-composer dev            # serve + queue + logs + vite en paralelo
+composer dev            # API (8000) + cola + Vite del frontend (5173); detalle en el README de la raíz
 ```

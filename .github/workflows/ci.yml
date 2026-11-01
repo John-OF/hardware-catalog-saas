@@ -109,9 +109,20 @@ jobs:
       # tumba la pantalla entera. Estaba en `CatalogPage`, se arreglo, y hoy la
       # cuenta es cero en todo `src`; este paso es lo que impide que vuelva sin
       # que nadie se entere, sin tener que esperar a que bajen los otros 74.
+      #
+      # TEC-22: ESLint sale con 1 si encuentra algo (hoy siempre, por los de
+      # arriba) y con 2 si no pudo revisar nada (configuracion rota, un plugin que
+      # no carga tras actualizar). Con un `|| true` a secas, el 2 dejaba el json
+      # vacio y el paso decia "sin violaciones" sin haber mirado un archivo.
       - name: Lint - regla de hooks (bloqueante)
         run: |
-          npx eslint src -f json > /tmp/eslint.json || true
+          estado=0
+          npx eslint src -f json > /tmp/eslint.json || estado=$?
+          if [ "$estado" -gt 1 ]; then
+            echo "::error::ESLint no pudo ejecutarse (codigo $estado): la regla de hooks no se ha comprobado"
+            npx eslint src || true
+            exit 1
+          fi
           if grep -q '"ruleId":"react-hooks/rules-of-hooks"' /tmp/eslint.json; then
             echo "::error::Hay hooks detras de un return temprano (react-hooks/rules-of-hooks)"
             npx eslint src | grep -B 6 'rules-of-hooks' || true
@@ -164,9 +175,26 @@ jobs:
         working-directory: saas-hardware-api
         run: composer audit --locked
 
-      # Sin --audit-level: hoy esta en cero, asi que cualquier aviso nuevo (de la
-      # severidad que sea) debe verse. Si algun dia hay ruido de severidad baja
-      # que no se puede resolver, se sube el umbral aqui con su porque.
-      - name: npm audit
+      # TEC-22: los dos audits de npm corren aunque falle `composer audit`. En
+      # TEC-22 el fallo de Composer corto el paso de npm, y sus 19 avisos solo se
+      # vieron en local.
+      #
+      # Lo que llega al navegador (dependencies), sin umbral: cualquier aviso nuevo,
+      # de la severidad que sea, pone esto en rojo.
+      - name: npm audit (produccion, sin umbral)
+        if: ${{ !cancelled() }}
         working-directory: saas-hardware-frontend
-        run: npm audit
+        run: npm audit --omit=dev
+
+      # Las herramientas de desarrollo (devDependencies), desde alto. Bajo este
+      # umbral queda, a sabiendas, la cadena de eslint y typescript-eslint por
+      # `minimatch` (GHSA-g3hv-75wg-m249, medio): solo esta arreglado en la 11, que
+      # eslint 10 aun no admite, y `npm audit fix --force` "lo arregla" bajando
+      # typescript-eslint a la 8.14 y @eslint/js a la 9. Es una denegacion de
+      # servicio al expandir globs, en el lint, con nuestra propia configuracion,
+      # y no llega al build. Cuando eslint admita minimatch 11, `npm audit fix`
+      # lo cierra y este umbral vuelve a quitarse.
+      - name: npm audit (desarrollo, desde alto)
+        if: ${{ !cancelled() }}
+        working-directory: saas-hardware-frontend
+        run: npm audit --audit-level=high
