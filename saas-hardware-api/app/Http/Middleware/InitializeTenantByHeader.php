@@ -10,24 +10,37 @@ use Illuminate\Support\Facades\Auth;
 
 class InitializeTenantByHeader
 {
+    /**
+     * Lo único que el equipo de una tienda cerrada puede hacer en el panel
+     * (FUN-28): saber quién es y por qué está cerrada, y salir. Lo mismo que
+     * deja `platform.dos-pasos` a un operador sin la verificación activa.
+     */
+    private const ABIERTAS_CON_LA_TIENDA_CERRADA = ['api/auth/me', 'api/auth/logout'];
+
+    /** El `motivo` del 403 de una tienda cerrada, para que el panel lo distinga. */
+    public const MOTIVO_TIENDA_CERRADA = 'tienda_cerrada';
+
     public function handle(Request $request, Closure $next): mixed
     {
         // El frontend envía el slug del tenant en el header X-Tenant
         $slug = $request->header('X-Tenant');
         $tenant = null;
 
+        // Sin filtrar por `is_active` (FUN-28): una tienda cerrada se busca igual,
+        // para poder decirle a SU equipo por qué está cerrada. A cualquier otro
+        // le sigue respondiendo el mismo 404 de antes, más abajo.
         if ($slug) {
-            $tenant = Tenant::where('slug', $slug)->where('is_active', true)->first();
+            $tenant = Tenant::where('slug', $slug)->first();
         } else {
             // Resolver por dominio personalizado. `conDominioVerificado()` es a
             // proposito (FUN-6): sin ella, cualquiera podia escribir el dominio
             // de otra tienda y entrar aqui con SU host, antes de demostrar que
             // el dominio es suyo.
             $host = $request->getHost();
-            $tenant = Tenant::conDominioVerificado()->where('custom_domain', $host)->where('is_active', true)->first();
+            $tenant = Tenant::conDominioVerificado()->where('custom_domain', $host)->first();
         }
 
-        if (!$tenant) {
+        if (! $tenant || (! $tenant->is_active && ! $this->esDeSuEquipo($tenant))) {
             return response()->json(['message' => 'Tienda no encontrada, inactiva o no especificada.'], 404);
         }
 
@@ -39,10 +52,35 @@ class InitializeTenantByHeader
             }
         }
 
+        // FUN-28: antes, una tienda cerrada respondía 404 a todo y el panel lo
+        // pintaba como un fallo cualquiera («Error al cargar métricas»), sin decir
+        // que estaba cerrada ni qué hacer; y el logout también daba 404, así que
+        // el token quedaba vivo. Ahora `me` y `logout` pasan, y el resto responde
+        // 403 con el motivo, que es lo que lleva al panel a su pantalla.
+        if (! $tenant->is_active && ! $request->is(...self::ABIERTAS_CON_LA_TIENDA_CERRADA)) {
+            return response()->json([
+                'message' => 'Tu tienda está cerrada: el catálogo no se ve y el panel no deja trabajar hasta que se reabra.',
+                'motivo'  => self::MOTIVO_TIENDA_CERRADA,
+                'cierre'  => $tenant->cierre(),
+            ], 403);
+        }
+
         $tenant->makeCurrent();
         Observabilidad::tienda($tenant->slug);
 
         return $next($request);
+    }
+
+    /**
+     * Si quien pregunta es del panel de esa misma tienda. Solo a esa persona se le
+     * dice que la tienda existe y está cerrada: para cualquier otro, una tienda
+     * cerrada sigue sin existir.
+     */
+    private function esDeSuEquipo(Tenant $tenant): bool
+    {
+        $user = Auth::user();
+
+        return $user !== null && $user->tenant_id === $tenant->id && $user->esDelPanel();
     }
 
     /**

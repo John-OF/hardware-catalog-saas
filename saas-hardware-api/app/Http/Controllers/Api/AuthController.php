@@ -183,10 +183,14 @@ class AuthController extends Controller
         // rol del usuario, que los middleware leen en cada peticion (FUN-4).
         $token = $user->createToken('spa-token', [$user->role], now()->addDays(7));
 
+        // FUN-28: con la tienda cerrada se entra igual —la persona está activa y
+        // la contraseña es buena—, pero a una pantalla que explica por qué está
+        // cerrada y cómo reabrirla. `cierre` es lo que la decide.
         return response()->json([
             'token'  => $token->plainTextToken,
             'user'   => new UserResource($user),
             'tenant' => $user->tenant,
+            'cierre' => $user->tenant?->cierre(),
         ]);
     }
 
@@ -409,6 +413,10 @@ class AuthController extends Controller
             // lectura, y tiene que salir de aquí y no de lo que el navegador
             // recuerde: sale del token, que es lo único que decide de verdad.
             'soporte' => \App\Support\Suplantacion::activa($request),
+            // FUN-28: `me` es una de las dos rutas que responden con la tienda
+            // cerrada (`InitializeTenantByHeader`); al recargar el panel, es la
+            // que le dice que pinte la pantalla de tienda cerrada.
+            'cierre'  => $request->user()->tenant?->cierre(),
         ]);
     }
 }

@@ -280,6 +280,16 @@ return [
         'user_id' => 'usuario',
         'plan' => 'plan',
 
+        // Panel de plataforma: rubro (MOD-19) y pagos del plan (INF-23)
+        'vertical' => 'rubro',
+        'plan_ends_at' => 'pagado hasta',
+        'months' => 'meses',
+        'amount_usd' => 'monto',
+        'method' => 'medio de pago',
+        'reference' => 'referencia',
+        'notes' => 'nota',
+        'paid_on' => 'fecha de pago',
+
         // Configuración de la tienda
         'logo' => 'logo',
         'logo_url' => 'URL del logo',

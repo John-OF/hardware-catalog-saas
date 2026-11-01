@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PaginatedResponse, Tenant, User } from '../types';
+import type { CierreDeTienda, PaginatedResponse, Tenant, User } from '../types';
 
 /**
  * Cliente HTTP del panel de plataforma (SAAS-4).
@@ -132,18 +132,26 @@ export const platformLogout = async (): Promise<void> => {
   await platformApi.post('/platform/logout');
 };
 
+/** `por_vencer` (INF-23): abiertas con el plan pagado venciendo esta semana, las más cercanas primero. */
+export type FiltroDeEstado = 'active' | 'suspended' | 'por_vencer';
+
 export const getPlatformTenants = async (params?: {
   search?: string;
-  status?: 'active' | 'suspended';
+  status?: FiltroDeEstado;
   page?: number;
 }): Promise<PaginatedResponse<PlatformTenant>> => {
   const { data } = await platformApi.get<PaginatedResponse<PlatformTenant>>('/platform/tenants', { params });
   return data;
 };
 
+/**
+ * `plan_ends_at` (INF-23) corrige hasta qué día está pagada, como `AAAA-MM-DD`:
+ * la salida cuando un pago se apuntó mal. Solo vale si la tienda ya tiene pagos.
+ * Cambiar `plan` aquí no es cobrarlo: no toca ninguna fecha.
+ */
 export const updatePlatformTenant = async (
   id: string,
-  payload: { is_active?: boolean; plan?: string; vertical?: string },
+  payload: { is_active?: boolean; plan?: string; vertical?: string; plan_ends_at?: string },
 ): Promise<PlatformTenant> => {
   const { data } = await platformApi.put<PlatformTenant>(`/platform/tenants/${id}`, payload);
   return data;
@@ -171,6 +179,8 @@ export interface PlatformStats {
     publicadas: number;
     /** Activas que no han subido ni un producto: se registraron y no arrancaron. */
     sin_arrancar: number;
+    /** Abiertas con el plan pagado venciendo esta semana: a quién cobrarle (INF-23). */
+    por_vencer: number;
   };
   altas: { hoy: number; semana: number; mes: number };
   /** Cuántas tiendas hay en cada plan, con la clave del plan como propiedad. */
@@ -218,6 +228,7 @@ export interface PlatformTenantDetail {
    * Salen de `config/verticales.php`; el navegador no tiene copia.
    */
   verticales: Record<string, string>;
+  membresia: MembresiaDeTienda;
   equipo: User[];
   /** Clientes registrados del catálogo: comparten tabla con el equipo pero no cuentan para el plan. */
   clientes: number;
@@ -234,6 +245,63 @@ export interface PlatformTenantDetail {
 
 export const getPlatformTenant = async (id: string): Promise<PlatformTenantDetail> => {
   const { data } = await platformApi.get<PlatformTenantDetail>(`/platform/tenants/${id}`);
+  return data;
+};
+
+/* --- Pagos del plan (INF-23) ----------------------------------------------- */
+
+/** Un cobro apuntado por el operador. No se edita ni se borra: es el registro de un ingreso. */
+export interface PagoDeTienda {
+  id: string;
+  tenant_id: string;
+  plan: string;
+  months: number;
+  /** En USD, la moneda de los planes, con dos decimales: "29.00". */
+  amount_usd: string;
+  method: string;
+  reference: string | null;
+  notes: string | null;
+  /** El día que llegó el dinero, `AAAA-MM-DD`. */
+  paid_on: string;
+  starts_at: string;
+  ends_at: string;
+  registered_by_email: string | null;
+  created_at: string;
+}
+
+/**
+ * Lo que la ficha necesita para el plan pagado: por qué está cerrada, los pagos
+ * y lo que pide el formulario. `desde` es la fecha desde la que contarían los
+ * meses de un pago nuevo; la calcula la API, que es la única que tiene la regla.
+ */
+export interface MembresiaDeTienda {
+  cierre: CierreDeTienda | null;
+  desde: string;
+  meses_max: number;
+  /** Medio de pago => nombre en pantalla. `cortesia` es dar tiempo sin cobrar. */
+  medios: Record<string, string>;
+  planes: Array<{ key: string; label: string; price_usd: number }>;
+  pagos: PagoDeTienda[];
+}
+
+export interface NuevoPago {
+  plan: string;
+  months: number;
+  amount_usd: number;
+  method: string;
+  reference?: string;
+  notes?: string;
+  paid_on: string;
+}
+
+export const registrarPago = async (
+  id: string,
+  pago: NuevoPago,
+): Promise<{ pago: PagoDeTienda; tenant: PlatformTenant; message: string }> => {
+  const { data } = await platformApi.post<{ pago: PagoDeTienda; tenant: PlatformTenant; message: string }>(
+    `/platform/tenants/${id}/payments`,
+    pago,
+  );
   return data;
 };
 

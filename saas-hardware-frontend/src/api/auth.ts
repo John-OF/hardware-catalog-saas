@@ -1,5 +1,5 @@
 import api from './axios';
-import type { AuthResponse, User, Tenant } from '../types';
+import type { AuthResponse, CierreDeTienda, User, Tenant } from '../types';
 
 export const registerStore = async (data: any): Promise<AuthResponse> => {
   const response = await api.post<AuthResponse>('/auth/register', data);
@@ -50,7 +50,14 @@ export const logoutUser = async (): Promise<void> => {
  * navegador: es lo que decide si el panel pinta el aviso de "casa ajena, solo
  * lectura", y esconderlo tocando el navegador no daría permiso para escribir.
  */
-export const getMe = async (): Promise<{ user: User; tenant: Tenant; soporte: boolean }> => {
-  const response = await api.get<{ user: User; tenant: Tenant; soporte: boolean }>('/auth/me');
+export const getMe = async (): Promise<RespuestaDeMe> => {
+  const response = await api.get<RespuestaDeMe>('/auth/me');
   return response.data;
 };
+
+/**
+ * `cierre` (FUN-28): con la tienda cerrada, `me` es una de las dos rutas del
+ * panel que siguen respondiendo, y es lo que dice al recargar que hay que pintar
+ * la pantalla de tienda cerrada.
+ */
+type RespuestaDeMe = { user: User; tenant: Tenant; soporte: boolean; cierre?: CierreDeTienda | null };

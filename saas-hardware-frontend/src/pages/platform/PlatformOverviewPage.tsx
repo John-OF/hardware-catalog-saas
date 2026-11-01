@@ -47,6 +47,14 @@ export default function PlatformOverviewPage() {
           alerta={tiendas.sin_arrancar > 0}
         />
         <Cifra valor={altas.semana} etiqueta="Altas esta semana" pie={`${altas.hoy} hoy · ${altas.mes} en 30 días`} />
+        {/* INF-23: también marcada. Son las que se cierran solas si nadie
+            registra su renovación; el filtro del listado dice cuáles. */}
+        <Cifra
+          valor={tiendas.por_vencer}
+          etiqueta="Vencen esta semana"
+          pie="Plan pagado que termina en 7 días"
+          alerta={tiendas.por_vencer > 0}
+        />
       </section>
 
       <section className="overview-cols">

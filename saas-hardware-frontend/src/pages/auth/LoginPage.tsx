@@ -18,6 +18,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const setTenant = useTenantStore((s) => s.setTenant);
+  const setCierre = useTenantStore((s) => s.setCierre);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,6 +71,8 @@ export default function LoginPage() {
       // Guardar en Zustand
       setAuth(response.token, response.user);
       setTenant(response.tenant);
+      // FUN-28: con la tienda cerrada se entra igual, a la pantalla que lo explica.
+      setCierre(response.cierre ?? null);
 
       toast.success(`¡Bienvenido de nuevo, ${response.user.name}!`);
       

@@ -47,3 +47,12 @@
 .trial-banner p strong {
   color: var(--text-primary);
 }
+
+/* INF-23: el enlace a la plataforma (WhatsApp o correo), solo si hay uno. */
+.trial-banner-enlace {
+  flex-shrink: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}

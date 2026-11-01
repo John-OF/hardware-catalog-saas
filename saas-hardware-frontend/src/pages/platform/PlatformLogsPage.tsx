@@ -20,6 +20,10 @@ const ACCIONES: Record<string, string> = {
   // podía filtrar por ellas.
   'tenant.rescate_admin': 'Rescates de administrador',
   'tenant.prueba_vencida': 'Pruebas cerradas',
+  // INF-23: el plan pagado a mano.
+  'tenant.pago': 'Pagos registrados',
+  'tenant.plan_vencido': 'Planes vencidos',
+  'tenant.fecha_plan': 'Fechas de pago corregidas',
   // SEC-9: lo que pasa con la cuenta del propio operador.
   'operador.dos_pasos_activada': 'Verificación en dos pasos activada',
   'operador.codigo_de_recuperacion': 'Entradas con código de recuperación',

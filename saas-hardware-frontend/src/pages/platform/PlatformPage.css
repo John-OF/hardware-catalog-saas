@@ -104,3 +104,12 @@
   color: var(--primary);
   text-decoration: underline;
 }
+
+/* INF-23: hasta cuándo está pagada, debajo del selector de plan. */
+:where(.page-platform) .plan-hasta {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

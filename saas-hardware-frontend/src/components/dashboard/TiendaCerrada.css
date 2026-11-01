@@ -1,0 +1,215 @@
+/* Estilos de <TiendaCerrada> (FUN-28).
+
+   Sin acotar con `:where(.page-x)`: es un componente (TEC-6), y todas sus clases
+   van prefijadas con `tienda-cerrada`. Se pinta EN LUGAR del panel, dentro de un
+   `.dashboard-layout` vacío para heredar sus tokens de tema claro y oscuro; de
+   ahí el `flex: 1`, porque ese contenedor es una fila flexible. */
+
+.tienda-cerrada {
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  background-color: var(--bg-app);
+}
+
+.tienda-cerrada-card {
+  width: 100%;
+  max-width: 880px;
+  padding: 2.25rem 2rem;
+  text-align: center;
+}
+
+.tienda-cerrada-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  color: var(--warning);
+  background: var(--warning-glow);
+}
+
+.tienda-cerrada-card h1 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.tienda-cerrada-texto {
+  max-width: 560px;
+  margin: 0 auto 0.5rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.tienda-cerrada-aviso {
+  max-width: 560px;
+  margin: 1.25rem auto 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--info);
+  border-radius: 12px;
+  background: rgba(6, 182, 212, 0.1);
+  line-height: 1.5;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.tienda-cerrada-contacto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  text-decoration: none;
+}
+
+.tienda-cerrada-planes {
+  margin-top: 2rem;
+  text-align: left;
+}
+
+.tienda-cerrada-planes h2 {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.tienda-cerrada-lead {
+  margin: 0.4rem auto 1.25rem;
+  max-width: 560px;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.tienda-cerrada-cargando {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.tienda-cerrada-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.tienda-cerrada-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.tienda-cerrada-plan-suyo {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.tienda-cerrada-plan-badge {
+  position: absolute;
+  top: -0.65rem;
+  right: 1rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-on-primary);
+  background: var(--primary);
+}
+
+.tienda-cerrada-plan h3 {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.tienda-cerrada-precio {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tienda-cerrada-precio span {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.tienda-cerrada-plan ul {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+}
+
+.tienda-cerrada-plan li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tienda-cerrada-plan li svg {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.tienda-cerrada-plan li.tienda-cerrada-no {
+  opacity: 0.55;
+}
+
+.tienda-cerrada-plan li.tienda-cerrada-no svg {
+  color: var(--text-secondary);
+}
+
+.tienda-cerrada-plan a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  text-decoration: none;
+}
+
+/* En su propia línea, centrado: junto al botón de contacto parecía la otra
+   mitad de la misma acción. */
+.tienda-cerrada-salir {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 2rem auto 0;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tienda-cerrada-salir:hover {
+  color: var(--danger);
+  background: var(--danger-glow);
+}
+
+@media (max-width: 600px) {
+  .tienda-cerrada {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .tienda-cerrada-card {
+    padding: 1.75rem 1.1rem;
+  }
+}

@@ -39,6 +39,7 @@ import { getMe, logoutUser } from '../../api/auth';
 import VerifyEmailBanner from '../../components/dashboard/VerifyEmailBanner';
 import SupportBanner from '../../components/dashboard/SupportBanner';
 import TrialBanner from '../../components/dashboard/TrialBanner';
+import TiendaCerrada from '../../components/dashboard/TiendaCerrada';
 import { rutaDeSalidaDelPanel, useAuthStore, useEsAdmin } from '../../stores/authStore';
 import type { Permiso } from '../../utils/permisos';
 import { useTenantStore } from '../../stores/tenantStore';
@@ -56,6 +57,9 @@ export default function DashboardPage() {
   const tenant = useTenantStore((s) => s.tenant);
   const setTenant = useTenantStore((s) => s.setTenant);
   const clearTenant = useTenantStore((s) => s.clearTenant);
+  // FUN-28: con valor, la tienda está cerrada y el panel no se pinta.
+  const cierre = useTenantStore((s) => s.cierre);
+  const setCierre = useTenantStore((s) => s.setCierre);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(!user);
@@ -104,6 +108,7 @@ export default function DashboardPage() {
         .then((data) => {
           setAuth(token, data.user);
           setTenant(data.tenant);
+          setCierre(data.cierre ?? null);
           // INF-2: quien decide si esto es una sesion de soporte es el token, y
           // eso solo lo sabe el backend. Al recargar la pagina es la unica
           // forma de recuperar la marca, porque no se guarda en el navegador.
@@ -122,7 +127,7 @@ export default function DashboardPage() {
           setIsLoading(false);
         });
     }
-  }, [user, token, setAuth, setTenant, setSoporte, clearAuth, clearTenant, navigate]);
+  }, [user, token, setAuth, setTenant, setCierre, setSoporte, clearAuth, clearTenant, navigate]);
 
   const handleLogout = async () => {
     // Se calcula antes de que `clearAuth()` borre la marca de soporte: el
@@ -175,6 +180,17 @@ export default function DashboardPage() {
       <div className="loader-container page-dashboard">
         <div className="loader-ring"></div>
         <p>Cargando panel...</p>
+      </div>
+    );
+  }
+
+  // FUN-28: con la tienda cerrada la API solo responde `me` y `logout`, así que
+  // ninguna pantalla del panel funcionaría: se pinta la que explica por qué y
+  // cómo reabrirla. Dentro de un `.dashboard-layout` para heredar el tema.
+  if (cierre) {
+    return (
+      <div className={`dashboard-layout page-dashboard ${theme === 'dark' ? 'theme-dark' : ''}`}>
+        <TiendaCerrada onSalir={handleLogout} />
       </div>
     );
   }

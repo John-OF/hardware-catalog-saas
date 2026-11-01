@@ -27,6 +27,32 @@ export function formatearFechaHora(iso: string | null | undefined, timezone?: st
 }
 
 /**
+ * Cuántos días de calendario de la tienda faltan hasta `iso`: 0 si es hoy, 1 si
+ * es mañana (INF-23). Cuenta fechas y no horas: el 1 de noviembre por la tarde,
+ * algo que vence el 5 a última hora vence «en 4 días», aunque sean cuatro días y
+ * unas horas. `null` si no hay fecha o no se entiende.
+ *
+ * `ahora` se pasa desde fuera porque leer el reloj durante el render es impuro.
+ */
+export function diasDeCalendarioHasta(iso: string | null | undefined, timezone: string | null | undefined, ahora: Date): number | null {
+  if (!iso) return null;
+
+  const fin = new Date(iso);
+  if (Number.isNaN(fin.getTime())) return null;
+
+  // `en-CA` escribe AAAA-MM-DD: la fecha de cada instante en la zona de la tienda.
+  const dia = (fecha: Date) => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: zonaDeLaTienda(timezone) }).format(fecha);
+    } catch {
+      return new Intl.DateTimeFormat('en-CA').format(fecha);
+    }
+  };
+
+  return Math.round((Date.parse(dia(fin)) - Date.parse(dia(ahora))) / (1000 * 60 * 60 * 24));
+}
+
+/**
  * Devuelve cadena vacía si no hay fecha, en vez de "Invalid Date".
  *
  * Varias columnas del panel son opcionales —`ultima_compra` de un cliente que

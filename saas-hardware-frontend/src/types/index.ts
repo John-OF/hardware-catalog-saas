@@ -116,6 +116,12 @@ export interface Tenant {
    * (`PlanGate`), no el frontend.
    */
   trial_ends_at: string | null;
+  /**
+   * Hasta cuándo está pagado su plan (INF-23). `null` es un plan de antes de
+   * que hubiera fecha, o una tienda que nunca pagó (en prueba o cerrada). Al
+   * pasar, la tienda se cierra como una prueba vencida.
+   */
+  plan_ends_at?: string | null;
   /** Código ISO de la moneda de la tienda (OWN-1). Ver src/utils/money.ts. */
   currency: string;
   /**
@@ -603,10 +609,26 @@ export interface PaginatedResponse<T> {
   total: number;
 }
 
+/**
+ * Por qué está cerrada la tienda del panel (FUN-28), tal como lo calcula la API
+ * (`Tenant::cierre()`). `null` si está abierta.
+ *
+ * - `prueba`: terminó su prueba sin que se pagara un plan.
+ * - `plan`: venció su plan pagado.
+ * - `suspendida`: la cerró el operador a mano (`desde` es `null`).
+ */
+export interface CierreDeTienda {
+  motivo: 'prueba' | 'plan' | 'suspendida';
+  desde: string | null;
+  /** Nombre comercial del plan que tenía: «Pro». */
+  plan: string;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
   tenant: Tenant;
+  cierre?: CierreDeTienda | null;
 }
 
 export interface Page {

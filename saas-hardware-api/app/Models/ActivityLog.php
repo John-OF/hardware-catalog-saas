@@ -60,6 +60,10 @@ class ActivityLog extends Model
     public const TIENDA_SOPORTE = 'tenant.soporte';
     public const TIENDA_RESCATE_ADMIN = 'tenant.rescate_admin';
     public const TIENDA_PRUEBA_VENCIDA = 'tenant.prueba_vencida';
+    // INF-23: el cobro del plan, su vencimiento y la corrección a mano de la fecha.
+    public const TIENDA_PAGO = 'tenant.pago';
+    public const TIENDA_PLAN_VENCIDO = 'tenant.plan_vencido';
+    public const TIENDA_FECHA_PLAN = 'tenant.fecha_plan';
 
     /** Lo que pasa con la propia cuenta del operador (SEC-9). */
     public const OPERADOR_DOS_PASOS_ACTIVADA = 'operador.dos_pasos_activada';

@@ -26,6 +26,7 @@ import {
 import { getPublicPlans } from '../../api/public';
 import type { PublicPlan } from '../../api/public';
 import { PAGINAS_LEGALES } from '../../utils/legal';
+import { NOMBRES_LIMITE, ORDEN_LIMITES } from '../../utils/limitesDePlan';
 
 /**
  * Landing del SaaS (INF-1).
@@ -40,20 +41,6 @@ import { PAGINAS_LEGALES } from '../../utils/legal';
  * no inventado: cada bullet es una función que existe y está documentada en
  * `docs/funcionalidades.md`.
  */
-
-/** Mismo texto que usa `PlatformTenantPage` para cada límite del plan, para no decir la clave cruda. */
-const NOMBRES_LIMITE: Record<string, string> = {
-  products: 'Productos',
-  categories: 'Categorías',
-  pages: 'Páginas',
-  users: 'Equipo',
-  images_per_product: 'Imágenes por producto',
-  custom_domain: 'Dominio propio',
-  csv_import: 'Importar CSV',
-};
-
-/** Orden de lectura de los límites en la tarjeta; no es el orden de `config/plans.php`. */
-const ORDEN_LIMITES = ['products', 'categories', 'pages', 'images_per_product', 'users', 'custom_domain', 'csv_import'];
 
 const CARACTERISTICAS_TIENDA = [
   { icon: Store, text: 'Alta de tu tienda en minutos, sin que nadie la apruebe' },

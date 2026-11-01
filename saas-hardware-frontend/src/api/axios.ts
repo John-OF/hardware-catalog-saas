@@ -2,6 +2,10 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { rutaDeSalidaDelPanel, useAuthStore } from '../stores/authStore';
 import { useCustomerAuthStore } from '../stores/customerAuthStore';
+import { useTenantStore } from '../stores/tenantStore';
+
+/** El `motivo` del 403 del panel cuando la tienda está cerrada (`InitializeTenantByHeader`). */
+export const MOTIVO_TIENDA_CERRADA = 'tienda_cerrada';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
@@ -43,6 +47,18 @@ api.interceptors.response.use(
       toast.error('Demasiadas peticiones seguidas. Espera unos segundos y vuelve a intentarlo.', {
         id: 'rate-limit',
       });
+    }
+
+    // FUN-28: la tienda se cerró con la sesión abierta (venció la prueba o el
+    // plan, o la suspendió el operador). Cualquier ruta del panel responde este
+    // 403 con el motivo, y basta con guardarlo: el panel deja de pintar sus
+    // pantallas, que ya solo darían errores, y pinta la de tienda cerrada.
+    if (
+      error.response?.status === 403
+      && error.response?.data?.motivo === MOTIVO_TIENDA_CERRADA
+      && !error.config?.url?.includes('public/')
+    ) {
+      useTenantStore.getState().setCierre(error.response.data.cierre ?? { motivo: 'suspendida', desde: null, plan: '' });
     }
 
     if (error.response?.status === 401) {

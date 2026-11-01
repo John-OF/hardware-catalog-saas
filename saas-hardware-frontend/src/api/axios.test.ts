@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import api from './axios';
 import { useAuthStore } from '../stores/authStore';
 import { useCustomerAuthStore } from '../stores/customerAuthStore';
+import { useTenantStore } from '../stores/tenantStore';
 import { PLATFORM_TOKEN_KEY } from './platform';
 
 vi.mock('react-hot-toast', () => {
@@ -98,5 +99,33 @@ describe('api/axios', () => {
     expect(localStorage.getItem('customer_token')).toBeNull();
     expect(localStorage.getItem('customer_user')).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
+  /** Responde 403 con el cuerpo dado. */
+  const prohibidoCon = (data: unknown) => {
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('fallo', 'ERR_BAD_REQUEST', config, {}, { data, status: 403, statusText: '', headers: {}, config });
+    };
+  };
+
+  it('un 403 de tienda cerrada guarda el cierre, que es lo que cambia el panel de pantalla (FUN-28)', async () => {
+    const cierre = { motivo: 'plan', desde: '2026-11-08T15:00:00+00:00', plan: 'Pro' };
+    prohibidoCon({ message: 'Tu tienda está cerrada…', motivo: 'tienda_cerrada', cierre });
+    useTenantStore.setState({ cierre: null });
+
+    await expect(api.get('/dashboard/stats')).rejects.toBeInstanceOf(AxiosError);
+
+    expect(useTenantStore.getState().cierre).toEqual(cierre);
+    // La sesión sigue: con la tienda cerrada todavía se puede ver por qué y salir.
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
+  it('un 403 por otro motivo no toca el cierre', async () => {
+    prohibidoCon({ message: 'No tienes permiso para esto.' });
+    useTenantStore.setState({ cierre: null });
+
+    await expect(api.get('/products')).rejects.toBeInstanceOf(AxiosError);
+
+    expect(useTenantStore.getState().cierre).toBeNull();
   });
 });

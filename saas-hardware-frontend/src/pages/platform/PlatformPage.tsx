@@ -18,8 +18,9 @@ import {
   sendTenantPasswordReset,
   updatePlatformTenant,
 } from '../../api/platform';
-import type { PlatformTenant } from '../../api/platform';
+import type { FiltroDeEstado, PlatformTenant } from '../../api/platform';
 import type { PaginatedResponse } from '../../types';
+import { formatearFecha } from '../../utils/fechas';
 
 
 const PLANES = ['free', 'pro', 'enterprise'];
@@ -39,7 +40,7 @@ export default function PlatformPage() {
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [status, setStatus] = useState<'' | 'active' | 'suspended'>('');
+  const [status, setStatus] = useState<'' | FiltroDeEstado>('');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -58,12 +59,16 @@ export default function PlatformPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: { is_active?: boolean; plan?: string } }) =>
       updatePlatformTenant(id, payload),
-    onSuccess: (tenant) => {
+    onSuccess: (tenant, { payload }) => {
       queryClient.invalidateQueries({ queryKey: ['platformTenants'] });
       // La ficha y la bitácora hablan de lo mismo: si no se invalidan, quedan
       // enseñando el plan de antes y sin la línea que acaba de escribirse.
       queryClient.invalidateQueries({ queryKey: ['platformTenant', tenant.id] });
       queryClient.invalidateQueries({ queryKey: ['platformLogs'] });
+      if (payload.plan) {
+        toast.success(`Plan de ${tenant.name} corregido`);
+        return;
+      }
       toast.success(tenant.is_active ? `${tenant.name} está activa` : `${tenant.name} quedó suspendida`);
     },
     onError: (error) => {
@@ -100,11 +105,13 @@ export default function PlatformPage() {
         <select
           className="premium-input"
           value={status}
-          onChange={(e) => setStatus(e.target.value as '' | 'active' | 'suspended')}
+          onChange={(e) => setStatus(e.target.value as '' | FiltroDeEstado)}
         >
           <option value="">Todas</option>
           <option value="active">Activas</option>
           <option value="suspended">Suspendidas</option>
+          {/* INF-23: a quién cobrarle esta semana, las que vencen antes primero. */}
+          <option value="por_vencer">Vencen esta semana</option>
         </select>
         <span className="platform-count">
           {data ? `${data.total} tienda(s)` : 'Cargando...'}
@@ -147,10 +154,13 @@ export default function PlatformPage() {
                     </a>
                   </td>
                   <td>
+                    {/* INF-23: corrige el plan sin tocar su fecha; en prueba no
+                        cambiaría nada. Cobrar es registrar un pago, en la ficha. */}
                     <select
                       className="premium-input plan-select"
                       value={tenant.plan}
-                      disabled={updateMutation.isPending}
+                      disabled={updateMutation.isPending || !!tenant.trial_ends_at}
+                      title={tenant.trial_ends_at ? 'En prueba: para darle un plan, registra un pago en su ficha' : undefined}
                       onChange={(e) =>
                         updateMutation.mutate({ id: tenant.id, payload: { plan: e.target.value } })
                       }
@@ -159,6 +169,13 @@ export default function PlatformPage() {
                         <option key={plan} value={plan}>{plan}</option>
                       ))}
                     </select>
+                    <span className="plan-hasta">
+                      {tenant.trial_ends_at
+                        ? `prueba hasta ${formatearFecha(tenant.trial_ends_at, tenant.timezone)}`
+                        : tenant.plan_ends_at
+                          ? `pagado hasta ${formatearFecha(tenant.plan_ends_at, tenant.timezone)}`
+                          : 'sin fecha de fin'}
+                    </span>
                   </td>
                   <td className="counts-cell">
                     {tenant.products_count} prod · {tenant.orders_count} ped · {tenant.users_count} usu

@@ -10,14 +10,17 @@ use App\Models\Order;
 use App\Models\Page;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Models\TenantPayment;
 use App\Models\User;
 use App\Support\DosPasos;
+use App\Support\Membresia;
 use App\Support\Paginacion;
 use App\Support\PlanGate;
 use App\Support\Suplantacion;
 use App\Support\Verticales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
@@ -215,6 +218,9 @@ class PlatformController extends Controller
             })
             ->when($request->input('status') === 'active', fn ($q) => $q->where('is_active', true))
             ->when($request->input('status') === 'suspended', fn ($q) => $q->where('is_active', false))
+            // INF-23: las que hay que cobrar esta semana. Las que vencen antes
+            // primero: es la lista que se recorre para escribirles.
+            ->when($request->input('status') === 'por_vencer', fn ($q) => $q->porVencer()->reorder('plan_ends_at'))
             ->orderByDesc('created_at')
             ->paginate(Paginacion::porPagina($request, 20));
 
@@ -222,19 +228,55 @@ class PlatformController extends Controller
     }
 
     /**
-     * Suspender/reactivar una tienda y ajustar su plan.
+     * Suspender/reactivar una tienda, corregir su plan o su rubro, y corregir
+     * hasta cuándo está pagada.
      *
      * Suspender basta para dejarla inaccesible: `InitializeTenantByHeader` y el
      * catálogo público ya exigen `is_active`.
+     *
+     * **Cambiar el plan aquí no es cobrarlo** (INF-23). Hasta entonces, elegir un
+     * plan sacaba a la tienda de la prueba y se lo dejaba para siempre: era la
+     * forma de dar un plan pagado a mano, y por eso ninguno vencía. Ahora eso es
+     * `registerPayment()`, y esto solo corrige el plan del periodo que ya tiene,
+     * sin tocar ninguna fecha. A una tienda en prueba no le cambia nada.
      */
     public function updateTenant(Request $request, Tenant $tenant): JsonResponse
     {
         $data = $request->validate([
             'is_active' => 'sometimes|boolean',
-            'plan'      => ['sometimes', 'string', Rule::in(['free', 'pro', 'enterprise'])],
+            'plan'      => ['sometimes', 'string', Rule::in(self::planesQueSeCobran())],
             // MOD-19: cambia lo que la tienda enseña, nunca lo que guarda.
             'vertical'  => ['sometimes', 'string', Rule::in(array_keys(Verticales::disponibles()))],
+            // INF-23: un día del calendario; el plan dura hasta que ese día acaba.
+            'plan_ends_at' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:today'],
         ]);
+
+        $nuevoFin = null;
+
+        if (array_key_exists('plan_ends_at', $data)) {
+            if ($tenant->plan_ends_at === null) {
+                throw ValidationException::withMessages([
+                    'plan_ends_at' => ['Esta tienda no tiene ningún pago registrado: para darle un plan con fecha, registra un pago (con «Cortesía» y monto 0 si no se cobra).'],
+                ]);
+            }
+
+            $nuevoFin = Carbon::createFromFormat('Y-m-d', $data['plan_ends_at'], $tenant->zonaHoraria())
+                ->endOfDay()
+                ->utc();
+            unset($data['plan_ends_at']);
+        }
+
+        // Reabrir a mano una tienda con la prueba o el plan vencidos la dejaría
+        // abierta hasta la siguiente pasada del cierre automático. Con la fecha
+        // corregida en esta misma petición, la que cuenta es la nueva.
+        if (($data['is_active'] ?? null) === true && ! $tenant->is_active) {
+            $comoQuedaria = (clone $tenant)->forceFill($nuevoFin ? ['plan_ends_at' => $nuevoFin] : []);
+            $motivo = Membresia::motivoParaNoReabrir($comoQuedaria);
+
+            if ($motivo !== null) {
+                throw ValidationException::withMessages(['is_active' => [$motivo]]);
+            }
+        }
 
         // Se lee ANTES de escribir: la bitácora tiene que poder decir de qué
         // plan a cuál, y después del update el valor anterior ya no existe.
@@ -242,16 +284,11 @@ class PlatformController extends Controller
         $estabaActiva     = $tenant->is_active;
         $verticalAnterior = Verticales::clave($tenant);
 
-        $tenant->update($data);
-
-        // Elegir un plan de verdad es SALIR de la prueba (FUN-16): sin esto,
-        // una tienda ya asignada seguiría cayendo en el cierre automático si
-        // el trabajo programado corriera antes de que alguien recordara
-        // vaciar la fecha a mano. `trial_ends_at` es de sistema (fuera de
-        // $fillable), de ahí el `forceFill()` aparte del `update()` de arriba.
-        if (array_key_exists('plan', $data)) {
-            $tenant->forceFill(['trial_ends_at' => null])->save();
+        if ($nuevoFin !== null) {
+            Membresia::corregirFin($tenant, $nuevoFin, $request->user(), $request);
         }
+
+        $tenant->update($data);
 
         $this->anotarCambio($request, $tenant, $data, $planAnterior, $estabaActiva, $verticalAnterior);
 
@@ -266,6 +303,66 @@ class PlatformController extends Controller
             'orders'   => fn ($q) => $q->withoutTenant(),
             'users'    => fn ($q) => $q->withoutTenant(),
         ]));
+    }
+
+    /**
+     * Apuntar un pago del plan (INF-23): la tienda pasa a ese plan hasta la nueva
+     * fecha y, si estaba cerrada, se reabre.
+     *
+     * Las cuentas —desde cuándo, hasta cuándo, sin desbordar meses— viven en
+     * `App\Support\Membresia::registrarPago()`; aquí solo se valida.
+     */
+    public function registerPayment(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate([
+            'plan'       => ['required', 'string', Rule::in(self::planesQueSeCobran())],
+            'months'     => ['required', 'integer', 'min:1', 'max:'.TenantPayment::MESES_MAXIMOS],
+            'amount_usd' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'method'     => ['required', 'string', Rule::in(array_keys(TenantPayment::MEDIOS))],
+            'reference'  => ['nullable', 'string', 'max:120'],
+            'notes'      => ['nullable', 'string', 'max:500'],
+            'paid_on'    => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+        ]);
+
+        // Un monto y un medio que se contradicen dejarían en el historial una
+        // línea que no se sabe si fue cobro o regalo.
+        $cortesia = $data['method'] === 'cortesia';
+        $monto = (float) $data['amount_usd'];
+
+        if ($cortesia && $monto > 0) {
+            throw ValidationException::withMessages([
+                'amount_usd' => ['Una cortesía es sin cobro: deja el monto en 0, o elige por dónde llegó el pago.'],
+            ]);
+        }
+
+        if (! $cortesia && $monto <= 0) {
+            throw ValidationException::withMessages([
+                'amount_usd' => ['Un pago de 0 es una cortesía: elige «Cortesía (sin cobro)» como medio.'],
+            ]);
+        }
+
+        $pago = Membresia::registrarPago($tenant, $data, $request->user(), $request);
+
+        return response()->json([
+            'pago'    => $pago,
+            'tenant'  => $tenant->fresh(),
+            'message' => "Pago registrado. {$tenant->name} queda pagada hasta el "
+                .$pago->ends_at->copy()->setTimezone($tenant->zonaHoraria())->format('d/m/Y').'.',
+        ], 201);
+    }
+
+    /**
+     * Los planes que se pueden cobrar: los que se venden en la landing. 'trial'
+     * no, porque es un cálculo de `PlanGate` mientras dura la prueba (FUN-16).
+     *
+     * @return list<string>
+     */
+    private static function planesQueSeCobran(): array
+    {
+        return collect(config('plans.plans'))
+            ->filter(fn (array $plan) => $plan['public'] ?? false)
+            ->keys()
+            ->all();
     }
 
     /**
@@ -344,6 +441,9 @@ class PlatformController extends Controller
                 'sin_arrancar' => Tenant::where('is_active', true)
                     ->whereDoesntHave('products', fn ($q) => $q->withoutTenant())
                     ->count(),
+                // INF-23: a quién hay que cobrarle esta semana para que no se
+                // cierre. Sin esto, el operador se entera cuando ya cerró.
+                'por_vencer' => Tenant::porVencer()->count(),
             ],
 
             'altas' => [
@@ -439,6 +539,28 @@ class PlatformController extends Controller
             // MOD-19: para el selector de rubro, con su nombre en pantalla. La
             // lista sale de la config; el navegador no tiene copia.
             'verticales' => Verticales::disponibles(),
+
+            // INF-23 y FUN-28: hasta cuándo está pagada, por qué está cerrada y
+            // lo que necesita el formulario de pago. `desde` es la fecha desde la
+            // que contarían los meses de un pago nuevo, calculada aquí para que
+            // el navegador no tenga su propia copia de la regla.
+            'membresia' => [
+                'cierre'      => $tenant->cierre(),
+                'desde'       => Membresia::inicioDelSiguientePeriodo($tenant)->toIso8601String(),
+                'meses_max'   => TenantPayment::MESES_MAXIMOS,
+                'medios'      => TenantPayment::MEDIOS,
+                'planes'      => collect(self::planesQueSeCobran())
+                    ->map(fn (string $clave) => [
+                        'key'       => $clave,
+                        'label'     => PlanGate::labelDe($clave),
+                        'price_usd' => config("plans.plans.{$clave}.price_usd"),
+                    ])
+                    ->all(),
+                'pagos'       => TenantPayment::where('tenant_id', $tenant->id)
+                    ->orderByDesc('created_at')
+                    ->take(24)
+                    ->get(),
+            ],
 
             'equipo' => UserResource::collection($equipo),
 

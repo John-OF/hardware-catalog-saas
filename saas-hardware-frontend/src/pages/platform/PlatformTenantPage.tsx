@@ -26,19 +26,14 @@ import {
 import type { PlatformTenantDetail } from '../../api/platform';
 import { useAuthStore } from '../../stores/authStore';
 import { useTenantStore } from '../../stores/tenantStore';
+import { NOMBRES_LIMITE as NOMBRES } from '../../utils/limitesDePlan';
+import MembresiaDeLaTienda from './MembresiaDeLaTienda';
 
-
-const PLANES = ['free', 'pro', 'enterprise'];
-
-/** Cómo se llama cada límite del plan en pantalla (las claves vienen de config/plans.php). */
-const NOMBRES: Record<string, string> = {
-  products: 'Productos',
-  categories: 'Categorías',
-  pages: 'Páginas',
-  users: 'Equipo',
-  images_per_product: 'Imágenes por producto',
-  custom_domain: 'Dominio propio',
-  csv_import: 'Importar CSV',
+/** Cómo se dice en la cabecera por qué está cerrada (FUN-28). */
+const ESTADO_CERRADA: Record<string, string> = {
+  prueba: 'Cerrada: prueba terminada',
+  plan: 'Cerrada: plan vencido',
+  suspendida: 'Suspendida',
 };
 
 /**
@@ -79,6 +74,10 @@ export default function PlatformTenantPage() {
       refrescar();
       if (payload.vertical) {
         toast.success(`${tenant.name} cambió de rubro`);
+        return;
+      }
+      if (payload.plan) {
+        toast.success(`Plan de ${tenant.name} corregido`);
         return;
       }
       toast.success(tenant.is_active ? `${tenant.name} está activa` : `${tenant.name} quedó suspendida`);
@@ -139,7 +138,11 @@ export default function PlatformTenantPage() {
     );
   }
 
-  const { tenant, plan, equipo, clientes, ultimos_pedidos, bitacora } = data;
+  const { tenant, plan, equipo, clientes, ultimos_pedidos, bitacora, membresia } = data;
+
+  // INF-23: en prueba, el selector no cambiaría nada (manda la prueba hasta que
+  // se paga). Para darle un plan, se registra un pago.
+  const enPrueba = !!tenant.trial_ends_at;
 
   // Puede pasar por la carrera que cierra `UserController::impedirQuedarseSinAdmins`
   // o porque alguien desactivó al último a mano. Sin esto no hay forma de saber
@@ -155,7 +158,7 @@ export default function PlatformTenantPage() {
         </Link>
         <div className="tenant-detail-badges">
           <span className={`badge ${tenant.is_active ? 'badge-success' : 'badge-danger'}`}>
-            {tenant.is_active ? 'Activa' : 'Suspendida'}
+            {tenant.is_active ? 'Activa' : ESTADO_CERRADA[membresia.cierre?.motivo ?? 'suspendida']}
           </span>
           {/* Publicada y activa no son lo mismo: una tienda activa sin publicar
               tiene el panel abierto y el catálogo cerrado (FUN-5). */}
@@ -227,14 +230,22 @@ export default function PlatformTenantPage() {
         </div>
 
         <div className="tenant-actions">
+          {/* INF-23: corrige el plan del periodo pagado sin tocar su fecha. Cobrar
+              un plan es «Registrar un pago», más abajo. */}
           <select
             className="premium-input plan-select"
+            aria-label="Plan de la tienda"
             value={tenant.plan}
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || enPrueba}
+            title={
+              enPrueba
+                ? 'En prueba: para darle un plan, registra un pago'
+                : 'Corrige el plan sin cambiar hasta cuándo está pagado'
+            }
             onChange={(e) => updateMutation.mutate({ plan: e.target.value })}
           >
-            {PLANES.map((p) => (
-              <option key={p} value={p}>{p}</option>
+            {membresia.planes.map((p) => (
+              <option key={p.key} value={p.key}>{p.label}</option>
             ))}
           </select>
 
@@ -287,6 +298,8 @@ export default function PlatformTenantPage() {
           </button>
         </div>
       </header>
+
+      <MembresiaDeLaTienda tenant={tenant} membresia={membresia} onCambio={refrescar} />
 
       <section className="tenant-cols">
         <div className="glass-card tenant-card">

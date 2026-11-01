@@ -203,12 +203,18 @@ class PlatformAdminTest extends TestCase
         // El catálogo público deja de existir para el comprador...
         $this->getJson("/api/public/{$this->tenantA->slug}")->assertStatus(404);
 
-        // ...y el dueño tampoco puede entrar a su panel.
+        // ...y el dueño tampoco puede trabajar en su panel. Desde FUN-28 no es un
+        // 404 («tienda no encontrada») sino un 403 que dice que está cerrada.
+        // Sin olvidar el guard, la petición seguiría autenticada como el operador.
+        $this->app['auth']->forgetGuards();
         $tokenDuenio = $this->duenioA->createToken('test', ['admin'])->plainTextToken;
         $this->withHeaders([
             'Authorization' => 'Bearer '.$tokenDuenio,
             'X-Tenant'      => $this->tenantA->slug,
-        ])->getJson('/api/products')->assertStatus(404);
+        ])->getJson('/api/products')
+            ->assertForbidden()
+            ->assertJsonPath('motivo', 'tienda_cerrada');
+        $this->app['auth']->forgetGuards();
 
         $this->asSuperAdmin()
             ->putJson("/api/platform/tenants/{$this->tenantA->id}", ['is_active' => true])

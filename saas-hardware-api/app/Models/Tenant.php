@@ -82,6 +82,9 @@ class Tenant extends Model implements IsTenant
         'custom_domain_requested_at' => 'datetime',
         'custom_domain_verified_at' => 'datetime',
         'trial_ends_at' => 'datetime',
+        // INF-23: el «pagado hasta». De sistema, como `trial_ends_at`: fuera de
+        // $fillable, lo mueve solo `App\Support\Membresia`.
+        'plan_ends_at' => 'datetime',
     ];
 
     /**
@@ -152,8 +155,8 @@ class Tenant extends Model implements IsTenant
      * Si esta tienda sigue dentro de su período de prueba (FUN-16).
      *
      * `trial_ends_at` nula significa que nunca tuvo prueba (una tienda vieja,
-     * de antes de este cambio) o que ya se le asignó un plan de verdad -ver
-     * `PlatformController::updateTenant()`, que la vacía al elegir plan-. Una
+     * de antes de este cambio) o que ya pagó un plan -ver
+     * `Membresia::registrarPago()`, que la vacía (INF-23)-. Una
      * prueba VENCIDA (la fecha ya pasó) tampoco cuenta: para entonces el
      * trabajo programado ya debería haber suspendido la tienda, y aunque no
      * hubiera corrido todavía, tratarla como "sigue en prueba" le regalaría
@@ -162,6 +165,48 @@ class Tenant extends Model implements IsTenant
     public function enPrueba(): bool
     {
         return $this->trial_ends_at !== null && $this->trial_ends_at->isFuture();
+    }
+
+    /** Por qué está cerrada una tienda (FUN-28): ver `cierre()`. */
+    public const CIERRE_PRUEBA = 'prueba';
+    public const CIERRE_PLAN = 'plan';
+    public const CIERRE_SUSPENDIDA = 'suspendida';
+
+    /**
+     * Si la tienda está cerrada, por qué y desde cuándo (FUN-28). `null` si está
+     * abierta.
+     *
+     * No se guarda en ninguna columna: sale de las mismas dos fechas que usa el
+     * cierre automático (`trials:cerrar-vencidas`). Una prueba o un plan vencidos
+     * son eso; cualquier otra tienda inactiva la cerró el operador a mano. Es lo
+     * que necesita la pantalla del dueño para decirle algo útil: no es lo mismo
+     * «elige un plan» que «escríbenos».
+     *
+     * **No va en `$appends`, a propósito.** Lee tres columnas, y el catálogo
+     * público consulta `tenants` eligiendo columnas (`COLUMNAS_PUBLICAS_TENANT`):
+     * sin `is_active` entre ellas, toda tienda abierta saldría «suspendida». La
+     * piden a mano el login, `me` y el 403 del panel.
+     *
+     * @return array{motivo: string, desde: ?string, plan: string}|null
+     */
+    public function cierre(): ?array
+    {
+        if ($this->is_active) {
+            return null;
+        }
+
+        [$motivo, $desde] = match (true) {
+            $this->trial_ends_at?->isPast() === true => [self::CIERRE_PRUEBA, $this->trial_ends_at],
+            $this->plan_ends_at?->isPast() === true  => [self::CIERRE_PLAN, $this->plan_ends_at],
+            default                                  => [self::CIERRE_SUSPENDIDA, null],
+        };
+
+        return [
+            'motivo' => $motivo,
+            'desde'  => $desde?->toIso8601String(),
+            // El nombre comercial del plan que tenía, para «tu plan Pro venció».
+            'plan'   => \App\Support\PlanGate::labelDe((string) $this->plan),
+        ];
     }
 
     /**
@@ -194,6 +239,19 @@ class Tenant extends Model implements IsTenant
      * tienda por su dominio, y repetirla a mano en cada sitio es la forma
      * segura de que un dia se olvide en uno.
      */
+    /**
+     * Las tiendas abiertas cuyo plan pagado vence en los próximos días (INF-23):
+     * a quién hay que cobrarle antes de que se cierre. La usan el resumen y el
+     * filtro del listado del operador, para que los dos cuenten lo mismo.
+     */
+    public function scopePorVencer(Builder $query): Builder
+    {
+        return $query->where('is_active', true)
+            ->whereNotNull('plan_ends_at')
+            ->where('plan_ends_at', '>=', now())
+            ->where('plan_ends_at', '<', now()->addDays(\App\Support\Membresia::DIAS_DE_AVISO));
+    }
+
     public function scopeConDominioVerificado(Builder $query): Builder
     {
         return $query->whereNotNull('custom_domain_verified_at');
@@ -218,5 +276,11 @@ class Tenant extends Model implements IsTenant
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /** Los cobros de su plan (INF-23). Sin global scope: ver `TenantPayment`. */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(TenantPayment::class);
     }
 }

@@ -198,6 +198,9 @@ Route::middleware(['platform.ip', 'auth:sanctum', 'superadmin'])->prefix('platfo
         Route::get('/tenants',            [PlatformController::class, 'tenants']);
         Route::get('/tenants/{tenant}',   [PlatformController::class, 'show']);
         Route::put('/tenants/{tenant}',   [PlatformController::class, 'updateTenant']);
+        // INF-23: apuntar un pago del plan. Mueve el «pagado hasta» y reabre la
+        // tienda si estaba cerrada; los pagos no se editan ni se borran.
+        Route::post('/tenants/{tenant}/payments', [PlatformController::class, 'registerPayment']);
         Route::post('/tenants/{tenant}/password-reset', [PlatformController::class, 'sendAdminPasswordReset']);
         // Entrar en una tienda como soporte: token de 15 minutos y SOLO LECTURA.
         // Lo de "solo lectura" no lo impone esta ruta sino el middleware 'soporte'

@@ -52,8 +52,9 @@ catálogo; comparador de hasta tres productos; **armador de PC** que avisa de in
 carrito; cuenta con favoritos e historial; reseñas con moderación y anti-bot.
 
 **Para el operador del SaaS**: panel propio —restringido por IP— para listar tiendas, suspenderlas,
-cambiar su plan y rescatar la contraseña de un dueño. Los planes limitan cuánto puede crear cada
-tienda (`config/plans.php`).
+registrar lo que cobra a mano de cada plan (con su fecha de fin: al llegar, la tienda se cierra sola
+y su dueño ve una pantalla que lo explica) y rescatar la contraseña de un dueño. Los planes limitan
+cuánto puede crear cada tienda (`config/plans.php`).
 
 **Lo que todavía no existe** y conviene saber antes de nada: no hay pasarela de pago —ni para cobrar
 en la tienda ni para cobrarle a la tienda— ni impuestos/comprobante, ni cupones, ni papelera. El
@@ -70,7 +71,8 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
 - **Un worker de colas corriendo** (`php artisan queue:work`): los correos van por cola y sin él no
   sale ninguno
 - **En producción, un cron del sistema llamando `php artisan schedule:run` cada minuto**: es lo que
-  cierra solas las tiendas cuya prueba de 7 días venció (`trials:cerrar-vencidas`), lo que vacía la
+  cierra solas las tiendas cuya prueba de 7 días venció o cuyo plan pagado a mano llegó a su fecha
+  de fin (`trials:cerrar-vencidas`, `FUN-16` e `INF-23`), lo que vacía la
   papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`), lo que borra la
   actividad de tienda de más de un año (`bitacora:purgar`, `INF-20`) y lo que hace la
   **copia de seguridad diaria** (`copias:crear`, `INF-7`); sin él, ninguna prueba se cierra aunque la
@@ -314,7 +316,7 @@ app/
 ├── Casts/SanitizedHtml.php        # Limpia el HTML al guardar
 ├── Casts/ImagenDelDisco.php       # Columna de imagen: ruta del disco en la base, URL al leer (TEC-15)
 ├── Casts/TemaDeTienda.php         # tenants.theme, con portada y favicon como ImagenDelDisco
-├── Console/Commands/              # CloseExpiredTrials (FUN-16), PurgeTrash (MOD-8),
+├── Console/Commands/              # CloseExpiredTrials (pruebas y planes vencidos, FUN-16 e INF-23), PurgeTrash (MOD-8),
 │                                  # CreateBackup (INF-7) y CheckDeployment (INF-19), desde el
 │                                  # scheduler; CreateSuperAdmin y RemoveOperatorTwoFactor (SEC-9), a mano
 ├── Enums/ComponentType.php        # Qué pieza de PC vende una categoría
@@ -358,7 +360,8 @@ app/
 ├── Jobs/ComprobarCola.php  # El trabajo de prueba de salud:comprobar: ¿hay worker, y con qué código? (INF-19)
 ├── Models/            # Tenant, User, Category, Product, ProductImage, ProductVariant,
 │                      # Order, OrderItem, Coupon, Review, StockNotification, Page, ActivityLog,
-│                      # TeamRole (rol del equipo con sus permisos, MOD-21)
+│                      # TeamRole (rol del equipo con sus permisos, MOD-21),
+│                      # TenantPayment (un cobro del plan, INF-23: no se edita ni se borra)
 │   └── Concerns/BelongsToTenant.php        # Global scope que falla en cerrado
 ├── Notifications/     # VerifyEmail, ResetPassword, CustomerResetPassword, TeamInvitation,
 │                      # NewOrder, OrderPlaced, OrderStatusChanged, BackInStock  (todas ShouldQueue)
@@ -397,6 +400,8 @@ app/
     ├── TextoDeCorreo.php   # Escapa el Markdown de un dato antes de meterlo en una linea de correo (SEC-8)
     ├── CeldaCsv.php        # Neutraliza las formulas de una celda del CSV (SEC-7), y las desneutraliza al importar
     ├── DosPasos.php        # Verificación en dos pasos del operador (SEC-9): códigos, desafío, recuperación
+    ├── Membresia.php       # El plan pagado (INF-23): registrar un pago, hasta cuándo dura, corregir la
+    │                       # fecha y si una tienda cerrada se puede reabrir a mano
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
@@ -431,7 +436,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 91 archivos, 983 tests (+1 en tests/Unit)
+tests/Feature/         # 97 archivos, 1086 tests (+1 en tests/Unit)
 ```
 
 ### Endpoints
@@ -484,7 +489,7 @@ criterio están en `routes/api.php`:
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión. `me` (y el login) traen en `user` el `team_role` (`{id, name}`, solo staff) y `permisos`: lo que puede de verdad, ya resuelto | — |
+| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión. `me` (y el login) traen en `user` el `team_role` (`{id, name}`, solo staff) y `permisos`: lo que puede de verdad, ya resuelto; y `cierre` (FUN-28): `null` con la tienda abierta, o `{motivo, desde, plan}` si está cerrada —`motivo` es `prueba`, `plan` o `suspendida`—. Son las dos únicas rutas del panel que responden con la tienda cerrada | — |
 | POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | — |
 | GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | `resumen.ver` |
 | GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **solo salen con `costos.ver`** (MOD-6) | `reportes.ver` |
@@ -518,17 +523,26 @@ criterio están en `routes/api.php`:
 | POST | `/api/platform/login` · `/logout` | Sesión del operador. Con la verificación en dos pasos activa, la contraseña no da el token sino `{requiere_dos_pasos, desafio}` |
 | POST | `/api/platform/login/dos-pasos` | Segundo paso del login (SEC-9): `desafio` + `codigo` (el de la app o uno de recuperación). Un desafío dura 5 min y muere al quinto código equivocado; ese fallo va en `errors.desafio` y el del código en `errors.codigo` |
 | POST | `/api/platform/dos-pasos` · `/dos-pasos/confirmar` | Activar la verificación en dos pasos: semilla y QR; y confirmarla con un código, que devuelve los 8 códigos de recuperación una sola vez |
-| GET | `/api/platform/me` · `/tenants` | Perfil (con `seguridad`: si tiene la verificación en dos pasos, si es obligatoria, desde cuándo y cuántos códigos le quedan) y listado de tiendas |
-| GET | `/api/platform/stats` | Resumen del negocio: altas, estados, reparto por plan y totales |
+| GET | `/api/platform/me` · `/tenants` | Perfil (con `seguridad`: si tiene la verificación en dos pasos, si es obligatoria, desde cuándo y cuántos códigos le quedan) y listado de tiendas (`status`: `active`, `suspended` o `por_vencer` —abiertas con el plan pagado venciendo en 7 días, las más cercanas primero, INF-23—) |
+| GET | `/api/platform/stats` | Resumen del negocio: altas, estados (con `tiendas.por_vencer`, INF-23), reparto por plan y totales |
 | GET | `/api/platform/logs` | Bitácora del operador (filtros `tenant_id`, `action`); no incluye la actividad de las tiendas |
-| GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora, y `verticales` (clave => nombre, para el selector de rubro, MOD-19) |
-| PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar, cambiar plan y cambiar `vertical` (una de `config/verticales.php`; se anota como `tenant.vertical`) |
+| GET | `/api/platform/tenants/{tenant}` | Ficha: plan y consumo, equipo, últimos pedidos, bitácora, `verticales` (clave => nombre, para el selector de rubro, MOD-19) y `membresia` (INF-23): `cierre`, `desde` (desde qué fecha contarían los meses de un pago nuevo), `meses_max`, `medios` y `planes` para el formulario, y los últimos 24 `pagos` |
+| PUT | `/api/platform/tenants/{tenant}` | Suspender/reactivar, corregir el plan, cambiar `vertical` (una de `config/verticales.php`; se anota como `tenant.vertical`) y corregir `plan_ends_at` (`AAAA-MM-DD`, desde hoy, el plan dura hasta que acaba ese día en la zona de la tienda; solo si ya tiene pagos; se anota como `tenant.fecha_plan`). **Cambiar el plan aquí no es cobrarlo** (INF-23): no toca ninguna fecha ni saca de la prueba. Reabrir una tienda con la prueba o el plan vencidos da 422 en `is_active`: se reabre registrando un pago |
+| POST | `/api/platform/tenants/{tenant}/payments` | Registrar un pago del plan (INF-23): `plan`, `months` (1–24), `amount_usd`, `method` (`TenantPayment::MEDIOS`; `cortesia` va con monto 0 y un pago de 0 tiene que ser cortesía), `reference`, `notes` y `paid_on` (hasta hoy). Los meses se suman desde hoy o desde el final de la prueba o del plan que le quede, sin desbordar meses (31/01 + 1 = 28/02); saca de la prueba y reabre la tienda si estaba cerrada. Se anota como `tenant.pago`. Los pagos no se editan ni se borran |
 | POST | `/api/platform/tenants/{tenant}/password-reset` | Mandar recuperación al dueño |
 | POST | `/api/platform/tenants/{tenant}/impersonate` | Entrar como soporte: token de 15 min y **solo lectura** |
 | POST | `/api/platform/tenants/{tenant}/rescue-admin` | Nombrar admin a un colaborador cuando la tienda se quedó sin ninguno |
 
 > El token de soporte lleva la ability `soporte`, y el middleware `soporte` —aplicado al grupo
 > entero del panel— rechaza con 403 cualquier método que no sea GET/HEAD (salvo `/api/auth/logout`).
+
+> **Tienda cerrada (`FUN-28`).** Con la tienda cerrada —prueba o plan vencidos, o suspendida por el
+> operador— la contraseña sigue dando token, y el middleware `tenant` deja pasar solo
+> `/api/auth/me` y `/api/auth/logout`; el resto del panel responde **403 con `motivo:
+> tienda_cerrada`** y el `cierre`, que es lo que lleva al panel a su pantalla de tienda cerrada. A
+> quien no es del equipo de esa tienda, o va sin sesión, le sigue respondiendo 404: para él la
+> tienda no existe. El motivo no se guarda: lo deduce `Tenant::cierre()` de `trial_ends_at` y
+> `plan_ends_at`, las mismas fechas que mira el cierre automático.
 
 > **Verificación en dos pasos del operador (`SEC-9`).** En producción es obligatoria: sin ella, todo
 > el panel de plataforma salvo `me`, `logout` y activarla responde 403 con `motivo:
@@ -583,9 +597,9 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 ### Comandos
 
 ```bash
-php artisan test        # 1059 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 1087 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
-php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba vencida (normalmente vía Schedule::command, diario)
+php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba o el plan pagado vencidos (FUN-16, INF-23; normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan bitacora:purgar          # Borra la actividad de tienda de +365 días; la de plataforma no caduca (INF-20; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
@@ -660,7 +674,8 @@ src/
 │   ├── dashboard/  # NewOrderModal (venta de mostrador), EditorDeVariantes, VerifyEmailBanner,
 │   │               # EditorDeTramos (precio por mayor, MOD-15),
 │   │               # FichaTecnica (las specs fijas del tipo, FUN-8),
-│   │               # SupportBanner, InformeDeImport (resultado del import CSV)
+│   │               # SupportBanner, InformeDeImport (resultado del import CSV),
+│   │               # TrialBanner (prueba o plan por vencer), TiendaCerrada (FUN-28)
 │   ├── public/     # CartDrawer, CustomerAccountModal, StoreHeader, StoreFooter,
 │   │               # AnnouncementBar
 │   └── ui/         # Dialogo (ventana flotante del panel), Imagen (toda imagen,
@@ -677,7 +692,9 @@ src/
 │                   # puede subir y cuánto, copia de config/subidas.php, UI-15),
 │                   # specsFijas (repartir y pintar las specs de FUN-8),
 │                   # armadoCompartido (el armado de PC en la URL, MOD-20),
-│                   # plantillasWhatsapp (rellenar un mensaje y el enlace wa.me, MOD-25)
+│                   # plantillasWhatsapp (rellenar un mensaje y el enlace wa.me, MOD-25),
+│                   # contactoPlataforma (a quién escribe la tienda para pagar, FUN-28),
+│                   # limitesDePlan (nombres de los límites del plan en pantalla)
 ├── types/          # Tipos compartidos de la API
 └── test/           # setup de Vitest y datos de ejemplo (fixtures) para los tests
 ```
@@ -730,6 +747,7 @@ que aquí sólo van valores públicos; una clave secreta nunca va en el frontend
 | `VITE_PLATFORM_HOSTS` | Hosts de la propia plataforma, separados por comas (`plataforma.com,www.plataforma.com`). En ellos `/` es la landing; en cualquier otro host, `/` resuelve la tienda por dominio propio (INF-9). **En producción hay que ponerlo al hacer el build**, o la landing no sale nunca | `localhost,127.0.0.1` |
 | `VITE_SENTRY_DSN` · `VITE_SENTRY_ENVIRONMENT` | Errores no controlados hacia Sentry, proyecto React (`TEC-5`). Sin ellas no se envía nada. Sin usuario, cookies, cabeceras ni parámetros de URL, y sin rastro de navegación (`utils/observabilidad.ts`) | sin DSN, apagado |
 | `VITE_LEGAL_TITULAR` · `VITE_LEGAL_CORREO` | Nombre del titular y correo de contacto que salen en las páginas legales (`INF-15`). Son datos personales del dueño, por eso no van en el código | sin ellas, las páginas avisan en pantalla de que no están listas para publicarse |
+| `VITE_PLATAFORMA_WHATSAPP` | WhatsApp del operador, con prefijo de país (`593991234567`). Mientras no hay pasarela, pagar o renovar el plan es escribirle: lo usan la pantalla de tienda cerrada (`FUN-28`) y el aviso de prueba o plan por vencer (`utils/contactoPlataforma.ts`) | sin ella, esos botones abren un correo a `VITE_LEGAL_CORREO`; sin ninguna de las dos, no sale ningún botón |
 
 **Cuentas de prueba en los logins (sólo desarrollo).** Con `npm run dev`, `/login` y
 `/platform/login` enseñan debajo del formulario una lista de cuentas para entrar con un clic, como
@@ -755,7 +773,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 335 tests (Vitest + Testing Library, jsdom)
+npm test          # 355 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 
@@ -766,7 +784,9 @@ el carrito), la validación de variantes del formulario de producto, los mensaje
 formularios sin sesión y de las pantallas con sesión (`erroresDeFormulario`, con una guardia que falla
 si una pantalla vuelve a pintar el `message` de un error a mano), el aviso antes de subir un archivo
 (`utils/subidas`, `ImageSourceField`), los interceptores de Axios (qué token va a cada
-ruta y qué sesión cierra un 401), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
+ruta, qué sesión cierra un 401 y que el 403 de tienda cerrada cambie el panel de pantalla), la
+pantalla de tienda cerrada según el motivo y quién mira (`TiendaCerrada`, `FUN-28`), el aviso de
+prueba o plan por vencer contado en días de calendario (`TrialBanner`, `INF-23`), las guardas `PrivateRoute`/`SoloAdmin`, qué host es el de la
 plataforma (`utils/plataforma`), el envío y los métodos de pago en el checkout (`utils/paymentMethods`,
 la selección de entrega y su costo en `CartDrawer`), que el `FormData` de Configuración mande
 booleanos de verdad (`api/tenant`), el margen y qué precio se compara con el costo (`utils/margen`),

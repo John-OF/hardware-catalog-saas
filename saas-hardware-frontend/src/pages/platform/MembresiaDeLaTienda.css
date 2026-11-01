@@ -1,0 +1,108 @@
+/* Estilos del bloque de pagos de la ficha de tienda (INF-23).
+
+   Es parte de la ficha del operador, así que va acotado como ella a
+   `.page-platform` con `:where()` (ver la cabecera de PlatformTenantPage.css), y
+   sus clases van prefijadas con `membresia`. */
+
+:where(.page-platform) .membresia h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.page-platform) .membresia h4 {
+  margin: 1.1rem 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .membresia-estado {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .membresia-cierre {
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  background: var(--warning-glow);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .membresia-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+:where(.page-platform) .membresia label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .membresia-nota {
+  margin-top: 0.75rem;
+}
+
+:where(.page-platform) .membresia-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .membresia-corregir {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-platform) .membresia-ayuda {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+:where(.page-platform) .membresia-pagos {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+:where(.page-platform) .membresia-pagos li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-platform) .membresia-pagos li:last-child {
+  border-bottom: none;
+}
+
+:where(.page-platform) .membresia-pagos strong {
+  color: var(--text-primary);
+}
+
+:where(.page-platform) .membresia-pago-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}

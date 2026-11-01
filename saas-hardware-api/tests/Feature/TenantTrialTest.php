@@ -107,11 +107,11 @@ class TenantTrialTest extends TestCase
     }
 
     /**
-     * Elegir un plan de verdad tiene que sacar a la tienda de la prueba: si
-     * no, el comando de cierre automático podría suspenderla de todos modos
-     * en cuanto llegara la fecha, aunque ya estuviera pagando.
+     * Desde INF-23, cambiar el plan con el selector NO saca de la prueba: era la
+     * forma de dar un plan a mano, y dejaba ese plan para siempre. Lo que saca de
+     * la prueba es registrar un pago (`PagosDelPlanTest`), que pone fecha de fin.
      */
-    public function test_asignar_un_plan_desde_plataforma_termina_la_prueba(): void
+    public function test_cambiar_el_plan_desde_plataforma_no_termina_la_prueba(): void
     {
         $tenant = Tenant::create([
             'slug' => 'recien-convertida', 'name' => 'Recién Convertida',
@@ -131,8 +131,9 @@ class TenantTrialTest extends TestCase
             ->assertOk();
 
         $tenant->refresh();
-        $this->assertNull($tenant->trial_ends_at);
-        $this->assertFalse($tenant->enPrueba());
+        $this->assertNotNull($tenant->trial_ends_at);
+        $this->assertTrue($tenant->enPrueba());
+        $this->assertNull($tenant->plan_ends_at);
         $this->assertSame('pro', $tenant->plan);
     }
 
