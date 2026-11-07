@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Services\DomainVerifier;
 use App\Services\ImageService;
 use App\Support\Bitacora;
+use App\Support\MetodosDePago;
 use App\Support\PlanGate;
 use App\Support\Subidas;
 use Illuminate\Database\QueryException;
@@ -95,26 +96,23 @@ class TenantController extends Controller
             // podrian separarse sin que nada fallara.
             'timezone' => ['sometimes', 'string', Rule::in(array_keys(config('timezones')))],
 
-            // Métodos de pago visibles para el comprador (MOD-3). Cuatro fijos,
-            // por eso van con nombre y no como un array libre: un método
-            // inventado no tendría ni formulario ni traducción en el catálogo.
-            // Ninguno es obligatorio y ninguno pide el otro — una tienda puede
-            // enseñar solo "efectivo contra entrega" y no llenar nada más.
-            'payment_methods' => 'sometimes|nullable|array',
-            'payment_methods.yape.enabled' => 'sometimes|boolean',
-            'payment_methods.yape.phone' => 'nullable|string|max:20',
-            'payment_methods.yape.holder_name' => 'nullable|string|max:150',
-            'payment_methods.plin.enabled' => 'sometimes|boolean',
-            'payment_methods.plin.phone' => 'nullable|string|max:20',
-            'payment_methods.plin.holder_name' => 'nullable|string|max:150',
-            'payment_methods.transferencia.enabled' => 'sometimes|boolean',
-            'payment_methods.transferencia.bank' => 'nullable|string|max:100',
-            'payment_methods.transferencia.account_number' => 'nullable|string|max:40',
-            // CCI opcional: los depósitos entre cuentas del mismo banco no lo piden.
-            'payment_methods.transferencia.cci' => 'nullable|string|max:40',
-            'payment_methods.transferencia.account_type' => 'nullable|in:ahorros,corriente',
-            'payment_methods.transferencia.holder_name' => 'nullable|string|max:150',
-            'payment_methods.efectivo.enabled' => 'sometimes|boolean',
+            // Métodos de pago visibles para el comprador (MOD-3). Desde MOD-23
+            // son una lista que escribe la tienda —nombre, datos para pagar,
+            // instrucciones y, si quiere, la imagen de su QR—, porque los
+            // cuatro fijos de antes eran de Perú. **La lista manda**: llega
+            // entera cada vez y lo que no viene se quita, como las variantes de
+            // un producto. Vacía (`payment_methods=''`, que en un FormData es la
+            // única forma de mandar una lista sin nada) las quita todas.
+            'payment_methods' => 'sometimes|nullable|array|max:'.MetodosDePago::MAXIMO,
+            'payment_methods.*.id' => 'nullable|string|max:20',
+            'payment_methods.*.name' => 'required|string|max:60',
+            'payment_methods.*.details' => 'nullable|string|max:300',
+            'payment_methods.*.instructions' => 'nullable|string|max:500',
+            'payment_methods.*.enabled' => 'sometimes|boolean',
+            'payment_methods.*.remove_qr' => 'sometimes|boolean',
+            // La imagen del QR de cada uno, por su posición en la lista.
+            'payment_method_qr' => 'nullable|array',
+            'payment_method_qr.*' => ['image', ...Subidas::reglas('imagen')],
 
             // Envío (MOD-1). Un solo precio, sin zonas: lo que hoy hace falta es
             // distinguir "recojo en tienda" de "delivery", no tarifar por distrito.
@@ -129,6 +127,11 @@ class TenantController extends Controller
             'tax_name' => 'sometimes|string|max:20',
             'tax_rate' => 'sometimes|numeric|min:0|max:99.99',
             'tax_included' => 'sometimes|boolean',
+
+            // FUN-26: la cotización en PDF. La validez se imprime como fecha
+            // (hoy + N días); vacía, la cotización no dice hasta cuándo vale.
+            'quote_validity_days' => 'sometimes|nullable|integer|min:1|max:365',
+            'quote_terms' => 'sometimes|nullable|string|max:1000',
 
             // Archivos subidos opcionales (alternativa a pegar la URL)
             'banner' => ['nullable', 'image', ...Subidas::reglas('banner')],
@@ -229,25 +232,15 @@ class TenantController extends Controller
             $data['theme'] = array_merge($tenant->theme ?? [], $data['theme']);
         }
 
-        // Igual que el theme: el formulario manda los cuatro métodos completos
-        // cada vez que guarda, así que un merge a nivel superior basta y no hace
-        // falta fusionar campo a campo dentro de cada uno.
-        if (isset($data['payment_methods'])) {
-            // La regla `boolean` de arriba VALIDA que "0"/"1" sirvan, pero no
-            // los convierte: `$request->validate()` devuelve el string tal
-            // cual llegó. Sin este cast, "enabled": "0" se guardaría en el
-            // JSON literal, y en el navegador "0" es un string con contenido
-            // -verdadero-, así que un método apagado volvía a aparecer
-            // marcado la próxima vez que se abriera Configuración.
-            foreach ($data['payment_methods'] as &$metodo) {
-                if (array_key_exists('enabled', $metodo)) {
-                    $metodo['enabled'] = filter_var($metodo['enabled'], FILTER_VALIDATE_BOOLEAN);
-                }
-            }
-            unset($metodo);
+        // MOD-23: la lista entera, con el QR de cada uno. Los QR que dejan de
+        // usarse se borran al final, cuando la base ya no les apunta.
+        $qrSueltos = [];
 
-            $data['payment_methods'] = array_merge($tenant->payment_methods ?? [], $data['payment_methods']);
+        if (array_key_exists('payment_methods', $data)) {
+            [$data['payment_methods'], $qrSueltos] = $this->metodosDePagoDelFormulario($tenant, $data['payment_methods'] ?? [], $request);
         }
+
+        unset($data['payment_method_qr']);
 
         if ($request->hasFile('logo')) {
             $urls = $this->imageService->uploadProductImage($request->file('logo'), $tenant->slug.'/logo');
@@ -274,6 +267,7 @@ class TenantController extends Controller
             'name', 'whatsapp_number', 'currency', 'timezone', 'custom_domain', 'primary_color', 'logo_url', 'theme',
             'payment_methods', 'delivery_enabled', 'delivery_cost',
             'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
+            'quote_validity_days', 'quote_terms',
         ]);
 
         try {
@@ -299,9 +293,74 @@ class TenantController extends Controller
         // Invalidar la caché pública del tenant para que el branding se refleje al instante
         Cache::forget("tenant:{$tenant->slug}");
 
+        foreach ($qrSueltos as $url) {
+            $this->imageService->borrarImagenDePago($url, $tenant->slug);
+        }
+
         $this->anotarConfiguracion($antes, $tenant->fresh());
 
         return response()->json($tenant->fresh());
+    }
+
+    /**
+     * La lista de métodos de pago tal como queda al guardar (MOD-23), y los QR
+     * que dejan de usarse.
+     *
+     * Cada método se sigue por su `id`: el que trae uno de los que ya tenía la
+     * tienda conserva su QR; el que no, es nuevo (un `id` inventado o de otra
+     * tienda no adopta nada, porque solo se busca entre los de esta). El QR
+     * llega como `payment_method_qr[<posición>]` y reemplaza al que hubiera;
+     * `remove_qr` lo quita. Lo que la lista ya no trae se va con su QR.
+     *
+     * `enabled` llega como '1'/'0' de un FormData: la regla `boolean` lo valida
+     * pero no lo convierte, y guardar el texto "0" en el JSON es el fallo que
+     * encontró MOD-3 (en el navegador, "0" es verdadero). Lo convierte
+     * `MetodosDePago::normalizar()`, por el que pasa todo al guardar.
+     *
+     * @param  array<int, array<string, mixed>>  $entrada
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, string>}
+     */
+    private function metodosDePagoDelFormulario(Tenant $tenant, array $entrada, Request $request): array
+    {
+        $existentes = collect($tenant->payment_methods ?? [])->keyBy('id');
+        $lista = [];
+        $sueltos = [];
+        $usados = [];
+
+        foreach (array_values($entrada) as $posicion => $metodo) {
+            $anterior = isset($metodo['id']) ? $existentes->get($metodo['id']) : null;
+            $id = $anterior && ! isset($usados[$anterior['id']]) ? $anterior['id'] : MetodosDePago::nuevoId();
+            $usados[$id] = true;
+            $qr = $anterior && $anterior['id'] === $id ? $anterior['qr_url'] : null;
+
+            $archivo = $request->file("payment_method_qr.{$posicion}");
+
+            if (($archivo || filter_var($metodo['remove_qr'] ?? false, FILTER_VALIDATE_BOOLEAN)) && $qr) {
+                $sueltos[] = $qr;
+                $qr = null;
+            }
+
+            if ($archivo) {
+                $qr = $this->imageService->subirImagenDePago($archivo, $tenant->slug);
+            }
+
+            $lista[] = [
+                'id'           => $id,
+                'name'         => $metodo['name'],
+                'details'      => $metodo['details'] ?? null,
+                'instructions' => $metodo['instructions'] ?? null,
+                'qr_url'       => $qr,
+                'enabled'      => $metodo['enabled'] ?? true,
+            ];
+        }
+
+        foreach ($existentes as $id => $metodo) {
+            if (! isset($usados[$id]) && $metodo['qr_url']) {
+                $sueltos[] = $metodo['qr_url'];
+            }
+        }
+
+        return [MetodosDePago::normalizar($lista), $sueltos];
     }
 
     /**
@@ -330,6 +389,7 @@ class TenantController extends Controller
             'tax_name' => 'nombre del impuesto',
             'tax_rate' => 'tasa del impuesto',
             'tax_included' => 'impuesto incluido en los precios',
+            'quote_validity_days' => 'días de validez de la cotización',
         ]);
 
         $otros = [];
@@ -340,6 +400,11 @@ class TenantController extends Controller
 
         if (($antes['logo_url'] ?? null) !== $tenant->logo_url) {
             $otros[] = 'logo';
+        }
+
+        // FUN-26: un texto largo, se nombra como la apariencia.
+        if (($antes['quote_terms'] ?? null) !== $tenant->quote_terms) {
+            $otros[] = 'condiciones de la cotización';
         }
 
         // Se nombra y no se detalla, como la apariencia: son cuentas y números

@@ -31,6 +31,20 @@ class Tenant extends Model implements IsTenant
         static::created(function (Tenant $tenant) {
             TeamRole::crearDeFabrica($tenant->id);
         });
+
+        // INF-24: un cierre nuevo empieza la cuenta de la purga de cero. Al
+        // reabrirse (un pago, el operador) o al moverse la prueba, los avisos y
+        // la fecha prometida eran de otro cierre: si se quedaran, un segundo
+        // cierre podría borrar sin haber avisado de nuevo.
+        static::updating(function (Tenant $tenant) {
+            $reabre = $tenant->isDirty('is_active') && $tenant->is_active;
+
+            if ($reabre || $tenant->isDirty('trial_ends_at')) {
+                $tenant->purge_scheduled_at = null;
+                $tenant->purge_reminded_at = null;
+                $tenant->data_purged_at = null;
+            }
+        });
     }
 
     protected $fillable = [
@@ -40,6 +54,9 @@ class Tenant extends Model implements IsTenant
         // MOD-2. `tax_included` decide si el porcentaje se saca del precio o se
         // suma al final, y cambia la aritmética entera: ver `App\Support\Impuesto`.
         'tax_enabled', 'tax_name', 'tax_rate', 'tax_included',
+        // FUN-26: cuántos días vale una cotización (null: sin fecha) y las
+        // condiciones que se imprimen en ella (anticipo, entrega, garantía).
+        'quote_validity_days', 'quote_terms',
         // MOD-25: solo lo que la tienda cambió; lo demás sale de la config.
         'whatsapp_templates',
         // MOD-19: solo lo escribe el operador (`PlatformController::updateTenant`);
@@ -63,7 +80,9 @@ class Tenant extends Model implements IsTenant
      * caché del catálogo se llevan el crudo, que incluye los mensajes que la
      * tienda manda a sus clientes.
      */
-    protected $hidden = ['whatsapp_templates'];
+    // INF-24: las fechas de la purga son del sistema; lo que el dueño necesita
+    // saber de ellas viaja en `cierre()`.
+    protected $hidden = ['whatsapp_templates', 'purge_scheduled_at', 'purge_reminded_at', 'data_purged_at'];
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -72,12 +91,16 @@ class Tenant extends Model implements IsTenant
         // como ruta del disco y se leen como URL completa.
         'logo_url' => \App\Casts\ImagenDelDisco::class,
         'theme' => \App\Casts\TemaDeTienda::class,
-        'payment_methods' => 'array',
+        // MOD-23: la lista de métodos de pago que arma la tienda, siempre con la
+        // misma forma (también lo de antes, con los cuatro fijos) y con el QR
+        // de cada uno como ruta del disco.
+        'payment_methods' => \App\Casts\MetodosDePagoDeTienda::class,
         'delivery_enabled' => 'boolean',
         'delivery_cost' => 'decimal:2',
         'tax_enabled' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_included' => 'boolean',
+        'quote_validity_days' => 'integer',
         'whatsapp_templates' => 'array',
         'custom_domain_requested_at' => 'datetime',
         'custom_domain_verified_at' => 'datetime',
@@ -85,6 +108,10 @@ class Tenant extends Model implements IsTenant
         // INF-23: el «pagado hasta». De sistema, como `trial_ends_at`: fuera de
         // $fillable, lo mueve solo `App\Support\Membresia`.
         'plan_ends_at' => 'datetime',
+        // INF-24: de sistema también; las escribe solo `pruebas:purgar`.
+        'purge_scheduled_at' => 'datetime',
+        'purge_reminded_at' => 'datetime',
+        'data_purged_at' => 'datetime',
     ];
 
     /**
@@ -125,20 +152,16 @@ class Tenant extends Model implements IsTenant
         return \App\Support\Verticales::modulos($this);
     }
 
-    public const METODOS_DE_PAGO = ['yape', 'plin', 'transferencia', 'efectivo'];
-
     /**
-     * Los métodos que la tienda activó, con sus datos. Nunca los que están
-     * apagados: mostrar un Yape a medio llenar es peor que no mostrar Yape.
+     * Los métodos de pago que la tienda tiene encendidos, en su orden (MOD-23).
+     * Nunca los apagados: mostrar uno a medio llenar es peor que no mostrarlo.
+     * La forma de la lista, en `App\Support\MetodosDePago`.
      *
-     * @return array<string, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     public function metodosDePagoActivos(): array
     {
-        return collect($this->payment_methods ?? [])
-            ->only(self::METODOS_DE_PAGO)
-            ->filter(fn ($datos) => is_array($datos) && ($datos['enabled'] ?? false))
-            ->all();
+        return \App\Support\MetodosDePago::activos($this->payment_methods ?? []);
     }
 
     /**
@@ -187,7 +210,11 @@ class Tenant extends Model implements IsTenant
      * sin `is_active` entre ellas, toda tienda abierta saldría «suspendida». La
      * piden a mano el login, `me` y el 403 del panel.
      *
-     * @return array{motivo: string, desde: ?string, plan: string}|null
+     * INF-24: si nunca pagó, también desde cuándo se borran sus datos
+     * (`borrado_desde`) o cuándo se borraron (`datos_borrados`); los dos en
+     * `null` si a esta tienda no le toca. Lo decide `PruebasAbandonadas`.
+     *
+     * @return array{motivo: string, desde: ?string, plan: string, borrado_desde: ?string, datos_borrados: ?string}|null
      */
     public function cierre(): ?array
     {
@@ -206,7 +233,7 @@ class Tenant extends Model implements IsTenant
             'desde'  => $desde?->toIso8601String(),
             // El nombre comercial del plan que tenía, para «tu plan Pro venció».
             'plan'   => \App\Support\PlanGate::labelDe((string) $this->plan),
-        ];
+        ] + (\App\Support\PruebasAbandonadas::estado($this) ?? ['borrado_desde' => null, 'datos_borrados' => null]);
     }
 
     /**

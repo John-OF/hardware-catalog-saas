@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   enlaceDeProducto,
+  enlaceDeSeguimiento,
   enlaceDeWhatsapp,
   plantillaDelEstado,
   rellenarPlantilla,
@@ -8,7 +9,7 @@ import {
   valoresDePedido,
   variablesQueNoAdmite,
 } from './plantillasWhatsapp';
-import { PLANTILLAS_DEL_COMPRADOR, unaTienda } from '../test/fixtures';
+import { PLANTILLAS_DEL_COMPRADOR, unMetodo, unaTienda } from '../test/fixtures';
 import type { Order } from '../types';
 
 /**
@@ -54,7 +55,7 @@ describe('rellenarPlantilla', () => {
   it('con el pedido de fábrica, sin envío ni pagos ni nota, queda limpio', () => {
     const mensaje = rellenarPlantilla(PLANTILLAS_DEL_COMPRADOR.pedido_nuevo, {
       tienda: 'Tienda Demo', pedido: '#42', productos: '• 1 x Mouse — $10.00', total: '$10.00',
-      cliente: 'Ana', entrega: '', nota: '', pagos: '',
+      cliente: 'Ana', entrega: '', nota: '', pagos: '', seguimiento: '',
     });
 
     expect(mensaje).toBe('Hola Tienda Demo, quiero hacer este pedido:\n\n• 1 x Mouse — $10.00\n\n*Total: $10.00*\n\nNombre: Ana\n\n(Pedido #42)');
@@ -85,6 +86,7 @@ describe('mensajes de un pedido desde el panel', () => {
     id: 'o-1', number: 47, customer_name: 'Ana Pérez', customer_phone: '+51987654321',
     customer_email: null, customer_note: null, status: 'attended', total: 215,
     delivery_method: 'delivery', delivery_cost: 15,
+    tracking_token: 'T'.repeat(40),
     items: [
       { id: 'i-1', product_id: 'p-1', product_name: 'Kingston Fury', variant_name: '32 GB', unit_price: 100, quantity: 2, subtotal: 200 },
     ],
@@ -100,10 +102,10 @@ describe('mensajes de un pedido desde el panel', () => {
 
   it('arma las variables con el número, los productos, la entrega y los pagos activos', () => {
     const tienda = unaTienda({
-      payment_methods: {
-        yape: { enabled: true, phone: '987654321', holder_name: 'Ana' },
-        efectivo: { enabled: false },
-      },
+      payment_methods: [
+        unMetodo({ name: 'Yape', details: '987654321 · Ana' }),
+        unMetodo({ name: 'Efectivo contra entrega', enabled: false }),
+      ],
     });
 
     expect(valoresDePedido(pedido, tienda)).toEqual({
@@ -114,7 +116,21 @@ describe('mensajes de un pedido desde el panel', () => {
       total: '$215.00',
       entrega: 'Delivery ($15.00)',
       pagos: 'Yape (987654321 · Ana)',
+      seguimiento: `${window.location.origin}/tienda-demo/pedido/${'T'.repeat(40)}`,
+      motivo: '',
     });
+  });
+
+  it('MOD-26: el motivo del rechazo sale en su variable', () => {
+    expect(valoresDePedido({ ...pedido, payment_rejection_reason: 'El monto no coincide' }, unaTienda()).motivo).toBe('El monto no coincide');
+  });
+
+  it('MOD-26: el enlace de seguimiento usa el dominio propio verificado, y sin token no hay enlace', () => {
+    const conDominio = unaTienda({ custom_domain: 'mitienda.com', custom_domain_verified_at: '2026-10-01T00:00:00Z' });
+
+    expect(enlaceDeSeguimiento(conDominio, 'abc')).toBe('https://mitienda.com/pedido/abc');
+    expect(enlaceDeSeguimiento(unaTienda({ custom_domain: 'mitienda.com', custom_domain_verified_at: null }), 'abc')).toBe(`${window.location.origin}/tienda-demo/pedido/abc`);
+    expect(enlaceDeSeguimiento(unaTienda(), undefined)).toBe('');
   });
 
   it('sin forma de entrega (mostrador, o la tienda no reparte) la entrega queda vacía', () => {

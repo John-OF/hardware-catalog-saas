@@ -1,4 +1,4 @@
-import type { Product, ProductVariant, Tenant } from '../types';
+import type { PaymentMethod, Product, ProductVariant, Tenant } from '../types';
 
 /** Datos mínimos con la forma que devuelve la API. Cada test pisa solo lo que le importa. */
 
@@ -10,7 +10,7 @@ import type { Product, ProductVariant, Tenant } from '../types';
  * tiene por qué cambiar con él.
  */
 export const PLANTILLAS_DEL_COMPRADOR = {
-  pedido_nuevo: 'Hola {tienda}, quiero hacer este pedido:\n\n{productos}\n\n*Total: {total}*\n\nNombre: {cliente}\nEntrega: {entrega}\nNota: {nota}\n\nFormas de pago: {pagos}\n\n(Pedido {pedido})',
+  pedido_nuevo: 'Hola {tienda}, quiero hacer este pedido:\n\n{productos}\n\n*Total: {total}*\n\nNombre: {cliente}\nEntrega: {entrega}\nNota: {nota}\n\nFormas de pago: {pagos}\n\n(Pedido {pedido})\nMi pedido: {seguimiento}',
   consulta_producto: 'Hola, me interesa el producto *{producto}* (precio: {precio}) de tu catálogo. ¿Está disponible?\n\nEnlace del producto: {enlace}',
   armado_pc: '*¡Hola! Armé una PC desde tu catálogo:*\n\n{piezas}\n\n*Total estimado:* {total}\n*Consumo del sistema:* {consumo}\n*Ver el armado:* {enlace}\n\nPor favor, confírmenme stock y disponibilidad. ¡Gracias!',
 };
@@ -44,6 +44,17 @@ export const unaTienda = (datos: Partial<Tenant> = {}): Tenant => ({
   tax_rate: 15,
   tax_included: true,
   plantillas_whatsapp: PLANTILLAS_DEL_COMPRADOR,
+  ...datos,
+});
+
+/** Un método de pago de la tienda (MOD-23), encendido y sin QR. */
+export const unMetodo = (datos: Partial<PaymentMethod> = {}): PaymentMethod => ({
+  id: 'm-1',
+  name: 'Yape',
+  details: null,
+  instructions: null,
+  qr_url: null,
+  enabled: true,
   ...datos,
 });
 

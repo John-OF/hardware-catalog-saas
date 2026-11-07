@@ -36,7 +36,11 @@ class Product extends Model
         // MOD-15: el precio por mayor, `[{"min": 10, "price": 90}]`. Lo normaliza
         // siempre `App\Support\PreciosPorCantidad`, nunca se escribe a mano.
         'price_tiers',
-        'stock', 'low_stock_threshold', 'description', 'specs',
+        'stock',
+        // MOD-22: si se lleva la cuenta de las unidades. Con false el producto
+        // se pide siempre; lo que eso apaga lo dice `controlaStock()`.
+        'track_stock',
+        'low_stock_threshold', 'description', 'specs',
         'image_url', 'thumbnail_url', 'is_active', 'sort_order', 'status',
     ];
 
@@ -66,6 +70,7 @@ class Product extends Model
         'price_tiers'          => 'array',
         'cost'                 => 'decimal:2',
         'low_stock_threshold'  => 'integer',
+        'track_stock'          => 'boolean',
         'is_active'            => 'boolean',
         'sort_order'           => 'integer',
         // TEC-15: en la base, la ruta dentro del disco; al leer, la URL completa.
@@ -92,7 +97,18 @@ class Product extends Model
 
         // "Avísame cuando llegue": al reponer stock (de 0 a >0) notificar a los interesados
         static::updated(function ($product) {
-            if ($product->wasChanged('stock')
+            // MOD-22: dejar de llevar la cuenta es otra forma de que vuelva a
+            // haber: desde ahora se puede pedir. Quien esperaba se entera igual
+            // que si hubieran llegado unidades, y se mira antes que el stock
+            // porque con la cuenta apagada el numero ya no dice nada.
+            if ($product->wasChanged('track_stock') && ! $product->track_stock) {
+                $product->avisarQueYaSePuedePedir();
+
+                return;
+            }
+
+            if ($product->controlaStock()
+                && $product->wasChanged('stock')
                 && (int) $product->getOriginal('stock') <= 0
                 && (int) $product->stock > 0) {
                 $product->notifyStockSubscribers();
@@ -170,6 +186,67 @@ class Product extends Model
         }
 
         return $enviados;
+    }
+
+    /**
+     * Avisa a toda la lista de espera de este producto, la de la ficha y la de
+     * cada variante, de que ya se puede pedir (MOD-22). Lo llama el hook de
+     * `updated` al apagar el control de stock: entonces deja de haber agotados.
+     *
+     * Las mismas reglas que una reposicion (FUN-1b): solo a quien dejo correo,
+     * y cada fila se marca despues de encolar. Las variantes que ya tenian
+     * stock no tienen a nadie pendiente por correo, asi que recorrerlas todas
+     * no avisa dos veces a nadie.
+     */
+    public function avisarQueYaSePuedePedir(): int
+    {
+        $enviados = $this->notifyStockSubscribers();
+
+        $variantes = ProductVariant::withoutTenant()
+            ->where('tenant_id', $this->tenant_id)
+            ->where('product_id', $this->id)
+            ->get();
+
+        foreach ($variantes as $variante) {
+            $enviados += $variante->notificarListaDeEspera();
+        }
+
+        return $enviados;
+    }
+
+    /**
+     * Si la tienda lleva la cuenta de las unidades de este producto (MOD-22).
+     *
+     * Con `false` se puede pedir siempre —un servicio, un encargo, algo
+     * digital—: no se enseñan las unidades, no hay "Avísame cuando llegue",
+     * atender un pedido no mueve nada y no sale en el stock bajo. Vale para la
+     * ficha y para todas sus variantes.
+     *
+     * Un producto leido sin la columna (una consulta que eligio otras) cuenta
+     * como que si la lleva, que es lo que era todo antes de esto.
+     */
+    public function controlaStock(): bool
+    {
+        return ($this->attributes['track_stock'] ?? true) == true;
+    }
+
+    /**
+     * Si lo que se elige se puede pedir: con la cuenta apagada, siempre; con
+     * ella, si quedan unidades del producto o de la variante.
+     */
+    public function hayParaPedir(?ProductVariant $variante = null): bool
+    {
+        return ! $this->controlaStock() || (int) ($variante ? $variante->stock : $this->stock) > 0;
+    }
+
+    /**
+     * Lo que se puede pedir ahora: lo que lleva la cuenta y tiene unidades, y lo
+     * que no lleva la cuenta (MOD-22). Es el filtro "Sólo en stock" del
+     * catálogo y lo que el armador pide para sus cajones.
+     */
+    public function scopeParaPedir($query)
+    {
+        return $query->where(fn ($q) => $q->where('track_stock', false)->orWhere('stock', '>', 0));
     }
 
     public function category(): BelongsTo
@@ -313,6 +390,6 @@ class Product extends Model
     // Accessor útil para el frontend
     public function getIsAvailableAttribute(): bool
     {
-        return $this->stock > 0;
+        return $this->hayParaPedir();
     }
 }

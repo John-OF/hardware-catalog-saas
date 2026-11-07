@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderPricing;
 use App\Support\Bitacora;
+use App\Support\Comprobantes;
 use App\Support\Costos;
 use App\Support\Cupones;
 use App\Support\Impuesto;
@@ -35,6 +36,11 @@ class OrderController extends Controller
         // Filtro por estado
         if ($request->has('status') && in_array($request->status, ['pending', 'processing', 'attended', 'cancelled'])) {
             $query->where('status', $request->status);
+        }
+
+        // MOD-26: los que tienen un comprobante esperando que alguien lo mire.
+        if ($request->payment_status === Order::PAGO_EN_REVISION) {
+            $query->where('payment_status', Order::PAGO_EN_REVISION);
         }
 
         // Búsqueda por cliente o por número de pedido
@@ -236,6 +242,61 @@ class OrderController extends Controller
     }
 
     /** Cómo se llama cada estado en la bitácora (INF-3): lo lee el dueño, no el código. */
+    /**
+     * El comprobante que mandó el comprador desde su enlace (MOD-26), tal como
+     * lo subió. Del disco privado: no hay otra forma de verlo.
+     */
+    public function comprobante(Order $order)
+    {
+        return Comprobantes::respuesta($order)
+            ?? response()->json(['message' => 'Este pedido no tiene un comprobante guardado.'], 404);
+    }
+
+    /**
+     * Confirmar o rechazar el pago (MOD-26). No toca el estado del pedido ni el
+     * stock: decir «el pago llegó» no es decir «el pedido está listo».
+     *
+     * Rechazar pide un motivo, que ve el comprador en su enlace («el monto no
+     * coincide»), y solo vale sobre un comprobante en revisión: no hay nada que
+     * rechazar si no mandó nada. Confirmar vale siempre que el pedido siga vivo,
+     * también sin comprobante: el dueño puede haberlo visto en su banco.
+     */
+    public function revisarPago(Request $request, Order $order): JsonResponse
+    {
+        $data = $request->validate([
+            'decision' => 'required|in:confirmar,rechazar',
+            'motivo'   => 'nullable|required_if:decision,rechazar|string|max:300',
+        ], [
+            'motivo.required_if' => 'Dile al cliente por qué no se confirmó su pago.',
+        ]);
+
+        if ($order->status === 'cancelled') {
+            return response()->json(['message' => 'El pedido está cancelado.'], 422);
+        }
+
+        if ($data['decision'] === 'rechazar' && $order->payment_status !== Order::PAGO_EN_REVISION) {
+            return response()->json(['message' => 'Solo se puede rechazar un comprobante que esté en revisión.'], 422);
+        }
+
+        $confirma = $data['decision'] === 'confirmar';
+
+        $order->forceFill([
+            'payment_status' => $confirma ? Order::PAGO_CONFIRMADO : Order::PAGO_RECHAZADO,
+            'payment_reviewed_at' => now(),
+            'payment_rejection_reason' => $confirma ? null : trim($data['motivo']),
+        ])->save();
+
+        Bitacora::anotar(
+            ActivityLog::PEDIDO_PAGO,
+            $confirma
+                ? "Confirmó el pago del pedido #{$order->number}."
+                : "Rechazó el comprobante del pedido #{$order->number}: {$order->payment_rejection_reason}",
+            ['pedido_id' => $order->id, 'numero' => $order->number, 'pago' => $order->payment_status],
+        );
+
+        return response()->json(Costos::mostrar($order->load('items')));
+    }
+
     private function etiquetaDeEstado(string $estado): string
     {
         return match ($estado) {

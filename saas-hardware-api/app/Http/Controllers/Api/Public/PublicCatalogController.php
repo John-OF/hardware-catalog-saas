@@ -208,7 +208,9 @@ class PublicCatalogController extends Controller
                 // busqueda la ofrecen tambien el panel y la exportacion, y antes
                 // cada uno miraba columnas distintas.
                 ->tap(fn ($q) => Busqueda::aplicar($q, $request->search))
-                ->when($request->in_stock, fn ($q) => $q->where('stock', '>', 0))
+                // MOD-22: "en stock" es "se puede pedir", y un producto que no
+                // lleva la cuenta de sus unidades se puede pedir siempre.
+                ->when($request->in_stock, fn ($q) => $q->paraPedir())
                 ->when($specs, function ($q) use ($specs) {
                     foreach ($specs as $key => $value) {
                         $q->where('specs->'.$key, $value);
@@ -887,8 +889,9 @@ class PublicCatalogController extends Controller
             }
         }
 
-        // Solo tiene sentido si lo que espera está agotado
-        if (($variante ? $variante->stock : $product->stock) > 0) {
+        // Solo tiene sentido si lo que espera está agotado. MOD-22: y un producto
+        // que no lleva la cuenta de sus unidades no se agota nunca.
+        if ($product->hayParaPedir($variante)) {
             return response()->json([
                 'message' => $variante
                     ? 'Esa opción ya está disponible. ¡Puedes pedirla ahora!'

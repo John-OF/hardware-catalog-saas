@@ -89,7 +89,7 @@
             @if ($producto->sale_price)
                 <span class="precio"><s>{{ \App\Support\Money::format($producto->price, $tienda->currency) }}</s></span>
             @endif
-            — {{ (int) $producto->stock > 0 ? 'Disponible' : 'Agotado' }}
+            — {{ $producto->hayParaPedir() ? 'Disponible' : 'Agotado' }}
         </p>
 
         @if ($producto->brand)

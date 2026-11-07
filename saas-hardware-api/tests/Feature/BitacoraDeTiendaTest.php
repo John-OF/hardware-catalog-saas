@@ -59,6 +59,8 @@ class BitacoraDeTiendaTest extends TestCase
         'POST api/orders'                              => ActivityLog::PEDIDO_MOSTRADOR,
         'PUT api/orders/{order}'                       => ActivityLog::PEDIDO_ESTADO,
         'DELETE api/orders/{order}'                    => ActivityLog::PEDIDO_BORRADO,
+        // MOD-26: confirmar o rechazar un pago es dinero que se da por cobrado.
+        'POST api/orders/{order}/pago'                 => ActivityLog::PEDIDO_PAGO,
         'POST api/categories'                          => ActivityLog::CATEGORIA_CREADA,
         'PUT api/categories/{category}'                => ActivityLog::CATEGORIA_EDITADA,
         'DELETE api/categories/{category}'             => ActivityLog::CATEGORIA_BORRADA,
@@ -89,6 +91,10 @@ class BitacoraDeTiendaTest extends TestCase
         'POST api/coupons'                             => ActivityLog::CUPON_CREADO,
         'PUT api/coupons/{coupon}'                     => ActivityLog::CUPON_EDITADO,
         'DELETE api/coupons/{coupon}'                  => ActivityLog::CUPON_BORRADO,
+        // MOD-24: lo que la tienda escribe de sus clientes. Los casos, en
+        // `DirectorioDeClientesTest`.
+        'PUT api/customers/{customer}'                 => ActivityLog::CLIENTE_EDITADO,
+        'POST api/customers/import'                    => ActivityLog::CLIENTES_IMPORTADOS,
         'POST api/trash/{tipo}/{id}/restore'           => ActivityLog::PAPELERA_RESTAURADO,
         'DELETE api/trash/{tipo}/{id}'                 => ActivityLog::PAPELERA_PURGADO,
         'DELETE api/trash'                             => ActivityLog::PAPELERA_VACIADA,
@@ -164,6 +170,11 @@ class BitacoraDeTiendaTest extends TestCase
         $cupon->tenant_id = $this->tienda->id;
         $cupon->save();
 
+        // MOD-24: una persona del directorio, para escribirle una nota.
+        $persona = new \App\Models\Customer(['name' => 'Luisa Compradora', 'phone' => '987111222', 'phone_key' => '87111222']);
+        $persona->tenant_id = $this->tienda->id;
+        $persona->save();
+
         // MOD-21: un rol sin nadie, para editarlo y borrarlo.
         $rol = new \App\Models\TeamRole(['name' => 'Compras', 'permissions' => ['productos.ver']]);
         $rol->tenant_id = $this->tienda->id;
@@ -186,6 +197,7 @@ class BitacoraDeTiendaTest extends TestCase
                 'customer_name' => 'Cliente', 'status' => 'pending', 'items' => [['product_id' => $this->producto->id, 'quantity' => 1]],
             ]),
             'PUT api/orders/{order}' => fn () => $this->como($this->admin)->putJson('/api/orders/'.$this->ultimoPedidoId(), ['status' => 'attended']),
+            'POST api/orders/{order}/pago' => fn () => $this->como($this->admin)->postJson('/api/orders/'.$this->ultimoPedidoId().'/pago', ['decision' => 'confirmar']),
             'DELETE api/orders/{order}' => fn () => $this->como($this->admin)->deleteJson('/api/orders/'.$this->ultimoPedidoId()),
             'POST api/categories' => fn () => $this->como($this->admin)->postJson('/api/categories', ['name' => 'Tarjetas gráficas']),
             'PUT api/categories/{category}' => fn () => $this->como($this->admin)->putJson("/api/categories/{$categoria->id}", ['name' => 'CPU']),
@@ -212,6 +224,10 @@ class BitacoraDeTiendaTest extends TestCase
             'POST api/coupons' => fn () => $this->como($this->admin)->postJson('/api/coupons', ['code' => 'NUEVO', 'type' => 'percent', 'value' => 15]),
             'PUT api/coupons/{coupon}' => fn () => $this->como($this->admin)->putJson("/api/coupons/{$cupon->id}", ['value' => 20]),
             'DELETE api/coupons/{coupon}' => fn () => $this->como($this->admin)->deleteJson("/api/coupons/{$cupon->id}"),
+            'PUT api/customers/{customer}' => fn () => $this->como($this->admin)->putJson("/api/customers/{$persona->id}", ['notes' => 'Prefiere recoger en tienda']),
+            'POST api/customers/import' => fn () => $this->como($this->admin)->post('/api/customers/import', [
+                'file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('clientes.csv', "nombre;telefono\nMario;912345678\n"),
+            ], ['Accept' => 'application/json']),
             'DELETE api/products/{product}' => fn () => $this->como($this->admin)->deleteJson("/api/products/{$this->producto->id}"),
             // Van al final a propósito: el paso de arriba deja un producto en la
             // papelera, que es lo que encuentra el vaciado.

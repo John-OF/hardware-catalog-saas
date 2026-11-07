@@ -23,6 +23,9 @@ trait ValidaVariantes
     // `variants.*`. Quien use este trait hereda las dos cosas.
     use ValidaTramosDePrecio;
 
+    // MOD-22: el stock de cada variante solo se exige si el producto lleva la cuenta.
+    use ValidaControlDeStock;
+
     protected function decodificarVariantes(): void
     {
         if (is_string($this->variants)) {
@@ -52,7 +55,8 @@ trait ValidaVariantes
             'variants.*.cost' => 'nullable|numeric|min:0',
             // MOD-15: y su precio por mayor, por lo mismo.
             ...$this->reglasDeTramos('variants.*'),
-            'variants.*.stock' => 'required|integer|min:0',
+            // MOD-22: sin control de stock, el de cada variante tampoco hace falta.
+            'variants.*.stock' => [$this->controlaStock() ? 'required' : 'nullable', 'integer', 'min:0'],
             'variants.*.low_stock_threshold' => 'nullable|integer|min:0',
             'variants.*.remove_image' => 'nullable|boolean',
             'variant_images' => 'nullable|array',

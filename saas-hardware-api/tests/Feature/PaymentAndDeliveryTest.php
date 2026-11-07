@@ -17,7 +17,8 @@ use Tests\TestCase;
  * Dos funciones chicas y sin nada en común salvo que las pidió el mismo
  * cambio, así que van en el mismo fichero.
  *
- * **`MOD-3` no es una pasarela.** No hay ningún cobro ni ningún API externa:
+ * **`MOD-3` no es una pasarela.** (Desde `MOD-23` los métodos son una lista
+ * que escribe la tienda; lo propio de la lista está en `MetodosDePagoTest`.) No hay ningún cobro ni ningún API externa:
  * es solo lo que la tienda le enseña al comprador (Yape, cuenta bancaria,
  * efectivo) para que sepa cómo pagarle. El checkout sigue cerrándose por
  * WhatsApp. Por eso lo único que fija esta parte es que **un método apagado
@@ -69,39 +70,38 @@ class PaymentAndDeliveryTest extends TestCase
         $this->producto->save();
     }
 
-    // ---------------------------------------------------------- MOD-3: guardar
+    // ------------------------------------------- MOD-3 / MOD-23: guardar
 
-    public function test_guarda_los_cuatro_metodos_de_pago_con_sus_datos(): void
+    /**
+     * Desde MOD-23 son una lista que escribe la tienda, no cuatro fijos. Los
+     * casos de la lista en sí (QR, ids, el formato de antes) están en
+     * `MetodosDePagoTest`; aquí queda lo que ya fijaba MOD-3.
+     */
+    public function test_guarda_la_lista_de_metodos_con_sus_datos_y_en_su_orden(): void
     {
         $this->comoAdmin()->putJson('/api/tenant', [
             'payment_methods' => [
-                'yape' => ['enabled' => true, 'phone' => '987654321', 'holder_name' => 'Ana Dueña'],
-                'plin' => ['enabled' => false, 'phone' => '', 'holder_name' => ''],
-                'transferencia' => [
-                    'enabled' => true, 'bank' => 'BCP', 'account_number' => '1937482910',
-                    'account_type' => 'ahorros', 'holder_name' => 'Ana Dueña', 'cci' => '00219300123456789012',
-                ],
-                'efectivo' => ['enabled' => true],
+                ['name' => 'Deuna', 'details' => '0991234567 · Ana Dueña', 'enabled' => true],
+                ['name' => 'Transferencia Banco Pichincha', 'details' => 'Ahorros 2201234567', 'instructions' => 'Manda la captura', 'enabled' => false],
+                ['name' => 'Efectivo contra entrega'],
             ],
         ])->assertOk();
 
         $guardado = $this->tenant->fresh()->payment_methods;
 
-        $this->assertTrue($guardado['yape']['enabled']);
-        $this->assertSame('987654321', $guardado['yape']['phone']);
-        $this->assertFalse($guardado['plin']['enabled']);
-        $this->assertSame('BCP', $guardado['transferencia']['bank']);
-        $this->assertSame('ahorros', $guardado['transferencia']['account_type']);
-        $this->assertTrue($guardado['efectivo']['enabled']);
+        $this->assertSame(['Deuna', 'Transferencia Banco Pichincha', 'Efectivo contra entrega'], array_column($guardado, 'name'));
+        $this->assertSame('0991234567 · Ana Dueña', $guardado[0]['details']);
+        $this->assertFalse($guardado[1]['enabled']);
+        $this->assertSame('Manda la captura', $guardado[1]['instructions']);
+        // Sin decir nada, encendido: es lo que se acaba de escribir para enseñarlo.
+        $this->assertTrue($guardado[2]['enabled']);
     }
 
-    public function test_rechaza_un_tipo_de_cuenta_que_no_es_ahorros_ni_corriente(): void
+    public function test_un_metodo_sin_nombre_se_rechaza(): void
     {
         $this->comoAdmin()->putJson('/api/tenant', [
-            'payment_methods' => [
-                'transferencia' => ['enabled' => true, 'account_type' => 'billetera'],
-            ],
-        ])->assertStatus(422)->assertJsonValidationErrors(['payment_methods.transferencia.account_type']);
+            'payment_methods' => [['name' => '', 'details' => '987654321']],
+        ])->assertStatus(422)->assertJsonValidationErrors(['payment_methods.0.name']);
     }
 
     /**
@@ -110,51 +110,35 @@ class PaymentAndDeliveryTest extends TestCase
      * cazado —manda JSON de verdad, con booleanos de verdad— así que aquí se
      * manda tal cual llega de un formulario, con `post()` y no `postJson()`.
      *
-     * Sin el `filter_var` de `TenantController::update()`, "0" se guardaba
-     * literal en el JSON, y en el navegador el string "0" es verdadero: un
-     * método apagado volvía a aparecer marcado la próxima vez que se abría
-     * Configuración.
+     * Sin convertirlo, "0" se guardaba literal en el JSON, y en el navegador el
+     * string "0" es verdadero: un método apagado volvía a aparecer marcado la
+     * próxima vez que se abría Configuración.
      */
     public function test_un_metodo_apagado_por_formulario_se_guarda_como_booleano_de_verdad_y_no_como_texto(): void
     {
         $this->comoAdmin()->post('/api/tenant', [
             '_method' => 'PUT',
             'payment_methods' => [
-                'yape' => ['enabled' => '1', 'phone' => '987654321'],
-                'plin' => ['enabled' => '0'],
+                ['name' => 'Yape', 'enabled' => '1', 'details' => '987654321'],
+                ['name' => 'Plin', 'enabled' => '0'],
             ],
         ])->assertOk();
 
         $guardado = $this->tenant->fresh()->payment_methods;
 
-        $this->assertSame(true, $guardado['yape']['enabled']);
-        $this->assertSame(false, $guardado['plin']['enabled']);
+        $this->assertSame(true, $guardado[0]['enabled']);
+        $this->assertSame(false, $guardado[1]['enabled']);
     }
 
-    public function test_un_metodo_desconocido_no_se_guarda(): void
-    {
-        // Un array libre inventaría formularios que no existen (ver la
-        // cabecera de la migración): solo los cuatro fijos tienen campos.
-        $this->comoAdmin()->putJson('/api/tenant', [
-            'payment_methods' => ['bitcoin' => ['enabled' => true]],
-        ])->assertOk();
-
-        $this->assertArrayNotHasKey('bitcoin', $this->tenant->fresh()->payment_methods ?? []);
-    }
-
-    public function test_guardar_solo_un_metodo_no_borra_los_demas(): void
+    public function test_guardar_otra_cosa_no_toca_los_metodos(): void
     {
         $this->comoAdmin()->putJson('/api/tenant', [
-            'payment_methods' => ['yape' => ['enabled' => true, 'phone' => '987654321']],
+            'payment_methods' => [['name' => 'Yape', 'details' => '987654321']],
         ])->assertOk();
 
-        $this->comoAdmin()->putJson('/api/tenant', [
-            'payment_methods' => ['efectivo' => ['enabled' => true]],
-        ])->assertOk();
+        $this->comoAdmin()->putJson('/api/tenant', ['delivery_enabled' => true])->assertOk();
 
-        $guardado = $this->tenant->fresh()->payment_methods;
-        $this->assertTrue($guardado['yape']['enabled'], 'el yape de la petición anterior no debería borrarse');
-        $this->assertTrue($guardado['efectivo']['enabled']);
+        $this->assertSame(['Yape'], array_column($this->tenant->fresh()->payment_methods, 'name'));
     }
 
     // ------------------------------------------------------- MOD-1: guardar
@@ -184,31 +168,33 @@ class PaymentAndDeliveryTest extends TestCase
     {
         $this->tenant->update([
             'payment_methods' => [
-                'yape' => ['enabled' => true, 'phone' => '987654321', 'holder_name' => 'Ana'],
+                ['name' => 'Yape', 'details' => '987654321 · Ana', 'enabled' => true],
                 // Apagado, pero con datos de un intento anterior: no deben salir.
-                'plin' => ['enabled' => false, 'phone' => '999888777', 'holder_name' => 'Ana'],
+                ['name' => 'Plin', 'details' => '999888777 · Ana', 'enabled' => false],
             ],
         ]);
 
         $respuesta = $this->getJson("/api/public/{$this->tenant->slug}")->assertOk();
 
-        $respuesta->assertJsonPath('payment_methods.yape.phone', '987654321');
-        $this->assertArrayNotHasKey('plin', $respuesta->json('payment_methods'));
+        $this->assertSame(['Yape'], array_column($respuesta->json('payment_methods'), 'name'));
+        $respuesta->assertJsonPath('payment_methods.0.details', '987654321 · Ana');
     }
 
     public function test_resolve_domain_tambien_filtra_los_metodos_apagados(): void
     {
         $this->tenant->update([
             'custom_domain' => 'tienda-envios.example.com',
-            'payment_methods' => ['efectivo' => ['enabled' => true], 'yape' => ['enabled' => false]],
+            'payment_methods' => [
+                ['name' => 'Efectivo contra entrega', 'enabled' => true],
+                ['name' => 'Yape', 'enabled' => false],
+            ],
         ]);
         // Fuera de $fillable a propósito (FUN-6): solo se escribe con forceFill.
         $this->tenant->forceFill(['custom_domain_verified_at' => now()])->save();
 
         $respuesta = $this->getJson('/api/public/resolve-domain?domain=tienda-envios.example.com')->assertOk();
 
-        $this->assertArrayHasKey('efectivo', $respuesta->json('payment_methods'));
-        $this->assertArrayNotHasKey('yape', $respuesta->json('payment_methods'));
+        $this->assertSame(['Efectivo contra entrega'], array_column($respuesta->json('payment_methods'), 'name'));
     }
 
     // ------------------------------------------------- MOD-1: el pedido cobra
@@ -323,7 +309,7 @@ class PaymentAndDeliveryTest extends TestCase
     public function test_cambiar_metodos_de_pago_se_nombra_sin_volcar_los_datos(): void
     {
         $this->comoAdmin()->putJson('/api/tenant', [
-            'payment_methods' => ['yape' => ['enabled' => true, 'phone' => '987654321']],
+            'payment_methods' => [['name' => 'Yape', 'details' => '987654321']],
         ])->assertOk();
 
         $linea = ActivityLog::where('origen', 'tienda')->latest()->first();

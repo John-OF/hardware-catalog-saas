@@ -1,0 +1,245 @@
+/* Estilos de <SeguimientoPedidoPage> (MOD-26): el pedido visto por quien lo
+   hizo. Acotados a `.page-seguimiento`, que va en la raíz y en los estados de
+   carga y de error, con :where() para no subir la especificidad (TEC-6). */
+
+:where(.page-seguimiento).public-catalog-container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  flex: 1;
+}
+
+:where(.page-seguimiento).loading-fullscreen,
+:where(.page-seguimiento).error-fullscreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 60vh;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+:where(.page-seguimiento).error-fullscreen h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+}
+
+:where(.page-seguimiento) .seguimiento-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+:where(.page-seguimiento) .seguimiento-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+}
+
+:where(.page-seguimiento) .seguimiento-card h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+:where(.page-seguimiento) .seguimiento-pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.page-seguimiento) .seguimiento-pasos li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+:where(.page-seguimiento) .seguimiento-pasos li.hecho {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+:where(.page-seguimiento) .seguimiento-punto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+:where(.page-seguimiento) .seguimiento-pasos li.hecho .seguimiento-punto {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+
+:where(.page-seguimiento) .seguimiento-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+:where(.page-seguimiento) .seguimiento-lineas li,
+:where(.page-seguimiento) .seguimiento-totales div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-seguimiento) .seguimiento-totales {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-seguimiento) .seguimiento-totales dd {
+  margin: 0;
+}
+
+:where(.page-seguimiento) .seguimiento-totales .seguimiento-total {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-estado {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+:where(.page-seguimiento) .seguimiento-estado svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+:where(.page-seguimiento) .seguimiento-estado.confirmado {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+}
+
+:where(.page-seguimiento) .seguimiento-estado.revision {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning);
+}
+
+:where(.page-seguimiento) .seguimiento-estado.rechazado,
+:where(.page-seguimiento) .seguimiento-estado.cancelado {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+:where(.page-seguimiento) .seguimiento-metodos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.page-seguimiento) .seguimiento-metodos li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+:where(.page-seguimiento) .seguimiento-metodos strong {
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-instrucciones {
+  display: block;
+}
+
+:where(.page-seguimiento) .seguimiento-qr {
+  flex-shrink: 0;
+  display: block;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+:where(.page-seguimiento) .seguimiento-qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:where(.page-seguimiento) .seguimiento-subir {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+:where(.page-seguimiento) .seguimiento-subir label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-seguimiento) .seguimiento-subir button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

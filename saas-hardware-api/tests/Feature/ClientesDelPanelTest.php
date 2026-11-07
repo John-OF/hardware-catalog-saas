@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Tenant;
 use App\Models\User;
@@ -142,7 +143,10 @@ class ClientesDelPanelTest extends TestCase
     {
         $pedido = $this->pedidoDe($this->cliente, total: 500);
 
-        $this->comoAdmin()->getJson("/api/customers/{$this->cliente->id}")
+        // MOD-24: la ficha es la del directorio, no la de la cuenta.
+        $ficha = Customer::withoutTenant()->where('user_id', $this->cliente->id)->value('id');
+
+        $this->comoAdmin()->getJson("/api/customers/{$ficha}")
             ->assertOk()
             ->assertJsonPath('customer.name', 'Ana Compradora')
             ->assertJsonPath('customer.pedidos_count', 1)

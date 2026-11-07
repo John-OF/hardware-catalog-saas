@@ -27,6 +27,15 @@ class Order extends Model
         return (string) Str::uuid7();
     }
 
+    /**
+     * El pago, aparte del estado del pedido (MOD-26). `null`: nadie dijo nada
+     * todavía. Lo mueve el comprador al mandar su comprobante y la tienda al
+     * revisarlo; el estado del pedido (y con él el stock) no se entera.
+     */
+    public const PAGO_EN_REVISION = 'en_revision';
+    public const PAGO_CONFIRMADO = 'confirmado';
+    public const PAGO_RECHAZADO = 'rechazado';
+
     // `number` NO va aquí a propósito (FUN-3): lo pone el correlativo de la
     // tienda, no quien crea el pedido. Fuera de `$fillable`, ni un `create()`
     // descuidado ni un campo de más en la petición pueden fijarlo.
@@ -49,7 +58,14 @@ class Order extends Model
      * MOD-2: el desglose se calcula, no se guarda dos veces. Va siempre, también
      * en los pedidos sin impuesto, donde es igual al total.
      */
-    protected $appends = ['base_imponible'];
+    protected $appends = ['base_imponible', 'tiene_comprobante'];
+
+    /**
+     * MOD-26: la ruta del comprobante en el disco privado no sale en ninguna
+     * respuesta: el panel lo pide por su ruta autenticada y el comprador solo
+     * sabe que lo mandó (`tiene_comprobante`).
+     */
+    protected $hidden = ['payment_proof_path'];
 
     protected $casts = [
         'total' => 'decimal:2',
@@ -60,7 +76,15 @@ class Order extends Model
         'items_subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'number' => 'integer',
+        'payment_proof_uploaded_at' => 'datetime',
+        'payment_reviewed_at' => 'datetime',
     ];
+
+    /** Si el comprador mandó un comprobante que todavía está guardado (MOD-26). */
+    public function getTieneComprobanteAttribute(): bool
+    {
+        return filled($this->attributes['payment_proof_path'] ?? null);
+    }
 
     protected static function booted(): void
     {
@@ -72,6 +96,19 @@ class Order extends Model
         //
         // Va después del hook de `BelongsToTenant` (los traits arrancan antes que
         // `booted()`), así que `tenant_id` ya está puesto cuando llega aquí.
+        // MOD-24: quien compra queda en el directorio de clientes de la tienda,
+        // tenga cuenta o no. Aquí y no en los controladores por lo mismo que el
+        // número: cualquier camino que cree un pedido lo apunta. Dentro de la
+        // transacción del pedido, así que si el pedido no entra, tampoco la
+        // persona; y sin tumbarlo si el directorio falla.
+        static::created(fn (Order $order) => \App\Support\Directorio::registrarPedidoSinFallar($order));
+
+        // MOD-26: la llave del enlace de seguimiento. Al crear, como el número,
+        // para que ningún camino que cree pedidos la olvide.
+        static::creating(function (Order $order) {
+            $order->tracking_token ??= Str::random(40);
+        });
+
         static::creating(function (Order $order) {
             if ($order->number === null) {
                 $order->number = static::siguienteNumeroDe($order->tenant_id);
@@ -148,6 +185,11 @@ class Order extends Model
      * Con el modelo (`increment()` de una instancia) y no con una consulta suelta,
      * para que salten los eventos: el aviso de "ya llegó" al devolver stock de un
      * pedido cancelado.
+     *
+     * MOD-22: un producto que no lleva la cuenta de sus unidades no se mueve, ni
+     * él ni sus variantes. Lo decide cómo está el producto **ahora**, no cuando
+     * se vendió: si el dueño apaga la cuenta entre atender y cancelar, la
+     * devolución no suma, y al volver a encenderla el número es el que quedó.
      */
     public function moverStock(bool $decrement): void
     {
@@ -163,11 +205,17 @@ class Order extends Model
                     continue;
                 }
 
+                $producto = $variante->product()->withTrashed()->first();
+
+                if ($producto && ! $producto->controlaStock()) {
+                    continue;
+                }
+
                 $decrement
                     ? $variante->decrement('stock', $item->quantity)
                     : $variante->increment('stock', $item->quantity);
 
-                $variante->product()->withTrashed()->first()?->sincronizarResumenDeVariantes();
+                $producto?->sincronizarResumenDeVariantes();
 
                 continue;
             }
@@ -178,7 +226,7 @@ class Order extends Model
 
             $producto = Product::withTrashed()->withCount('variants')->find($item->product_id);
 
-            if (! $producto || $producto->variants_count > 0) {
+            if (! $producto || $producto->variants_count > 0 || ! $producto->controlaStock()) {
                 continue;
             }
 

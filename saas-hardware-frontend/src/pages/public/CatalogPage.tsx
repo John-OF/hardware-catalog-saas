@@ -1,7 +1,7 @@
 import './CatalogPage.css';
 
 import { lazy, useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import RouteFallback from '../../components/ui/RouteFallback';
 
@@ -51,6 +51,7 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import type { Tenant, Category, Product, PaginatedResponse, Page } from '../../types';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
+import { controlaStock, hayParaPedir, quedanPocas } from '../../utils/stock';
 import { esHostDeLaPlataforma } from '../../utils/plataforma';
 import { etiquetaDeSpec, todosLosCampos, valorDeSpec } from '../../utils/specsFijas';
 import { enlaceDeWhatsapp } from '../../utils/plantillasWhatsapp';
@@ -59,6 +60,7 @@ import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 
 export default function CatalogPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const isCustomDomain = !slug;
   const currentDomain = window.location.hostname;
 
@@ -716,7 +718,7 @@ export default function CatalogPage() {
                                     />
                                   </button>
                                 )}
-                                {product.stock > 0 && (
+                                {hayParaPedir(product) && (
                                   <button
                                     type="button"
                                     onClick={(e) => handleToggleCompare(e, product)}
@@ -734,13 +736,14 @@ export default function CatalogPage() {
                                     </div>
                                   }
                                 />
-                                {product.stock === 0 && (
+                                {/* MOD-22: sin control de stock no se agota ni quedan pocas. */}
+                                {!hayParaPedir(product) && (
                                   <span className="card-badge sold-out">Agotado</span>
                                 )}
-                                {product.stock > 0 && product.stock < 5 && (
+                                {quedanPocas(product) && (
                                   <span className="card-badge low-stock">Pocas Unidades</span>
                                 )}
-                                {product.stock > 0 && product.sale_price !== null && product.sale_price !== undefined && (
+                                {hayParaPedir(product) && product.sale_price !== null && product.sale_price !== undefined && (
                                   <span className="card-badge sale">Oferta</span>
                                 )}
                               </div>
@@ -781,9 +784,9 @@ export default function CatalogPage() {
                                   // Con variantes no se agrega desde la tarjeta: el clic sigue
                                   // al enlace de la tarjeta y lleva a la ficha para elegir.
                                   onClick={conVariantes ? undefined : (e) => handleAddToCart(e, product)}
-                                  disabled={product.stock === 0}
+                                  disabled={!hayParaPedir(product)}
                                 >
-                                  {product.stock === 0 ? (
+                                  {!hayParaPedir(product) ? (
                                     'Agotado'
                                   ) : conVariantes ? (
                                     <>
@@ -835,7 +838,17 @@ export default function CatalogPage() {
           return null;
         })}
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} slug={resolvedSlug!} tenant={tenant} />
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        slug={resolvedSlug!}
+        tenant={tenant}
+        // MOD-26: después de pedir, el comprador llega a su pedido: ahí ve cómo
+        // pagar y manda el comprobante, mientras WhatsApp se abre en otra pestaña.
+        onPedidoCreado={(pedido) => {
+          if (pedido.tracking_token) navigate(slug ? `/${slug}/pedido/${pedido.tracking_token}` : `/pedido/${pedido.tracking_token}`);
+        }}
+      />
       <CustomerAccountModal
         isOpen={accountModalOpen}
         onClose={() => setAccountModalOpen(false)}
@@ -943,7 +956,7 @@ export default function CatalogPage() {
                               <button
                                 type="button"
                                 onClick={(e) => handleAddToCart(e, p)}
-                                disabled={p.stock === 0}
+                                disabled={!hayParaPedir(p)}
                                 className="btn-primary compare-add-btn"
                                 style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', marginTop: '0.5rem', width: '100%' }}
                               >
@@ -965,8 +978,8 @@ export default function CatalogPage() {
                     <tr>
                       <td><strong>Disponibilidad</strong></td>
                       {comparedProducts.map((p) => (
-                        <td key={p.id} className={p.stock > 0 ? 'text-success' : 'text-danger'} style={{ fontWeight: 600 }}>
-                          {p.stock > 0 ? `En Stock (${p.stock})` : 'Agotado'}
+                        <td key={p.id} className={hayParaPedir(p) ? 'text-success' : 'text-danger'} style={{ fontWeight: 600 }}>
+                          {!controlaStock(p) ? 'Disponible' : p.stock > 0 ? `En Stock (${p.stock})` : 'Agotado'}
                         </td>
                       ))}
                     </tr>

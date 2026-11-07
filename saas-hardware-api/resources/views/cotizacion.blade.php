@@ -49,6 +49,11 @@
 
         .nota { clear: both; padding-top: 26px; color: #6b7280; font-size: 9.5px; line-height: 1.5; }
         .aviso { margin-top: 10px; padding: 7px 9px; background: #f9fafb; border-left: 3px solid #d1d5db; color: #4b5563; }
+        .anexo { clear: both; padding-top: 22px; }
+        .anexo .bloque { margin-bottom: 12px; }
+        .anexo ul { margin: 0; padding-left: 14px; }
+        .condiciones { line-height: 1.5; }
+        .emision { color: #6b7280; font-size: 9.5px; }
     </style>
 </head>
 <body>
@@ -66,6 +71,13 @@
                 <br>
             @endif
             <span class="tienda-nombre">{{ $tienda->name }}</span>
+            {{-- FUN-26: quién emite, con los datos que la tienda escribe para su pie. --}}
+            @if ($idFiscal)
+                <br><span class="tienda-dato">{{ $idFiscal }}</span>
+            @endif
+            @if ($direccion)
+                <br><span class="tienda-dato">{{ $direccion }}</span>
+            @endif
             @if ($tienda->whatsapp_number)
                 <br><span class="tienda-dato">WhatsApp {{ $tienda->whatsapp_number }}</span>
             @endif
@@ -74,7 +86,11 @@
         <td class="doc">
             <span class="doc-tipo">{{ mb_strtoupper($titulo) }}</span><br>
             <span class="doc-numero">{{ $numero }}</span><br>
-            <span class="doc-fecha">{{ $fecha }}</span>
+            <span class="doc-fecha">Pedido del {{ $fecha }}</span>
+            {{-- FUN-26: hasta cuándo vale, lo primero que pregunta quien compara presupuestos. --}}
+            @if ($validaHasta)
+                <br><span class="doc-fecha"><strong>Válida hasta el {{ $validaHasta }}</strong></span>
+            @endif
         </td>
     </tr>
 </table>
@@ -154,7 +170,35 @@
     </tr>
 </table>
 
+{{-- FUN-26: cómo pagar y en qué condiciones, para que la cotización se pueda
+     mandar sin explicarla por chat. --}}
+@if ($pagos !== [] || $condiciones)
+    <div class="anexo">
+        @if ($pagos !== [])
+            <div class="bloque">
+                <div class="bloque-titulo">Cómo pagar</div>
+                <ul>
+                    @foreach ($pagos as $pago)
+                        <li>{{ $pago }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        @if ($condiciones)
+            <div class="bloque">
+                <div class="bloque-titulo">Condiciones</div>
+                <div class="condiciones">{!! nl2br(e($condiciones)) !!}</div>
+            </div>
+        @endif
+    </div>
+@endif
+
 <div class="nota">
+    <div class="emision">
+        Emitida el {{ $emitida }}@if ($emitidaPor) por {{ $emitidaPor }}@endif{{ $validaHasta ? '. Válida hasta el '.$validaHasta : '' }}.
+    </div>
+    <br>
+
     @if ($pedido->customer_note)
         <strong>Nota:</strong> {{ $pedido->customer_note }}<br><br>
     @endif

@@ -1,0 +1,224 @@
+/* Métodos de pago de la tienda (MOD-23). CSS de componente: global, con
+   prefijo propio para no chocar con las clases de ninguna página. */
+
+.metodos-pago {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.metodos-pago-sugeridos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.metodos-pago-pais {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.metodos-pago-pais select {
+  width: auto;
+  min-width: 0;
+  padding-block: 0.35rem;
+}
+
+.metodos-pago-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.metodos-pago-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.metodos-pago-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.metodos-pago-chip.otro {
+  border-style: dashed;
+}
+
+.metodos-pago-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.metodos-pago-nota {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.metodos-pago-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.metodo-pago {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.metodo-pago.apagado {
+  opacity: 0.65;
+}
+
+.metodo-pago-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.metodo-pago-cabecera input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.metodo-pago-nombre {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.metodo-pago-acciones {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.metodo-pago-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.metodo-pago-icono:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.metodo-pago-icono.peligro:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.metodo-pago-cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.metodo-pago-textos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.metodo-pago-textos label,
+.metodo-pago-qr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metodo-pago-textos em,
+.metodo-pago-qr em {
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+.metodo-pago-textos textarea {
+  resize: vertical;
+  min-height: 3.2rem;
+}
+
+.metodo-pago-qr-imagen {
+  position: relative;
+  width: 76px;
+  height: 76px;
+}
+
+.metodo-pago-qr-imagen img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.metodo-pago-qr-quitar {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  padding: 2px;
+  border: none;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  cursor: pointer;
+}
+
+.metodo-pago-qr-elegir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 76px;
+  height: 76px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.metodo-pago-qr-elegir:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.metodo-pago-qr-elegir input {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .metodo-pago-cuerpo,
+  .metodo-pago-textos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

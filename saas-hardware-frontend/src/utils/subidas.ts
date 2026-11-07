@@ -15,6 +15,7 @@ export const LIMITES_DE_SUBIDA = {
   banner: { kb: 5120, tipos: ['jpeg', 'jpg', 'png', 'webp'] },
   favicon: { kb: 512, tipos: ['png', 'ico'] },
   csv: { kb: 4096, tipos: ['csv', 'txt'] },
+  comprobante: { kb: 5120, tipos: ['jpeg', 'jpg', 'png', 'webp', 'pdf'] },
 } as const;
 
 export type TipoDeSubida = keyof typeof LIMITES_DE_SUBIDA;
@@ -34,6 +35,7 @@ const MIME_DE: Record<string, string[]> = {
   ico: ['image/x-icon', 'image/vnd.microsoft.icon'],
   csv: ['text/csv'],
   txt: ['text/plain'],
+  pdf: ['application/pdf'],
 };
 
 /** Cómo se nombra cada extensión en un mensaje: el dueño conoce "JPG", no "jpeg". */

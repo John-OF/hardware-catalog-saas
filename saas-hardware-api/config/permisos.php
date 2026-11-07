@@ -70,6 +70,9 @@ return [
             'etiqueta' => 'Clientes',
             'permisos' => [
                 'clientes.ver' => ['etiqueta' => 'Ver los clientes y sus datos de contacto'],
+                // MOD-24: lo que la tienda anota de cada cliente, y traer o llevarse el directorio.
+                'clientes.gestionar' => ['etiqueta' => 'Escribir notas y etiquetas de los clientes, e importarlos desde un CSV', 'requiere' => ['clientes.ver']],
+                'clientes.exportar'  => ['etiqueta' => 'Exportar los clientes a CSV, con sus datos de contacto', 'requiere' => ['clientes.ver']],
             ],
         ],
         'reportes' => [

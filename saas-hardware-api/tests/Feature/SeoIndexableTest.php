@@ -174,6 +174,19 @@ class SeoIndexableTest extends TestCase
         $this->assertSame('https://schema.org/OutOfStock', $datos['offers']['availability']);
     }
 
+    public function test_lo_que_no_lleva_la_cuenta_de_su_stock_se_declara_disponible(): void
+    {
+        // MOD-22: un servicio con el número a 0 se puede comprar igual.
+        $producto = $this->producto('Instalación de Windows', 40, stock: 0);
+        $producto->update(['track_stock' => false]);
+
+        $html = $this->get("/tiendaseo/product/{$producto->id}", self::CRAWLER)->getContent();
+
+        $this->assertSame('https://schema.org/InStock', $this->jsonLdDe($html, 'Product')['offers']['availability']);
+        $this->assertStringContainsString('Disponible', $html);
+        $this->assertStringNotContainsString('Agotado', $html);
+    }
+
     public function test_el_catalogo_se_declara_como_tienda(): void
     {
         $datos = $this->jsonLdDe($this->get('/tiendaseo', self::CRAWLER)->getContent(), 'Store');

@@ -9,10 +9,10 @@ import { useCustomerAuthStore } from '../../stores/customerAuthStore';
 import { createPublicOrder } from '../../api/public';
 import { comprobarCupon, type CouponCheck } from '../../api/coupons';
 import { mensajeDeError } from '../../api/erroresDeFormulario';
-import type { Tenant } from '../../types';
+import type { Order, Tenant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { metodosDePagoActivos } from '../../utils/paymentMethods';
-import { enlaceDeWhatsapp, lineaDeProducto, rellenarPlantilla, textoDeEntrega, textoDePagos } from '../../utils/plantillasWhatsapp';
+import { enlaceDeSeguimiento, enlaceDeWhatsapp, lineaDeProducto, rellenarPlantilla, textoDeEntrega, textoDePagos } from '../../utils/plantillasWhatsapp';
 import { COUNTRY_CODES, deriveCountryCode, splitPhone } from '../../utils/phone';
 import { claveDeLinea, datosDeVenta, nombreConVariante, precioVisible } from '../../utils/variants';
 import { tramoPara, tramosDeVenta } from '../../utils/preciosPorCantidad';
@@ -22,9 +22,15 @@ interface CartDrawerProps {
   onClose: () => void;
   slug: string;
   tenant: Tenant;
+  /**
+   * MOD-26: qué hacer con el pedido recién creado. La página del catálogo lleva
+   * al comprador a su enlace de seguimiento, donde ve cómo pagar y manda el
+   * comprobante; el carrito no navega por su cuenta para no depender del router.
+   */
+  onPedidoCreado?: (pedido: Order) => void;
 }
 
-export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerProps) {
+export default function CartDrawer({ open, onClose, slug, tenant, onPedidoCreado }: CartDrawerProps) {
   const money = (n: number | string | null | undefined) => formatMoney(n, tenant?.currency);
 
   const items = useCartStore((s) => s.items);
@@ -146,7 +152,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
    * verdad va a cobrar la tienda (incluido el envío, calculado en el
    * servidor) y no puede desalinearse de `totalConEnvio`.
    */
-  const buildWhatsappMessage = (orderNumber: number, total: number) =>
+  const buildWhatsappMessage = (orderNumber: number, total: number, trackingToken?: string) =>
     rellenarPlantilla(tenant.plantillas_whatsapp?.pedido_nuevo ?? '', {
       tienda: tenant.name,
       // FUN-3: el correlativo de la tienda. Antes iba un trozo del UUID, que ni
@@ -168,6 +174,8 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       nota: note,
       // MOD-3: cómo pagar, para que no tenga que preguntarlo por chat.
       pagos: textoDePagos(metodosDePago),
+      // MOD-26: su enlace. Va en el chat, así lo conservan los dos.
+      seguimiento: enlaceDeSeguimiento(tenant, trackingToken),
     });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,7 +201,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
 
       // El total del pedido creado, no `totalConEnvio`: es lo que el
       // servidor de verdad cobró.
-      window.open(enlaceDeWhatsapp(tenant.whatsapp_number, buildWhatsappMessage(order.number, Number(order.total))), '_blank');
+      window.open(enlaceDeWhatsapp(tenant.whatsapp_number, buildWhatsappMessage(order.number, Number(order.total), order.tracking_token)), '_blank');
 
       toast.success('Pedido enviado. Continúa la conversación por WhatsApp.');
       clear();
@@ -204,6 +212,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
       setNote('');
       setDeliveryMethod('pickup');
       onClose();
+      onPedidoCreado?.(order);
     } catch (err: any) {
       toast.error(mensajeDeError(err, { contexto: 'catalogo' }));
     } finally {
@@ -430,7 +439,7 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                 maxLength={200}
                 autoComplete="email"
               />
-              <p className="cart-field-hint">Si lo dejas, te enviamos la confirmacion y te avisamos cuando tu pedido este listo.</p>
+              <p className="cart-field-hint">Si lo dejas, te enviamos la confirmación y te avisamos cuando tu pedido esté listo.</p>
               <textarea className="premium-input" placeholder="Nota (opcional): forma de entrega, dudas..." value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={1000} />
 
               {/* MOD-3: informativo. El pago se coordina por WhatsApp; esto
@@ -441,7 +450,18 @@ export default function CartDrawer({ open, onClose, slug, tenant }: CartDrawerPr
                   <ul>
                     {metodosDePago.map((m) => (
                       <li key={m.clave}>
-                        <strong>{m.etiqueta}</strong>{m.detalle && ` · ${m.detalle}`}
+                        <div className="cart-payment-method-text">
+                          <span><strong>{m.etiqueta}</strong>{m.detalle && ` · ${m.detalle}`}</span>
+                          {/* MOD-23: lo que la tienda pide hacer al pagar. */}
+                          {m.instrucciones && <span className="cart-payment-method-hint">{m.instrucciones}</span>}
+                        </div>
+                        {/* El QR se abre a tamaño completo en otra pestaña: en el
+                            celular es la forma de guardarlo para la app del banco. */}
+                        {m.qr && (
+                          <a href={m.qr} target="_blank" rel="noopener noreferrer" className="cart-payment-method-qr" title={`Ver el QR de ${m.etiqueta}`}>
+                            <Imagen src={m.qr} alt={`QR de ${m.etiqueta}`} loading="lazy" />
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>

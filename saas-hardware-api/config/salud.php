@@ -38,6 +38,8 @@ return [
         'pruebas'  => env('VIGILANCIA_PRUEBAS_URL'),
         'papelera' => env('VIGILANCIA_PAPELERA_URL'),
         'bitacora' => env('VIGILANCIA_BITACORA_URL'),
+        'comprobantes' => env('VIGILANCIA_COMPROBANTES_URL'),
+        'purga'    => env('VIGILANCIA_PURGA_URL'),
         'salud'    => env('VIGILANCIA_SALUD_URL'),
     ],
 

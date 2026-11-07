@@ -74,7 +74,9 @@ hace cada función, qué **no** hace y dónde cojea— está en `docs/funcionali
   cierra solas las tiendas cuya prueba de 7 días venció o cuyo plan pagado a mano llegó a su fecha
   de fin (`trials:cerrar-vencidas`, `FUN-16` e `INF-23`), lo que vacía la
   papelera de lo que lleve más de 30 días borrado (`papelera:purgar`, `MOD-8`), lo que borra la
-  actividad de tienda de más de un año (`bitacora:purgar`, `INF-20`) y lo que hace la
+  actividad de tienda de más de un año (`bitacora:purgar`, `INF-20`), lo que caduca los comprobantes
+  de pago (`comprobantes:purgar`, `MOD-26`), lo que avisa y, a los 90 días, borra los datos de las
+  pruebas que nunca pagaron (`pruebas:purgar`, `INF-24`) y lo que hace la
   **copia de seguridad diaria** (`copias:crear`, `INF-7`); sin él, ninguna prueba se cierra aunque la
   fecha ya haya pasado, la papelera crece sin techo y **no hay ninguna copia de la base**. Como sin él
   no hay ningún error que leer, cada tarea avisa fuera al terminar (`INF-18`, ver *Vigilancia de las
@@ -211,8 +213,8 @@ Un cron caído no da errores: se calla, y la copia de esa noche simplemente no e
 tarea del scheduler avisa al terminar a una URL de `config/salud.php` (`VIGILANCIA_*_URL`), y es un
 servicio externo —healthchecks.io, Better Stack— el que da la alarma cuando **deja de llegar** el
 aviso. Al fallar se avisa a la misma URL con `/fail`, para enterarse en el momento. Hacen falta
-cinco comprobaciones en ese servicio: `copias`, `pruebas`, `papelera` y `bitacora` cada día, y
-`salud` cada hora, que cubre de paso al propio cron. Sin URL no se avisa a nadie, que es lo que pasa en local.
+siete comprobaciones en ese servicio: `copias`, `pruebas`, `papelera`, `bitacora`, `comprobantes` y
+`purga` cada día, y `salud` cada hora, que cubre de paso al propio cron. Sin URL no se avisa a nadie, que es lo que pasa en local.
 
 ### Copias de seguridad y cómo restaurar una (`INF-7`)
 
@@ -317,7 +319,7 @@ app/
 ├── Casts/ImagenDelDisco.php       # Columna de imagen: ruta del disco en la base, URL al leer (TEC-15)
 ├── Casts/TemaDeTienda.php         # tenants.theme, con portada y favicon como ImagenDelDisco
 ├── Console/Commands/              # CloseExpiredTrials (pruebas y planes vencidos, FUN-16 e INF-23), PurgeTrash (MOD-8),
-│                                  # CreateBackup (INF-7) y CheckDeployment (INF-19), desde el
+│                                  # PurgeAbandonedTrials (INF-24), CreateBackup (INF-7) y CheckDeployment (INF-19), desde el
 │                                  # scheduler; CreateSuperAdmin y RemoveOperatorTwoFactor (SEC-9), a mano
 ├── Enums/ComponentType.php        # Qué pieza de PC vende una categoría
 ├── Exceptions/PlanLimitException  # 422 con la clave del límite alcanzado
@@ -402,6 +404,8 @@ app/
     ├── DosPasos.php        # Verificación en dos pasos del operador (SEC-9): códigos, desafío, recuperación
     ├── Membresia.php       # El plan pagado (INF-23): registrar un pago, hasta cuándo dura, corregir la
     │                       # fecha y si una tienda cerrada se puede reabrir a mano
+    ├── PruebasAbandonadas.php # Las pruebas que nunca pagaron (INF-24): avisos, fecha prometida y el
+    │                       # borrado, que se deshace si alguna tabla entera no baja justo lo de la tienda
     └── Suplantacion.php    # Sesión de soporte: ability, duración y cómo se reconoce
 
 config/backups.php     # Dónde y cuánto se guardan las copias de seguridad (INF-7)
@@ -436,7 +440,7 @@ resources/views/       # catalog_og (lo que ve un crawler, INF-4), sitemap (INF-
 routes/api.php         # Toda la API
 routes/web.php         # Vistas previas Open Graph para crawlers + redirect al SPA
 routes/console.php     # Tareas programadas (Schedule::command), sin Kernel.php en Laravel 13
-tests/Feature/         # 97 archivos, 1086 tests (+1 en tests/Unit)
+tests/Feature/         # 104 archivos, 1168 tests (+2 en tests/Unit)
 ```
 
 ### Endpoints
@@ -468,6 +472,8 @@ tests/Feature/         # 97 archivos, 1086 tests (+1 en tests/Unit)
 | POST | `/products/{product}/reviews` | Crear reseña (Turnstile) · 10/min |
 | POST | `/products/{product}/notify-me` | "Avísame cuando llegue" (`variant_id` obligatorio si el producto tiene variantes) · 10/min |
 | POST | `/orders` | Crear pedido; cada línea con `variant_id` si el producto tiene variantes; `delivery_method` (`pickup`/`delivery`) y `coupon_code` opcionales — el costo del envío y el descuento los calcula el servidor, nunca lo que mande el cliente (MOD-1, MOD-4) · 10/min |
+| GET | `/pedidos/{token}` | El pedido visto por quien lo hizo (MOD-26): estado, líneas, totales y el estado del pago; sin teléfono, correo ni nota. El token (40 caracteres) es la única llave; el de otra tienda da 404 |
+| POST | `/pedidos/{token}/comprobante` | El comprobante del pago (`file`: JPG, PNG, WEBP o PDF, 5 MB, comprobado por su contenido) al disco **privado**; deja el pago `en_revision` y reemplaza al anterior. No con el pedido cancelado ni el pago confirmado. Limitador `throttle:comprobante` (5/min) |
 | POST | `/coupons/check` | Comprueba un código desde el carrito y devuelve cuánto descontaría (MOD-4). Limitador propio (`throttle:cupon`, **5/min**) porque es el único sitio público donde adivinar a ciegas tiene premio |
 | GET | `/pages` · `/pages/{page_slug}` | Páginas informativas |
 | POST | `/auth/register` · `/auth/login` | Cuenta de cliente · 5/min (el login, por correo; 20/min por IP) |
@@ -489,22 +495,28 @@ criterio están en `routes/api.php`:
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión. `me` (y el login) traen en `user` el `team_role` (`{id, name}`, solo staff) y `permisos`: lo que puede de verdad, ya resuelto; y `cierre` (FUN-28): `null` con la tienda abierta, o `{motivo, desde, plan}` si está cerrada —`motivo` es `prueba`, `plan` o `suspendida`—. Son las dos únicas rutas del panel que responden con la tienda cerrada | — |
+| POST·GET | `/api/auth/logout` · `/api/auth/me` | Sesión. `me` (y el login) traen en `user` el `team_role` (`{id, name}`, solo staff) y `permisos`: lo que puede de verdad, ya resuelto; y `cierre` (FUN-28): `null` con la tienda abierta, o `{motivo, desde, plan, borrado_desde, datos_borrados}` si está cerrada —`motivo` es `prueba`, `plan` o `suspendida`; las dos últimas, si nunca pagó, cuándo se borran o se borraron sus datos (INF-24), y si no, `null`—. Son las dos únicas rutas del panel que responden con la tienda cerrada | — |
 | POST | `/api/auth/email/resend` | Reenviar verificación · 3/min | — |
 | GET | `/api/dashboard/stats` | Métricas del Resumen: totales históricos, más vistos y últimos pedidos | `resumen.ver` |
 | GET | `/api/reports` | Reportes de un rango (MOD-9): `desde`, `hasta` y `agrupacion=dia\|mes` (por defecto, 30 días por día; tope 366 días / 60 meses). El rango y el agrupado se leen en la zona de la tienda (MOD-13) y `rango.zona` la devuelve. Responde resumen, serie, más vendidos y stock bajo. Las claves `costo`, `utilidad`, `margen` y `lineas_sin_costo` **solo salen con `costos.ver`** (MOD-6) | `reportes.ver` |
 | GET | `/api/plan` | Plan, límites y consumo | — |
 | GET · PUT | `/api/whatsapp-templates` | Los diez mensajes de WhatsApp de la tienda (MOD-25): `GET` trae cada uno con `texto` (el que usa hoy), `de_fabrica`, `personalizada`, `grupo` (`comprador`/`tienda`) y las `variables` que admite, más `max` y la descripción de cada variable. `PUT {"plantillas": {"clave": "texto" \| null}}` guarda solo las que llegan; `null`, vacío o el texto de fábrica vuelven al de fábrica. Una variable que ese mensaje no admite, 422 con la lista de las que sí | `GET` —; `PUT` `tienda.configurar` |
-| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | `GET` —; `PUT` `tienda.configurar` |
+| GET · PUT | `/api/tenant` | Configuración y branding, incluidos `payment_methods` (MOD-3; desde MOD-23 una lista de hasta 8 —`payment_methods[i][id\|name\|details\|instructions\|enabled\|remove_qr]`, el QR en `payment_method_qr[i]`—, que **manda**: lo que no viene se quita y `payment_methods=''` los quita todos), `delivery_enabled`/`delivery_cost` (MOD-1), `timezone` (MOD-13, whitelist de `config/timezones.php`), `quote_validity_days` (1–365 o vacío) y `quote_terms` (hasta 1000) de la cotización (FUN-26) y `tax_enabled`/`tax_name`/`tax_rate`/`tax_included` (MOD-2) | `GET` —; `PUT` `tienda.configurar` |
 | POST | `/api/tenant/custom-domain/verify` | Comprobar el TXT del dominio propio | `tienda.configurar` |
 | CRUD | `/api/products` (+ `POST /reorder`, `/{id}/duplicate`) | Productos; alta y edición aceptan `variants` (JSON) y `variant_images[<posición>]`. `cost` (y `variants[].cost`) solo lo ve y lo escribe quien tiene `costos.ver`: si la clave no llega, el costo guardado **no se toca** (MOD-6). `archivos_enviados`: cuántas fotos manda el formulario; si llegan menos —PHP descarta en silencio las que pasan de `max_file_uploads`—, 422 y no se guarda nada (INF-12). Una foto que no cabría en la memoria de PHP al procesarla, 422 con sus medidas (INF-14). El listado trae `waitlist_count` —las esperas pendientes de la lista de espera— por producto y, desde FUN-25, por variante: el formulario lo usa para avisar antes de quitar una variante con gente esperando, porque al guardar se borran con ella | `productos.ver` (leer) · `productos.editar` (alta, edición, duplicar, reordenar) · `productos.borrar` (`DELETE`) |
-| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | `productos.importar` · `productos.masivo` (borrar en lote pide además `productos.borrar`) |
+| POST | `/api/products/import` · `/api/products/bulk` | Import CSV y acciones masivas. El CSV admite una columna `variante` (MOD-12): vacía, la fila es un producto; rellena (`Capacidad: 1 TB`, hasta tres opciones separadas por `|`), la fila es una variante del producto que se llame igual, y `sku`/`precio`/`precio_oferta`/`costo`/`tramos`/`stock` son suyos. Columna `estado` (FUN-21): `publicado`/`borrador` (o `published`/`draft`); vacia crea publicado y al actualizar no toca el estado, y un valor que no se entiende rechaza la fila. Columna `controla_stock` (MOD-22): `si`/`no` (o `track_stock`), con las mismas reglas que `estado`; con `no` el `stock` puede ir vacío. Columna `tramos` (MOD-15): el precio por mayor en formato `10:90|25:85` —desde cuantas unidades y a cuanto sale cada una—; una fila cuyo tramo no baje del precio de esa fila se rechaza. Campo `vista_previa` (FUN-29): con `1`, hace el import entero y lo deshace —sin bitácora ni caché— y responde lo mismo con `preview: true`; la respuesta trae además `header` y `rejected_rows` (las filas con aviso, con sus celdas originales y el motivo). Campo `modo` (FUN-17) para lo que ya existe —mismo nombre, sin mayúsculas ni tildes—: `omitir` (por defecto), `actualizar` (una celda vacía no borra) o `duplicar`; responde `created_count`/`updated_count`/`unchanged_count`/`skipped_count` y `changes`, una entrada por producto con su fila, qué pasó y qué cambió (FUN-19; lo que el archivo trae igual no se guarda y cuenta como `sin_cambios`). La `categoria` tiene que existir: **no crea categorías** y la fila que nombra una que no existe se rechaza (FUN-18) | `productos.importar` · `productos.masivo` (borrar en lote pide además `productos.borrar`) |
 | CRUD | `/api/categories` (+ `POST /reorder`) | Categorías | `GET` —; el resto `categorias.gestionar` |
 | CRUD | `/api/orders` | Pedidos y venta de mostrador; el detalle trae `utilidad`, `costo_total` y `lineas_sin_costo` **solo con `costos.ver`** (MOD-6) | `pedidos.ver` · `pedidos.gestionar` (venta de mostrador y estado) · `pedidos.borrar` |
+| GET | `/api/orders/{order}/comprobante` | El comprobante que mandó el comprador (MOD-26), del disco privado, con `nosniff` y `Content-Security-Policy: sandbox` | `pedidos.ver` |
+| POST | `/api/orders/{order}/pago` | Confirmar el pago o rechazar el comprobante (`decision` `confirmar`/`rechazar`, `motivo` obligatorio al rechazar y solo sobre un comprobante en revisión). No toca el estado del pedido ni el stock (MOD-26). El listado acepta `payment_status=en_revision` | `pedidos.gestionar` |
 | GET | `/api/orders/{order}/pdf` | La cotización del pedido en PDF (MOD-2), con el logo —empotrado desde el disco, y solo si se subió: uno pegado de otra web no se descarga (FUN-20)— y el desglose del impuesto. **No es un comprobante fiscal** y el propio documento lo dice | `pedidos.ver` |
 | CRUD | `/api/coupons` | Cupones de descuento (MOD-4): código único por tienda, porcentaje o monto, con vigencia, tope de usos y compra mínima. Techo de 100 por tienda | `cupones.gestionar` |
-| GET | `/api/customers` · `/api/customers/{id}` | Clientes con cuenta y lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono (MOD-10) | `clientes.ver` |
-| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12) y la columna `tramos` con el precio por mayor (MOD-15). Las columnas `costo` (catálogo) y `costo_total`/`utilidad` (pedidos) **solo salen con `costos.ver`**; sin ellas, reimportar el catálogo no toca el costo | `productos.exportar` · `pedidos.exportar` |
+| GET | `/api/customers` · `/api/customers/{id}` | El directorio de clientes (MOD-24): quien compró —con cuenta o sin ella— y quien abrió cuenta, juntados por los últimos 8 dígitos del teléfono o por el correo (`App\Support\Directorio`), con lo que han comprado; orden `recientes`/`gasto`/`pedidos`, búsqueda por nombre, correo o teléfono, filtros `etiqueta` y `cuenta=con\|sin` (MOD-10) | `clientes.ver` |
+| GET | `/api/customers/etiquetas` | Las etiquetas que usa la tienda, sin repetir (MOD-24) | `clientes.ver` |
+| PUT | `/api/customers/{id}` | Las notas (`notes`, hasta 2000) y las etiquetas (`tags`, hasta 10 de 30 caracteres) de una persona: lo único que la tienda escribe del directorio (MOD-24) | `clientes.gestionar` |
+| POST | `/api/customers/import` | Trae personas desde un CSV (`nombre;telefono;correo;etiquetas;notas`, etiquetas con `\|`); cada fila necesita teléfono o correo; `modo` `omitir` (por defecto) o `actualizar` (una celda vacía no borra). Función de plan `csv_import` (MOD-24) | `clientes.gestionar` |
+| GET | `/api/customers/export` | El directorio en CSV, con las columnas que lee el import más `cuenta`, `pedidos`, `total_gastado` y `ultima_compra`; acepta `etiqueta` (MOD-24) | `clientes.exportar` |
+| GET | `/api/products/export` · `/api/orders/export` | Exportar a CSV (MOD-7). Acepta los filtros del listado; el de pedidos además `desde`/`hasta`. El del catálogo saca **una fila por variante** con la columna `variante` que lee el importador (MOD-12), la columna `tramos` con el precio por mayor (MOD-15) y la columna `controla_stock` (MOD-22). Las columnas `costo` (catálogo) y `costo_total`/`utilidad` (pedidos) **solo salen con `costos.ver`**; sin ellas, reimportar el catálogo no toca el costo | `productos.exportar` · `pedidos.exportar` |
 | GET | `/api/reports/export` | El reporte del rango en CSV (MOD-9): mismos parámetros que `/api/reports`, con la serie y los más vendidos —sin recortar— en dos bloques; la utilidad, solo con `costos.ver` | `reportes.exportar` |
 | GET·PUT·DELETE | `/api/reviews` | Moderación | `resenas.gestionar` |
 | GET·PUT·DELETE | `/api/stock-notifications` | Lista de espera | `espera.gestionar` |
@@ -590,20 +602,23 @@ vista `welcome` de siempre, si es la raíz, o en el `robots.txt` de la plataform
 | `TURNSTILE_SECRET_KEY` | Anti-bot de reseñas. Fuera de local, sin clave se rechazan con 502 |
 | `SENTRY_LARAVEL_DSN` · `SENTRY_ENVIRONMENT` | Errores no controlados hacia Sentry (`TEC-5`). Vacío = no se envía nada (local y suite). Sin datos personales: ni cuerpo de la petición, ni IP, ni usuario (`App\Support\Observabilidad`) |
 | `PLATFORM_ALLOWED_IPS` | IPs del panel de plataforma. **En producción, vacío = no entra nadie** |
-| `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_BITACORA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
+| `VIGILANCIA_COPIAS_URL` · `VIGILANCIA_PRUEBAS_URL` · `VIGILANCIA_PAPELERA_URL` · `VIGILANCIA_BITACORA_URL` · `VIGILANCIA_COMPROBANTES_URL` · `VIGILANCIA_PURGA_URL` · `VIGILANCIA_SALUD_URL` | Aviso de cada tarea programada al terminar (`INF-18`; healthchecks.io o Better Stack): es la **falta** de aviso lo que alarma. Al fallar, la misma URL con `/fail`. Vacías, no avisan |
 | `PASSWORD_UNCOMPROMISED` | Contrasta contraseñas contra Have I Been Pwned |
 | `APP_DEBUG` | **En producción tiene que ser `false` o la app no arranca** |
 
 ### Comandos
 
 ```bash
-php artisan test        # 1087 tests (PHPUnit, SQLite en memoria)
+php artisan test        # 1170 tests (PHPUnit, SQLite en memoria)
 php artisan salud:comprobar          # Lo que el despliegue necesita y falla en silencio si falta (INF-19; al desplegar y cada hora)
 php artisan trials:cerrar-vencidas   # Suspende tiendas con la prueba o el plan pagado vencidos (FUN-16, INF-23; normalmente vía Schedule::command, diario)
 php artisan papelera:purgar          # Borra lo que lleve +30 días en la papelera, con sus fotos (MOD-8; ídem, diario)
 php artisan bitacora:purgar          # Borra la actividad de tienda de +365 días; la de plataforma no caduca (INF-20; ídem, diario)
+php artisan comprobantes:purgar      # Borra los comprobantes de pago revisados hace +30 días, los de +90 y los sin pedido (MOD-26; ídem, diario)
 php artisan copias:crear             # Copia de seguridad de la base y purga de las caducadas (INF-7; ídem, 03:30)
+php artisan pruebas:purgar [--simular] [--tienda=slug]  # Avisa a las pruebas cerradas sin ningún pago y, a los 90 días y tras dos avisos, borra sus datos; sin copia reciente no borra (INF-24; ídem, 05:00)
 php artisan platform:quitar-dos-pasos {email}  # Quita la verificación en dos pasos a un operador y le cierra las sesiones (SEC-9)
+php artisan clientes:reconstruir {slug?}       # Enlaza al directorio de clientes los pedidos y cuentas sin persona; no borra ni duplica (MOD-24; solo si el log avisa)
 vendor/bin/pint         # Formateo (Laravel Pint)
 composer dev            # API (8000) + queue:listen + Vite del frontend (5173), en paralelo y sin pail
 composer setup          # install + .env + key + migrate + build
@@ -627,6 +642,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/{slug}/product/:id` · `/product/:id` | Ficha de producto |
 | `/{slug}/builder` · `/builder` | Armador de PC. El armado va en la URL para poder compartirlo (`?cpu=<id>&ram=<id>&ram_variante=<id>…`, MOD-20) |
 | `/{slug}/p/:pageSlug` · `/p/:pageSlug` | Página informativa |
+| `/{slug}/pedido/:token` · `/pedido/:token` | El pedido visto por quien lo hizo, con su enlace: cómo va, cómo pagar y mandar el comprobante (MOD-26). `pedido` es un slug reservado |
 
 **Cuenta y panel:**
 
@@ -636,7 +652,7 @@ react-hot-toast. CSS propio, sin framework.
 | `/forgot-password` · `/reset-password` | Recuperación de contraseña |
 | `/terminos` · `/privacidad` · `/reembolsos` | Páginas legales de la plataforma, las que Paddle revisa antes de aprobar la cuenta (`INF-15`). Enlazadas desde el pie de la landing y el alta de tienda; sus tres nombres son slugs reservados |
 | `/dashboard` | Resumen con métricas; sin `resumen.ver`, un saludo con las pantallas que esa persona sí puede abrir (MOD-21) |
-| `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: clientes con cuenta y su historial, MOD-10; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
+| `/dashboard/products` · `/categories` · `/orders` · `/customers` · `/reports` · `/pages` · `/reviews` · `/waitlist` | Gestión (`/customers`: el directorio de clientes —con cuenta o sin ella— con su historial, notas, etiquetas y CSV, MOD-10 y MOD-24; `/reports`: ventas por periodo, más vendidos y stock bajo, MOD-9) |
 | `/dashboard/users` | Equipo (solo admin). Dos pestañas: personas y `?pestania=roles`, los roles con sus permisos (MOD-21) |
 | `/dashboard/activity` | Actividad del panel (filtros en la URL: `area`, `persona`, `pagina`) |
 | `/dashboard/trash` | Papelera de productos y pedidos (`MOD-8`; el tipo va en la URL: `tipo`, `pagina`) |
@@ -732,6 +748,9 @@ Los tests van **al lado de lo que prueban** (`cartStore.test.ts` junto a `cartSt
 - **Variantes: el precio y el stock de un producto con variantes son un resumen** (el de la más
   barata y la suma), para listar, ordenar y filtrar. Todo lo que **cobra o descuenta** usa la
   variante: `datosDeVenta()` en `utils/variants.ts`, `OrderPricing` en el backend.
+- **Si algo se puede pedir lo dice `utils/stock.ts`**, nunca `stock > 0` a mano (`MOD-22`): un
+  producto con `track_stock = false` se pide siempre y su `stock` no dice nada. En el backend,
+  `Product::hayParaPedir()` y el scope `paraPedir()`.
 - La sesión de cliente (`customerAuthStore`) es independiente de la de admin (`authStore`).
 
 ### Variables de entorno y scripts
@@ -773,7 +792,7 @@ npm run dev       # Desarrollo con HMR (http://localhost:5173)
 npm run build     # tsc -b + build de producción en dist/
 npm run preview   # Sirve el build
 npm run lint      # ESLint
-npm test          # 355 tests (Vitest + Testing Library, jsdom)
+npm test          # 388 tests (Vitest + Testing Library, jsdom)
 npm run test:watch
 ```
 

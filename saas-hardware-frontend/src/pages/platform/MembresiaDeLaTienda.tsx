@@ -112,6 +112,19 @@ export default function MembresiaDeLaTienda({
           {cierre.motivo === 'suspendida' && 'Suspendida a mano. Registrar un pago también la reabre.'}
         </p>
       )}
+      {/* INF-24: lo que hará o hizo `pruebas:purgar` con una prueba que nunca pagó. */}
+      {cierre?.borrado_desde && (
+        <p className="membresia-cierre">
+          Nunca ha pagado: sus productos, pedidos y clientes se borran el {formatearFecha(cierre.borrado_desde, zona)} si
+          no se registra un pago antes.
+        </p>
+      )}
+      {cierre?.datos_borrados && (
+        <p className="membresia-cierre">
+          Sus productos, pedidos y clientes se borraron el {formatearFecha(cierre.datos_borrados, zona)}, al pasar el
+          plazo sin pagar. Si paga, la tienda vuelve a abrir vacía.
+        </p>
+      )}
 
       <form
         className="membresia-form"

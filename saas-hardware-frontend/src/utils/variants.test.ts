@@ -15,7 +15,14 @@ describe('variants', () => {
   it('datosDeVenta usa la variante cuando hay una elegida', () => {
     const { producto, de32 } = unaRamConVariantes();
 
-    expect(datosDeVenta(producto, de32)).toEqual({ price: 120, sale_price: 99.9, stock: 3, precio: 99.9 });
+    expect(datosDeVenta(producto, de32)).toEqual({
+      price: 120,
+      sale_price: 99.9,
+      stock: 3,
+      controlaStock: true,
+      disponible: true,
+      precio: 99.9,
+    });
   });
 
   it('datosDeVenta sin variante usa el producto', () => {
@@ -23,8 +30,17 @@ describe('variants', () => {
       price: 200,
       sale_price: null,
       stock: 7,
+      controlaStock: true,
+      disponible: true,
       precio: 200,
     });
+  });
+
+  it('MOD-22: sin control de stock se puede vender aunque el número guardado sea 0', () => {
+    const servicio = unProducto({ track_stock: false, stock: 0 });
+
+    expect(datosDeVenta(servicio)).toMatchObject({ stock: 0, controlaStock: false, disponible: true });
+    expect(datosDeVenta(unProducto({ stock: 0 }))).toMatchObject({ controlaStock: true, disponible: false });
   });
 
   it('tieneVariantes: lista vacía o ausente es "sin variantes"', () => {

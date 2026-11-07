@@ -130,6 +130,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($ruta($request).'|'.$request->ip());
         });
 
+        // MOD-26: mandar el comprobante desde el enlace de seguimiento. Por
+        // pedido y por IP: es un formulario público que sube archivos, y quien
+        // tiene el enlace no necesita mandar más de unos pocos por minuto.
+        RateLimiter::for('comprobante', function (Request $request) use ($ruta) {
+            return Limit::perMinute(5)->by($ruta($request).'|'.$request->ip());
+        });
+
         // El enlace de verificacion del correo (FUN-5).
         RateLimiter::for('verificacion_correo', function (Request $request) use ($ruta) {
             return Limit::perMinute(6)->by($ruta($request).'|'.$request->ip());

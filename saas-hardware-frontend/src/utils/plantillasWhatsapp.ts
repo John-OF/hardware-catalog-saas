@@ -30,6 +30,9 @@ export const PLANTILLAS = [
   'pedido_cancelado',
   'recordatorio_pago',
   'contacto_pedido',
+  // MOD-26: lo que la tienda contesta al revisar un comprobante.
+  'pago_confirmado',
+  'pago_rechazado',
   'stock_disponible',
 ] as const;
 
@@ -46,6 +49,9 @@ export const PLANTILLAS_DE_PEDIDO = [
   'pedido_cancelado',
   'recordatorio_pago',
   'contacto_pedido',
+  // MOD-26: lo que se contesta al revisar el comprobante.
+  'pago_confirmado',
+  'pago_rechazado',
 ] as const satisfies readonly ClaveDePlantilla[];
 
 export type PlantillaDePedido = (typeof PLANTILLAS_DE_PEDIDO)[number];
@@ -150,7 +156,25 @@ export function valoresDePedido(pedido: Order, tienda: Tenant | null | undefined
     total: money(pedido.total),
     entrega: textoDeEntrega(pedido.delivery_method, money(pedido.delivery_cost)),
     pagos: textoDePagos(metodosDePagoActivos(tienda?.payment_methods)),
+    // MOD-26: su enlace, y por qué no se confirmó su pago si se rechazó.
+    seguimiento: enlaceDeSeguimiento(tienda, pedido.tracking_token),
+    motivo: pedido.payment_rejection_reason ?? '',
   };
+}
+
+/**
+ * El enlace con el que el comprador ve su pedido y manda su comprobante
+ * (MOD-26). Mismo criterio que `enlaceDeProducto`: con dominio propio
+ * verificado, ese dominio; si no, el catálogo por slug en este origen.
+ */
+export function enlaceDeSeguimiento(tienda: Tenant | null | undefined, token: string | null | undefined): string {
+  if (!tienda || !token) return '';
+
+  if (tienda.custom_domain && tienda.custom_domain_verified_at) {
+    return `https://${tienda.custom_domain}/pedido/${token}`;
+  }
+
+  return `${window.location.origin}/${tienda.slug}/pedido/${token}`;
 }
 
 /**

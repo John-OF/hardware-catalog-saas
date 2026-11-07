@@ -24,6 +24,8 @@ export const PERMISOS = [
   'pedidos.exportar',
   'costos.ver',
   'clientes.ver',
+  'clientes.gestionar',
+  'clientes.exportar',
   'reportes.ver',
   'reportes.exportar',
   'resenas.gestionar',

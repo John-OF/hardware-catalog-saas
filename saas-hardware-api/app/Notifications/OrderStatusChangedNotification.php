@@ -47,6 +47,8 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
             'estado'     => $order->status,
             'whatsapp'   => $tenant?->whatsapp_number,
             'url'        => StoreUrl::forTenant($tenant),
+            // MOD-26: el enlace al pedido, como en el correo de confirmación.
+            'seguimiento' => StoreUrl::forOrderTracking($tenant, $order->tracking_token),
             'total'      => Money::format($order->total, $tenant?->currency),
         ];
     }
@@ -62,16 +64,16 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
     {
         return match ($estado) {
             'processing' => [
-                'asunto' => "Tu pedido {$referencia} esta en preparacion",
-                'cuerpo' => "Tu pedido **{$referencia}** ya esta en preparacion en {$tienda}. Te avisamos apenas este listo.",
+                'asunto' => "Tu pedido {$referencia} está en preparación",
+                'cuerpo' => "Tu pedido **{$referencia}** ya está en preparación en {$tienda}. Te avisamos apenas esté listo.",
             ],
             'attended' => [
-                'asunto' => "Tu pedido {$referencia} ya esta listo",
-                'cuerpo' => "Tu pedido **{$referencia}** por un total de {$total} ya esta listo en {$tienda} para que lo recojas o te lo entreguemos. Gracias por tu compra.",
+                'asunto' => "Tu pedido {$referencia} ya está listo",
+                'cuerpo' => "Tu pedido **{$referencia}** por un total de {$total} ya está listo en {$tienda} para que lo recojas o te lo entreguemos. Gracias por tu compra.",
             ],
             'cancelled' => [
                 'asunto' => "Tu pedido {$referencia} fue cancelado",
-                'cuerpo' => "Tu pedido **{$referencia}** fue cancelado en {$tienda}. Si crees que es un error o tienes dudas, respondenos por aqui.",
+                'cuerpo' => "Tu pedido **{$referencia}** fue cancelado en {$tienda}. Si crees que es un error o tienes dudas, respóndenos por aquí.",
             ],
             default => null,
         };
@@ -102,12 +104,14 @@ class OrderStatusChangedNotification extends Notification implements ShouldQueue
             ->greeting('Hola '.TextoDeCorreo::enLinea($this->pedido['cliente']).',')
             ->line($texto['cuerpo']);
 
-        if ($this->pedido['url']) {
+        if ($this->pedido['seguimiento'] ?? null) {
+            $mail->action('Ver mi pedido', $this->pedido['seguimiento']);
+        } elseif ($this->pedido['url']) {
             $mail->action('Ver la tienda', $this->pedido['url']);
         }
 
         if ($this->pedido['whatsapp']) {
-            $mail->line('Cualquier duda, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
+            $mail->line('Cualquier duda, escríbenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
         }
 
         return $mail;

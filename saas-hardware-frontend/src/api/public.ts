@@ -1,5 +1,5 @@
 import api from './axios';
-import type { Tenant, Product, PaginatedResponse, Order, Review } from '../types';
+import type { Tenant, Product, PaginatedResponse, Order, Review, SeguimientoDePedido } from '../types';
 
 export interface CreateOrderPayload {
   customer_name: string;
@@ -76,6 +76,23 @@ export const getPublicProduct = async (slug: string, productId: string): Promise
 
 export const createPublicOrder = async (slug: string, payload: CreateOrderPayload): Promise<Order> => {
   const response = await api.post<Order>(`/public/${slug}/orders`, payload);
+  return response.data;
+};
+
+/** MOD-26: el pedido visto por quien lo hizo, con la llave de su enlace. */
+export const getSeguimiento = async (slug: string, token: string): Promise<SeguimientoDePedido> => {
+  const response = await api.get<SeguimientoDePedido>(`/public/${slug}/pedidos/${token}`);
+  return response.data;
+};
+
+/** MOD-26: mandar el comprobante del pago (una captura o un PDF). */
+export const enviarComprobante = async (slug: string, token: string, archivo: File): Promise<SeguimientoDePedido> => {
+  const fd = new FormData();
+  fd.append('file', archivo);
+
+  const response = await api.post<SeguimientoDePedido>(`/public/${slug}/pedidos/${token}/comprobante`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 

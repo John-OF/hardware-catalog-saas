@@ -22,6 +22,8 @@ interface EditorDeVariantesProps {
   moneda: string;
   /** Si se enseña la columna de costo (MOD-6). Solo para admin. */
   conCostos?: boolean;
+  /** Si se enseña la columna de stock (MOD-22). Sin control de stock, no. */
+  conStock?: boolean;
   onChange: (ejes: string[], filas: VarianteEnFormulario[]) => void;
 }
 
@@ -40,7 +42,7 @@ const margenDeLaFila = (fila: VarianteEnFormulario) =>
  * El costo de cada variante (MOD-6) solo aparece si `conCostos`: es dato de
  * admin, y su ausencia significa "no lo toques" al guardar.
  */
-export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = false, onChange }: EditorDeVariantesProps) {
+export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = false, conStock = true, onChange }: EditorDeVariantesProps) {
   /**
    * MOD-15: qué variante tiene abierto su precio por mayor. En una ventana
    * aparte y no como columnas de la fila porque son de dos a cinco parejas de
@@ -92,8 +94,9 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
         <div>
           <span className="variant-editor-title">Variantes (opcional)</span>
           <p className="variant-editor-hint">
-            Si lo vendes en varias capacidades, colores o versiones, añade una variante por cada una.
-            Cada variante tiene su precio, su stock y su foto, y el comprador elige cuál quiere.
+            Si lo vendes en varias capacidades, colores o versiones, añade una variante por cada una.{' '}
+            {conStock ? 'Cada variante tiene su precio, su stock y su foto' : 'Cada variante tiene su precio y su foto'},
+            y el comprador elige cuál quiere.
           </p>
         </div>
       </div>
@@ -209,10 +212,12 @@ export default function EditorDeVariantes({ ejes, filas, moneda, conCostos = fal
                         )}
                       </label>
                     )}
-                    <label>
-                      <span>Stock</span>
-                      <input type="number" min="0" className="premium-input" value={fila.stock} onChange={(e) => cambiarFila(fila.clave, { stock: e.target.value })} />
-                    </label>
+                    {conStock && (
+                      <label>
+                        <span>Stock</span>
+                        <input type="number" min="0" className="premium-input" value={fila.stock} onChange={(e) => cambiarFila(fila.clave, { stock: e.target.value })} />
+                      </label>
+                    )}
                     <label>
                       <span>SKU</span>
                       <input type="text" maxLength={100} className="premium-input" value={fila.sku} onChange={(e) => cambiarFila(fila.clave, { sku: e.target.value })} />

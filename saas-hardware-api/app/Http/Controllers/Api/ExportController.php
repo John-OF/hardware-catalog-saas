@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -88,6 +89,9 @@ class ExportController extends Controller
                 // habia negociado, y sin decirselo.
                 'tramos',
                 'stock', 'categoria', 'descripcion', 'especificaciones', 'estado',
+                // MOD-22: si se lleva la cuenta de las unidades. Es de la ficha y
+                // va al final, con lo demas que la describe.
+                'controla_stock',
             ], $conCostos, [6]));
 
             foreach ($consulta->lazy(self::POR_LOTE) as $producto) {
@@ -108,6 +112,7 @@ class ExportController extends Controller
                     $producto->description,
                     $this->specsEnTexto($producto->specs),
                     $producto->status === 'published' ? 'publicado' : 'borrador',
+                    $producto->controlaStock() ? 'si' : 'no',
                 ];
 
                 if ($producto->variants->isEmpty()) {
@@ -140,7 +145,7 @@ class ExportController extends Controller
                         $variante->cost,
                         PreciosPorCantidad::aTexto($variante->price_tiers),
                         $variante->stock,
-                        ...($indice === 0 ? $cola : ['', '', '', '']),
+                        ...($indice === 0 ? $cola : array_fill(0, count($cola), '')),
                     ], $conCostos, [6]));
                 }
             }
@@ -216,6 +221,60 @@ class ExportController extends Controller
                     $pedido->utilidad,
                     $pedido->customer_note,
                 ], $conCostos, [10, 11]));
+            }
+        });
+    }
+
+    /**
+     * El directorio de clientes (MOD-24), una fila por persona.
+     *
+     * Las cinco primeras columnas son las que lee el importador de clientes
+     * (`CustomerController::import`), así que exportar y volver a subir no cambia
+     * nada; las demás —cuenta, pedidos, total y última compra— son para leerlas
+     * y el importador las ignora. Las etiquetas van separadas por `|`, como las
+     * opciones de una variante.
+     *
+     * Las consultas van sin el scope y con la tienda a mano: el callback corre
+     * al enviar la respuesta, cuando el middleware ya la olvidó (MOD-7).
+     */
+    public function customers(Request $request): StreamedResponse
+    {
+        $tenant = app('currentTenant');
+        $zona = $tenant->zonaHoraria();
+
+        $deEsteCliente = fn ($q) => $q->whereColumn('orders.customer_id', 'customers.id')
+            ->where('orders.tenant_id', $tenant->id)
+            ->where('orders.status', '!=', 'cancelled');
+
+        $consulta = $this->sinScopeDeTienda(Customer::query(), $tenant->id)
+            ->select(['customers.*'])
+            ->selectSub(Order::withoutTenant()->selectRaw('count(*)')->where($deEsteCliente), 'pedidos_count')
+            ->selectSub(Order::withoutTenant()->selectRaw('coalesce(sum(orders.total), 0)')->where($deEsteCliente), 'total_gastado')
+            ->selectSub(Order::withoutTenant()->selectRaw('max(orders.created_at)')->where($deEsteCliente), 'ultima_compra')
+            ->when($request->filled('etiqueta'), fn ($q) => $q->whereJsonContains('customers.tags', (string) $request->etiqueta))
+            ->orderBy('customers.created_at')
+            ->orderBy('customers.id');
+
+        return $this->csv("clientes-{$tenant->slug}-".now($zona)->format('Y-m-d').'.csv', function ($salida) use ($consulta, $zona) {
+            $this->fila($salida, [
+                'nombre', 'telefono', 'correo', 'etiquetas', 'notas',
+                'cuenta', 'pedidos', 'total_gastado', 'ultima_compra',
+            ]);
+
+            foreach ($consulta->lazy(self::POR_LOTE) as $cliente) {
+                $this->fila($salida, [
+                    $cliente->name,
+                    $cliente->phone,
+                    $cliente->email,
+                    implode('|', $cliente->tags ?? []),
+                    $cliente->notes,
+                    $cliente->user_id ? 'si' : 'no',
+                    (int) $cliente->pedidos_count,
+                    number_format((float) $cliente->total_gastado, 2, '.', ''),
+                    $cliente->ultima_compra
+                        ? CarbonImmutable::parse($cliente->ultima_compra, 'UTC')->timezone($zona)->format('Y-m-d H:i')
+                        : '',
+                ]);
             }
         });
     }

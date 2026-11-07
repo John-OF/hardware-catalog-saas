@@ -40,7 +40,7 @@ class AuthController extends Controller
                     // 'plans', 'resolve-domain' y 'component-specs' (FUN-8) son
                     // rutas de la API que van antes que 'public/{slug}': una
                     // tienda con ese slug no llegaría nunca a la suya.
-                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password', 'platform', 'terminos', 'privacidad', 'reembolsos', 'plans', 'resolve-domain', 'component-specs'];
+                    $reserved = ['admin', 'dashboard', 'login', 'register', 'api', 'public', 'settings', 'config', 'home', 'main', 'forgot-password', 'reset-password', 'platform', 'terminos', 'privacidad', 'reembolsos', 'plans', 'resolve-domain', 'component-specs', 'pedido'];
                     if (in_array(strtolower($value), $reserved)) {
                         $fail('El slug elegido está reservado por la plataforma.');
                     }

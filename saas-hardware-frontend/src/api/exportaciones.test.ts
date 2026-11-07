@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from './axios';
-import { exportarCatalogo, exportarPedidos, nombreDeArchivo } from './exportaciones';
+import { exportarCatalogo, exportarClientes, exportarPedidos, nombreDeArchivo } from './exportaciones';
 
 vi.mock('./axios', () => ({ default: { get: vi.fn() } }));
 
@@ -28,6 +28,12 @@ describe('exportaciones (MOD-7)', () => {
     await exportarCatalogo({ search: 'ryzen', category_id: 'cat-1' });
 
     expect(vi.mocked(api.get).mock.calls[0][1]?.params).toEqual({ search: 'ryzen', category_id: 'cat-1' });
+  });
+
+  it('MOD-24: el directorio de clientes, con la etiqueta del filtro', async () => {
+    await exportarClientes({ etiqueta: 'mayorista' });
+
+    expect(api.get).toHaveBeenCalledWith('/customers/export', expect.objectContaining({ params: { etiqueta: 'mayorista' } }));
   });
 
   it('no manda los filtros vacíos: `?search=` buscaría la cadena vacía', async () => {
@@ -65,5 +71,6 @@ describe('nombreDeArchivo', () => {
   it('sin cabecera usa uno de repuesto según lo que se exportaba', () => {
     expect(nombreDeArchivo(undefined, '/orders/export')).toBe('pedidos.csv');
     expect(nombreDeArchivo(undefined, '/products/export')).toBe('catalogo.csv');
+    expect(nombreDeArchivo(undefined, '/customers/export')).toBe('clientes.csv');
   });
 });

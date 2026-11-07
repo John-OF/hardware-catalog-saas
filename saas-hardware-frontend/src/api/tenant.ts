@@ -1,5 +1,6 @@
 import api from './axios';
-import type { PaymentMethods, Tenant, TenantTheme } from '../types';
+import type { Tenant, TenantTheme } from '../types';
+import { agregarMetodosAlFormulario, type MetodoEnFormulario } from '../utils/metodosDePagoEnFormulario';
 
 export interface UpdateTenantPayload {
   name?: string;
@@ -11,8 +12,11 @@ export interface UpdateTenantPayload {
   /** MOD-13. Identificador IANA de `utils/timezones.ts`; el backend valida contra la misma lista. */
   timezone?: string;
   theme?: TenantTheme;
-  /** MOD-3. Se manda el objeto completo: el backend hace merge por método, no por campo. */
-  payment_methods?: PaymentMethods;
+  /**
+   * MOD-23. La lista entera, con el QR de cada uno: el backend la toma tal
+   * cual y quita lo que no venga. Ausente, no se tocan.
+   */
+  payment_methods?: MetodoEnFormulario[];
   /** MOD-1. */
   delivery_enabled?: boolean;
   delivery_cost?: number | string;
@@ -21,6 +25,9 @@ export interface UpdateTenantPayload {
   tax_name?: string;
   tax_rate?: number | string;
   tax_included?: boolean;
+  /** FUN-26. Vacío quita la fecha de validez de la cotización. */
+  quote_validity_days?: number | string | null;
+  quote_terms?: string | null;
   // Archivos opcionales: si se envían, el backend los sube y usa su URL.
   logoFile?: File | null;
   bannerFile?: File | null;
@@ -55,18 +62,10 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
     });
   }
 
-  // payment_methods[metodo][campo]=valor, igual que el theme. `enabled` va
-  // como '1'/'0': la regla `boolean` de Laravel no acepta '' (a diferencia de
-  // los campos de texto, que sí la aceptan vía ConvertEmptyStringsToNull). Es
-  // el mismo criterio que ya usa `is_active` en productos.
+  // MOD-23: payment_methods[i][campo]=valor y payment_method_qr[i]=archivo.
+  // `enabled` va como '1'/'0': la regla `boolean` de Laravel no acepta ''.
   if (payload.payment_methods) {
-    Object.entries(payload.payment_methods).forEach(([metodo, datos]) => {
-      if (!datos) return;
-      Object.entries(datos).forEach(([campo, valor]) => {
-        const texto = campo === 'enabled' ? (valor ? '1' : '0') : (valor == null ? '' : String(valor));
-        fd.append(`payment_methods[${metodo}][${campo}]`, texto);
-      });
-    });
+    agregarMetodosAlFormulario(fd, payload.payment_methods);
   }
 
   if (payload.delivery_enabled !== undefined) {
@@ -86,6 +85,11 @@ export const updateTenant = async (payload: UpdateTenantPayload): Promise<Tenant
   if (payload.tax_included !== undefined) {
     fd.append('tax_included', payload.tax_included ? '1' : '0');
   }
+
+  // FUN-26: vacíos viajan como '' y el backend los guarda como null (sin fecha,
+  // sin condiciones), como el resto de campos de texto.
+  if (payload.quote_validity_days !== undefined) fd.append('quote_validity_days', payload.quote_validity_days == null ? '' : String(payload.quote_validity_days));
+  if (payload.quote_terms !== undefined) fd.append('quote_terms', payload.quote_terms ?? '');
 
   if (payload.logoFile) fd.append('logo', payload.logoFile);
   if (payload.bannerFile) fd.append('banner', payload.bannerFile);

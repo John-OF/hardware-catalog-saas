@@ -56,7 +56,8 @@ class PlantillasWhatsappTest extends TestCase
     {
         $variables = config('plantillas_whatsapp.variables');
 
-        $this->assertCount(10, PlantillasWhatsapp::catalogo());
+        // MOD-26 añadió «Pago confirmado» y «Pago no confirmado».
+        $this->assertCount(12, PlantillasWhatsapp::catalogo());
 
         foreach (PlantillasWhatsapp::catalogo() as $clave => $plantilla) {
             $this->assertMatchesRegularExpression('/^[a-z_]+$/', $clave, 'Las claves van sin tildes ni mayúsculas: se guardan en la base.');
@@ -179,7 +180,7 @@ class PlantillasWhatsappTest extends TestCase
 
         $mensaje = $respuesta->json('errors')['plantillas.contacto_pedido'][0];
         $this->assertStringContainsString('«Contacto sobre un pedido» usa {clinete}, {piezas}', $mensaje);
-        $this->assertStringContainsString('{cliente}, {tienda}, {pedido}, {productos}, {total}, {entrega} y {pagos}', $mensaje);
+        $this->assertStringContainsString('{cliente}, {tienda}, {pedido}, {productos}, {total}, {entrega}, {pagos} y {seguimiento}', $mensaje);
 
         $this->assertNull($this->tienda->fresh()->whatsapp_templates);
     }

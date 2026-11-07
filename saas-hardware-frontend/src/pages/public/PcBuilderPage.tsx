@@ -36,6 +36,7 @@ import StoreHeader from '../../components/public/StoreHeader';
 import { getPublicPages } from '../../api/pages';
 import type { Tenant, Product, Category, ComponentType, PaginatedResponse, Page, ProductVariant } from '../../types';
 import { datosDeVenta, nombreConVariante, tieneVariantes } from '../../utils/variants';
+import { hayParaPedir } from '../../utils/stock';
 import { useBloqueoDeScroll } from '../../hooks/useBloqueoDeScroll';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 import { specsParaMostrar } from '../../utils/specsFijas';
@@ -98,7 +99,7 @@ export default function PcBuilderPage() {
     if (!tieneVariantes(product)) return null;
     const variantes = product.variants!;
     return variantes.find((v) => v.id === varianteEnCajon[product.id])
-      ?? variantes.find((v) => v.stock > 0)
+      ?? variantes.find((v) => hayParaPedir(product, v))
       ?? variantes[0];
   };
   
@@ -747,8 +748,8 @@ export default function PcBuilderPage() {
                               aria-label={`Opción de ${product.name}`}
                             >
                               {product.variants!.map((v) => (
-                                <option key={v.id} value={v.id} disabled={v.stock <= 0}>
-                                  {v.nombre}{v.stock <= 0 ? ' (agotado)' : ''}
+                                <option key={v.id} value={v.id} disabled={!hayParaPedir(product, v)}>
+                                  {v.nombre}{!hayParaPedir(product, v) ? ' (agotado)' : ''}
                                 </option>
                               ))}
                             </select>
@@ -757,7 +758,7 @@ export default function PcBuilderPage() {
                           <button
                             onClick={() => handleSelectProduct(activeStep!.key, product, variante)}
                             className="btn-select-add"
-                            disabled={variante !== null && variante.stock <= 0}
+                            disabled={variante !== null && !hayParaPedir(product, variante)}
                           >
                             Seleccionar
                           </button>

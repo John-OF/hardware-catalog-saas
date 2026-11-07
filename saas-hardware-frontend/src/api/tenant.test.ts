@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { updateTenant } from './tenant';
+import { metodoNuevo } from '../utils/metodosDePagoEnFormulario';
 import api from './axios';
 
 vi.mock('./axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
@@ -26,22 +27,33 @@ describe('updateTenant (FormData)', () => {
     return Object.fromEntries(fd.entries());
   };
 
-  it('un método de pago activado manda enabled="1" y sus datos', async () => {
+  it('un método de pago activado manda enabled="1" y sus datos (MOD-23)', async () => {
     const campos = await camposDe({
-      payment_methods: { yape: { enabled: true, phone: '987654321', holder_name: 'Ana' } },
+      payment_methods: [{ ...metodoNuevo(), id: 'k3j9', name: 'Yape', details: '987654321 · Ana' }],
     });
 
-    expect(campos['payment_methods[yape][enabled]']).toBe('1');
-    expect(campos['payment_methods[yape][phone]']).toBe('987654321');
-    expect(campos['payment_methods[yape][holder_name]']).toBe('Ana');
+    expect(campos['payment_methods[0][id]']).toBe('k3j9');
+    expect(campos['payment_methods[0][name]']).toBe('Yape');
+    expect(campos['payment_methods[0][details]']).toBe('987654321 · Ana');
+    expect(campos['payment_methods[0][enabled]']).toBe('1');
   });
 
   it('un método apagado manda enabled="0", no cadena vacía', async () => {
-    const campos = await camposDe({ payment_methods: { plin: { enabled: false } } });
+    const campos = await camposDe({ payment_methods: [{ ...metodoNuevo(), name: 'Plin', enabled: false }] });
 
     // "" fallaría la regla `boolean` de Laravel: apagar un método no debe
     // convertirse en un 422 al guardar.
-    expect(campos['payment_methods[plin][enabled]']).toBe('0');
+    expect(campos['payment_methods[0][enabled]']).toBe('0');
+  });
+
+  it('FUN-26: la validez y las condiciones de la cotización; vacías viajan vacías', async () => {
+    const campos = await camposDe({ quote_validity_days: 15, quote_terms: 'Garantía de 12 meses.' });
+    expect(campos['quote_validity_days']).toBe('15');
+    expect(campos['quote_terms']).toBe('Garantía de 12 meses.');
+
+    const vacios = await camposDe({ quote_validity_days: null, quote_terms: null });
+    expect(vacios['quote_validity_days']).toBe('');
+    expect(vacios['quote_terms']).toBe('');
   });
 
   it('delivery_enabled manda "1"/"0" y nunca una cadena vacía', async () => {

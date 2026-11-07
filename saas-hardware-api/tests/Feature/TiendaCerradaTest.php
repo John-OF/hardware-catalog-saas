@@ -121,7 +121,8 @@ class TiendaCerradaTest extends TestCase
         $this->assertSame(Tenant::CIERRE_PRUEBA, $this->tienda->cierre()['motivo']);
 
         $this->tienda->forceFill(['trial_ends_at' => null, 'plan_ends_at' => now()->subDays(2), 'plan' => 'pro'])->save();
-        $this->assertSame(['motivo' => Tenant::CIERRE_PLAN, 'desde' => '2026-11-08T15:00:00+00:00', 'plan' => 'Pro'], $this->tienda->fresh()->cierre());
+        // INF-24: con el plan vencido no se borra nada (para tener plan hubo que pagarlo).
+        $this->assertSame(['motivo' => Tenant::CIERRE_PLAN, 'desde' => '2026-11-08T15:00:00+00:00', 'plan' => 'Pro', 'borrado_desde' => null, 'datos_borrados' => null], $this->tienda->fresh()->cierre());
 
         // Plan vigente y cerrada: la cerró el operador a mano.
         $this->tienda->forceFill(['plan_ends_at' => now()->addMonth()])->save();

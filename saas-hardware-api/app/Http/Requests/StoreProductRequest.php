@@ -8,6 +8,7 @@ use App\Http\Requests\Concerns\ValidaVariantes;
 use App\Support\DeLaTienda;
 use App\Support\Subidas;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreProductRequest extends FormRequest
@@ -57,7 +58,9 @@ class StoreProductRequest extends FormRequest
             // no hay variantes, porque es una regla implícita y no se la salta.
             'price'       => 'nullable|required_without:variants|numeric|min:0',
             'sale_price'  => 'nullable|numeric|min:0',
-            'stock'       => 'nullable|required_without:variants|integer|min:0',
+            // MOD-22: sin control de stock el numero no hace falta.
+            'stock'       => ['nullable', Rule::when($this->controlaStock(), ['required_without:variants']), 'integer', 'min:0'],
+            'track_stock' => 'nullable|boolean',
             // MOD-6: el costo de compra. Lo valida todo el panel pero solo lo
             // guarda un admin: el controlador lo descarta para staff, para que
             // editar un producto sin ver el campo no lo borre.

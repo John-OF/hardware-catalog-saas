@@ -134,6 +134,12 @@ Route::prefix('public/{slug}')->middleware(['throttle:catalogo_publico', 'tenant
     Route::post('/orders', [PublicCatalogController::class, 'storeOrder'])
         ->middleware('throttle:escritura_publica');
 
+    // MOD-26: el pedido visto por quien lo hizo, con el enlace que recibió, y
+    // el comprobante de su pago. Sin cuenta: el token es la llave.
+    Route::get('/pedidos/{token}', [\App\Http\Controllers\Api\Public\PublicOrderTrackingController::class, 'show']);
+    Route::post('/pedidos/{token}/comprobante', [\App\Http\Controllers\Api\Public\PublicOrderTrackingController::class, 'comprobante'])
+        ->middleware('throttle:comprobante');
+
     // Autenticación de cliente
     Route::post('/auth/register', [PublicAuthController::class, 'register'])
         ->middleware('throttle:auth_publica');
@@ -309,11 +315,21 @@ Route::middleware(['auth:sanctum', 'tenant', 'panel', 'soporte'])->group(functio
     // Borrar un pedido atendido devuelve su stock y borra el registro de la
     // venta: no es gestionar pedidos, es rehacer la contabilidad.
     Route::delete('orders/{order}', [OrderController::class, 'destroy'])->middleware('permiso:pedidos.borrar')->name('orders.destroy');
+    // MOD-26: el comprobante que mandó el comprador (del disco privado) y la
+    // revisión del pago, que no cambia el estado del pedido.
+    Route::get('orders/{order}/comprobante', [OrderController::class, 'comprobante'])->middleware('permiso:pedidos.ver');
+    Route::post('orders/{order}/pago', [OrderController::class, 'revisarPago'])->middleware('permiso:pedidos.gestionar');
 
-    // Clientes de la tienda (MOD-10). Lectura: no se crean ni se editan desde el
-    // panel -las cuentas las abre el propio cliente en el catalogo-.
+    // Clientes de la tienda (MOD-10, MOD-24): el directorio que se llena solo
+    // con los pedidos y las cuentas. No se crean ni se borran personas desde el
+    // panel; la tienda escribe sus notas y etiquetas, y lo trae o se lo lleva
+    // en CSV. Las rutas fijas van antes de `{customer}`.
     Route::get('customers', [CustomerController::class, 'index'])->middleware('permiso:clientes.ver');
+    Route::get('customers/etiquetas', [CustomerController::class, 'etiquetas'])->middleware('permiso:clientes.ver');
+    Route::get('customers/export', [ExportController::class, 'customers'])->middleware('permiso:clientes.exportar');
+    Route::post('customers/import', [CustomerController::class, 'import'])->middleware('permiso:clientes.gestionar');
     Route::get('customers/{customer}', [CustomerController::class, 'show'])->middleware('permiso:clientes.ver');
+    Route::put('customers/{customer}', [CustomerController::class, 'update'])->middleware('permiso:clientes.gestionar');
 
     // Reseñas/Calificaciones
     Route::apiResource('reviews', \App\Http\Controllers\Api\ReviewController::class)

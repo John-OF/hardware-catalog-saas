@@ -52,6 +52,7 @@ import { specsParaMostrar } from '../../utils/specsFijas';
 import { enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 import { useSpecsFijas } from '../../hooks/useSpecsFijas';
 import { tieneModulo } from '../../utils/verticales';
+import { hayParaPedir } from '../../utils/stock';
 
 export default function ProductDetailPage() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
@@ -294,7 +295,7 @@ export default function ProductDetailPage() {
   // que tenga stock (o la primera, si todas están agotadas): entrar a la ficha y
   // encontrarse elegida una agotada con otras disponibles sería un "Agotado" falso.
   const [varianteId, setVarianteId] = useState<string | null>(null);
-  const varianteInicial = product?.variants?.find((v) => v.stock > 0) ?? product?.variants?.[0] ?? null;
+  const varianteInicial = product?.variants?.find((v) => hayParaPedir(product, v)) ?? product?.variants?.[0] ?? null;
   const varianteElegida = product?.variants?.find((v) => v.id === varianteId) ?? varianteInicial;
   const venta = product ? datosDeVenta(product, varianteElegida) : null;
 
@@ -411,7 +412,8 @@ export default function ProductDetailPage() {
   );
   const mainQtyInCart = mainCartItem ? mainCartItem.quantity : 0;
   // `venta` solo es null sin producto, y aquí ya lo hay.
-  const { price: precioBase, sale_price: precioOferta, stock: stockVisible } = venta!;
+  // MOD-22: `disponible` y no `stock > 0`: sin control de stock se pide siempre.
+  const { price: precioBase, sale_price: precioOferta, stock: stockVisible, disponible, controlaStock: conStock } = venta!;
 
   // MOD-15: solo los tramos que de verdad rebajan sobre lo que se está
   // enseñando. Con una oferta por debajo del precio por mayor gana la oferta, y
@@ -570,10 +572,10 @@ export default function ProductDetailPage() {
                     type="button"
                     role="radio"
                     aria-checked={varianteElegida?.id === v.id}
-                    className={`variant-chip ${varianteElegida?.id === v.id ? 'active' : ''} ${v.stock <= 0 ? 'sold-out' : ''}`}
+                    className={`variant-chip ${varianteElegida?.id === v.id ? 'active' : ''} ${!hayParaPedir(product, v) ? 'sold-out' : ''}`}
                     onClick={() => elegirVariante(v)}
-                    aria-label={v.stock <= 0 ? `${v.nombre} (agotado)` : v.nombre}
-                    title={v.stock <= 0 ? 'Agotado' : undefined}
+                    aria-label={!hayParaPedir(product, v) ? `${v.nombre} (agotado)` : v.nombre}
+                    title={!hayParaPedir(product, v) ? 'Agotado' : undefined}
                   >
                     {v.nombre}
                   </button>
@@ -625,7 +627,15 @@ export default function ProductDetailPage() {
             )}
 
             <div className="detail-stock-box">
-              {stockVisible > 0 ? (
+              {/* MOD-22: sin control de stock no hay unidades que contar. */}
+              {!conStock ? (
+                <div className="stock-indicator instock">
+                  <CheckCircle size={18} />
+                  <div>
+                    <span className="stock-state">Disponible</span>
+                  </div>
+                </div>
+              ) : stockVisible > 0 ? (
                 <div className="stock-indicator instock">
                   <CheckCircle size={18} />
                   <div>
@@ -650,10 +660,10 @@ export default function ProductDetailPage() {
             <button
               onClick={handleAddToCart}
               className={`btn-secondary add-cart-btn ${mainQtyInCart > 0 ? 'added' : ''}`}
-              disabled={stockVisible <= 0}
+              disabled={!disponible}
               style={{ flex: 1 }}
             >
-              {stockVisible <= 0 ? (
+              {!disponible ? (
                 <>
                   <Plus size={18} />
                   <span>Agotado</span>
@@ -673,7 +683,7 @@ export default function ProductDetailPage() {
             <button
               onClick={handleWhatsappQuery}
               className="btn-primary whatsapp-buy-btn"
-              disabled={stockVisible <= 0}
+              disabled={!disponible}
               style={{ flex: 1 }}
             >
               <Phone size={18} />
@@ -718,8 +728,9 @@ export default function ProductDetailPage() {
             </button>
           </div>
 
-          {/* "Avísame cuando llegue" — solo si lo elegido está agotado */}
-          {stockVisible <= 0 && (
+          {/* "Avísame cuando llegue" — solo si lo elegido está agotado. MOD-22: lo
+              que no lleva la cuenta de sus unidades no se agota nunca. */}
+          {!disponible && (
             <div className="notify-stock-box">
               {notifySubmitted ? (
                 <div className="notify-success">
@@ -853,12 +864,12 @@ export default function ProductDetailPage() {
                       style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                       respaldo={<ShoppingBag size={32} style={{ color: 'var(--text-muted)' }} />}
                     />
-                    {p.stock === 0 && (
+                    {!hayParaPedir(p) && (
                       <span className="card-badge sold-out" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--danger)', color: 'var(--text-on-primary)', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
                         Agotado
                       </span>
                     )}
-                    {hasSale && p.stock > 0 && (
+                    {hasSale && hayParaPedir(p) && (
                       <span className="card-badge sale" style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--primary)', color: 'var(--text-on-primary)', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
                         Oferta
                       </span>
@@ -891,8 +902,8 @@ export default function ProductDetailPage() {
                       <button
                         type="button"
                         className="btn-icon"
-                        disabled={p.stock === 0}
-                        style={{ padding: '0.35rem 0.6rem', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', color: p.stock === 0 ? 'var(--text-muted)' : 'var(--primary)', fontSize: '0.75rem', border: 'none' }}
+                        disabled={!hayParaPedir(p)}
+                        style={{ padding: '0.35rem 0.6rem', borderRadius: '20px', background: 'rgba(255,255,255,0.05)', color: !hayParaPedir(p) ? 'var(--text-muted)' : 'var(--primary)', fontSize: '0.75rem', border: 'none' }}
                         onClick={(e) => { e.stopPropagation(); irALaFicha(); }}
                       >
                         Elegir
@@ -904,13 +915,13 @@ export default function ProductDetailPage() {
                       return (
                         <button 
                           type="button"
-                          disabled={p.stock === 0}
+                          disabled={!hayParaPedir(p)}
                           className="btn-icon"
                           style={{ 
                             padding: '0.35rem 0.6rem', 
                             borderRadius: '20px', 
                             background: relQty > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)', 
-                            color: p.stock === 0 ? 'var(--text-muted)' : relQty > 0 ? 'var(--success)' : 'var(--primary)',
+                            color: !hayParaPedir(p) ? 'var(--text-muted)' : relQty > 0 ? 'var(--success)' : 'var(--primary)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.2rem',
@@ -919,7 +930,7 @@ export default function ProductDetailPage() {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (p.stock > 0) {
+                            if (hayParaPedir(p)) {
                               addItem(resolvedSlug || '', p);
                               toast.success('Producto agregado al pedido.');
                             }

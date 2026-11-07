@@ -36,6 +36,8 @@ import CatalogPage from '../pages/public/CatalogPage';
 const ProductDetailPage = lazy(() => import('../pages/public/ProductDetailPage'));
 const PcBuilderPage = lazy(() => import('../pages/public/PcBuilderPage'));
 const PageDetailPage = lazy(() => import('../pages/public/PageDetailPage'));
+// MOD-26: el pedido visto por quien lo hizo, con su enlace.
+const SeguimientoPedidoPage = lazy(() => import('../pages/public/SeguimientoPedidoPage'));
 
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const RegisterStorePage = lazy(() => import('../pages/auth/RegisterStorePage'));
@@ -131,11 +133,15 @@ export const router = createBrowserRouter([
   { path: '/:slug/product/:id', element: <ProductDetailPage /> },
   { path: '/:slug/builder', element: <PcBuilderPage /> },
   { path: '/:slug/p/:pageSlug', element: <PageDetailPage /> },
+  { path: '/:slug/pedido/:token', element: <SeguimientoPedidoPage /> },
 
   // Rutas públicas (en dominios personalizados sin prefijo de slug)
   { path: '/product/:id', element: <ProductDetailPage /> },
   { path: '/builder', element: <PcBuilderPage /> },
   { path: '/p/:pageSlug', element: <PageDetailPage /> },
+  // `pedido` es un slug reservado (AuthController): con dominio propio, esta
+  // ruta y `/:slug/builder` empatarían en una tienda llamada así.
+  { path: '/pedido/:token', element: <SeguimientoPedidoPage /> },
 
   // Rutas privadas (dashboard)
   {

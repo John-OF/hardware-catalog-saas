@@ -37,4 +37,8 @@ return [
 
     'csv' => ['kb' => 4096, 'tipos' => ['csv', 'txt']],
 
+    // MOD-26: el comprobante de pago que sube el comprador desde su enlace de
+    // seguimiento: la captura de la app del banco o el PDF de la transferencia.
+    'comprobante' => ['kb' => 5120, 'tipos' => ['jpeg', 'jpg', 'png', 'webp', 'pdf']],
+
 ];

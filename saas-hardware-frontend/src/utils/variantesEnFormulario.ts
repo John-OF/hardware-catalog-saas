@@ -116,8 +116,11 @@ export const avisoAlQuitarVariante = (fila: VarianteEnFormulario): string | null
  * Qué falta para poder guardar. Devuelve el primer problema en palabras del
  * dueño, o null. El backend valida lo mismo; esto evita el viaje de ida y vuelta
  * con un mensaje de campo que el formulario no sabría señalar.
+ *
+ * `conStock` es false cuando el producto no lleva la cuenta de sus unidades
+ * (MOD-22): entonces el stock de cada variante no se pide.
  */
-export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[]): string | null => {
+export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[], conStock = true): string | null => {
   if (filas.length === 0) return null;
   if (ejes.some((e) => !e.trim())) return 'Ponle nombre a cada opción de las variantes (por ejemplo, "Capacidad").';
 
@@ -126,7 +129,7 @@ export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[
     const n = i + 1;
     if (fila.valores.some((v) => !v.trim())) return `A la variante ${n} le falta el valor de alguna opción.`;
     if (fila.price === '' || Number(fila.price) < 0) return `A la variante ${n} le falta el precio.`;
-    if (fila.stock === '' || Number(fila.stock) < 0) return `A la variante ${n} le falta el stock.`;
+    if (conStock && (fila.stock === '' || Number(fila.stock) < 0)) return `A la variante ${n} le falta el stock.`;
     if (fila.sale_price !== '' && Number(fila.sale_price) >= Number(fila.price)) {
       return `En la variante ${n}, el precio de oferta debe ser menor que el regular.`;
     }
@@ -150,12 +153,16 @@ export const problemaDeVariantes = (ejes: string[], filas: VarianteEnFormulario[
  * No es lo mismo que mandarla vacía: el backend entiende ausente como "no lo
  * toques" y null como "bórralo" (MOD-6), así que mandarla vacía dejaría a cada
  * vendedor borrando los costos al editar una variante.
+ *
+ * Con `conStock` en false (MOD-22) el stock viaja vacío: el backend deja el que
+ * tenía cada variante, o 0 si es nueva.
  */
 export const agregarVariantesAlFormulario = (
   formData: FormData,
   ejes: string[],
   filas: VarianteEnFormulario[],
   incluirCosto = false,
+  conStock = true,
 ) => {
   const lista = filas.map((fila) => ({
     ...(fila.id ? { id: fila.id } : {}),
@@ -168,7 +175,7 @@ export const agregarVariantesAlFormulario = (
     // mayor lo ve y lo edita todo el panel, así que una lista vacía significa de
     // verdad "quítalos" y no "no te dejan verlos".
     price_tiers: tramosParaGuardar(fila.price_tiers),
-    stock: fila.stock,
+    stock: conStock ? fila.stock : null,
     low_stock_threshold: fila.low_stock_threshold || '5',
     remove_image: fila.quitarImagen,
   }));

@@ -175,7 +175,7 @@ class QueuedMailWithRealQueueTest extends TestCase
 
         $mensajes = $this->correosEnviados();
         $this->assertCount(1, $mensajes);
-        $this->assertStringContainsString('Ya llego', $mensajes[0]->getOriginalMessage()->getSubject());
+        $this->assertStringContainsString('Ya llegó', $mensajes[0]->getOriginalMessage()->getSubject());
     }
 
     public function test_el_correo_de_verificacion_del_alta_sale_por_la_cola(): void

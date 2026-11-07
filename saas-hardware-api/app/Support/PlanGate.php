@@ -42,8 +42,10 @@ class PlanGate
         'pages'              => 'páginas informativas',
         'users'              => 'usuarios del panel',
         'images_per_product' => 'imágenes por producto',
-        'custom_domain'      => 'El dominio propio',
-        'csv_import'         => 'La importación por CSV',
+        // Las dos funciones entran a media frase («Tu plan Básico no incluye
+        // la importación por CSV»), por eso van en minúscula y con su artículo.
+        'custom_domain'      => 'el dominio propio',
+        'csv_import'         => 'la importación por CSV',
     ];
 
     /**
@@ -214,7 +216,9 @@ class PlanGate
             $funcion,
             false,
             null,
-            "{$nombre} no está incluido en tu plan ".self::label().'. Mejora de plan para usarlo.',
+            // Sin concordar con el nombre: «no está incluido» salía también
+            // para «la importación por CSV».
+            'Tu plan '.self::label()." no incluye {$nombre}. Para usar esta función, mejora de plan.",
         );
     }
 

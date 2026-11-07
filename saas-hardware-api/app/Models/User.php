@@ -70,6 +70,15 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected static function booted(): void
     {
+        // MOD-24: una cuenta de cliente nueva entra en el directorio de la
+        // tienda, y si ya había comprado como invitado con ese teléfono o ese
+        // correo, se junta con lo que compró.
+        static::created(function (User $usuario) {
+            if ($usuario->role === 'customer' && $usuario->tenant_id) {
+                \App\Support\Directorio::deCuentaSinFallar($usuario);
+            }
+        });
+
         static::saving(function (User $usuario) {
             // Un usuario leido con columnas sueltas, sin `role`, no se toca:
             // sin esto, guardarlo le borraria el rol a un staff.

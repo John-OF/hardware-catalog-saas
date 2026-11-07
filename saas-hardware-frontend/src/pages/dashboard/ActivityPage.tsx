@@ -13,6 +13,8 @@ const AREAS: { valor: AreaDeActividad; etiqueta: string }[] = [
   { valor: 'producto', etiqueta: 'Productos' },
   { valor: 'categoria', etiqueta: 'Categorías' },
   { valor: 'pedido', etiqueta: 'Pedidos' },
+  // MOD-24: notas, etiquetas e importaciones del directorio de clientes.
+  { valor: 'cliente', etiqueta: 'Clientes' },
   { valor: 'pagina', etiqueta: 'Páginas' },
   { valor: 'resena', etiqueta: 'Reseñas' },
   { valor: 'espera', etiqueta: 'Lista de espera' },

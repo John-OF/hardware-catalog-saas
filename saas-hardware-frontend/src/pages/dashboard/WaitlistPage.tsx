@@ -25,6 +25,7 @@ import type { StockNotification, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFecha } from '../../utils/fechas';
 import { nombreConVariante } from '../../utils/variants';
+import { controlaStock } from '../../utils/stock';
 import { getPlantillasWhatsapp, textoDePlantilla } from '../../api/plantillasWhatsapp';
 import { enlaceDeProducto, enlaceDeWhatsapp, rellenarPlantilla } from '../../utils/plantillasWhatsapp';
 import './WaitlistPage.css';
@@ -192,6 +193,8 @@ export default function WaitlistPage() {
                   const pendiente = espera.notified_at === null;
                   // MOD-5: si espera una variante, el stock que importa es el suyo.
                   const stockEsperado = espera.variant ? espera.variant.stock : espera.product?.stock ?? 0;
+                  // MOD-22: si el producto dejó de llevar la cuenta, ya se puede pedir.
+                  const sinControl = espera.product ? !controlaStock(espera.product) : false;
 
                   return (
                     <tr key={espera.id}>
@@ -217,10 +220,12 @@ export default function WaitlistPage() {
                               <span className="product-variant">{espera.variant.nombre}</span>
                             )}
                             {espera.product && (
-                              <span className={`product-stock ${stockEsperado > 0 ? 'in' : 'out'}`}>
-                                {stockEsperado > 0
-                                  ? `${stockEsperado} en stock`
-                                  : 'Sigue agotado'}
+                              <span className={`product-stock ${sinControl || stockEsperado > 0 ? 'in' : 'out'}`}>
+                                {sinControl
+                                  ? 'Ya se puede pedir'
+                                  : stockEsperado > 0
+                                    ? `${stockEsperado} en stock`
+                                    : 'Sigue agotado'}
                               </span>
                             )}
                           </div>

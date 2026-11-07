@@ -43,7 +43,8 @@ export default function ReembolsosPage() {
       <h2>4. Qué pasa con tu tienda</h2>
       <p>
         Al reembolsarse un pago, esa suscripción se cancela. Si no tienes otro plan activo, la tienda se
-        suspende como al terminar la prueba: <strong>no se borra nada</strong> de lo que creaste y se puede
+        suspende, pero <strong>no se borra nada</strong> de lo que creaste —a una tienda que pagó un plan
+        alguna vez no se le borran nunca sus datos, a diferencia de una prueba que nunca pagó— y se puede
         reactivar al contratar un plan.
       </p>
 

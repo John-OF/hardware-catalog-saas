@@ -50,6 +50,10 @@ export default function PrivacidadPage() {
         <li>si dejas una reseña: tu nombre, tu calificación y tu comentario, que se publican, y tu correo,
           que <strong>no</strong> se publica;</li>
         <li>si pides que te avisen cuando llegue un producto: tu correo, solo para ese aviso.</li>
+        <li>en la lista de clientes de la tienda: tu nombre y tus datos de contacto, juntando tus pedidos
+          por tu teléfono o tu correo, y las notas y etiquetas que la tienda escriba sobre ti para su uso
+          interno, que <strong>no</strong> se publican. La tienda también puede cargar en esa lista
+          contactos que ya tenía.</li>
       </ul>
 
       <p><strong>Si solo navegas un catálogo:</strong> tu navegador guarda un identificador aleatorio para
@@ -93,8 +97,11 @@ export default function PrivacidadPage() {
 
       <h2>5. Cuánto tiempo los guardamos</h2>
       <ul>
-        <li>Mientras tu tienda exista. Si se suspende —por ejemplo, al terminar la prueba sin elegir
-          plan— sus datos se conservan para que puedas reactivarla.</li>
+        <li>Mientras tu tienda exista. Si se suspende, sus datos se conservan para que puedas
+          reactivarla.</li>
+        <li>Si se suspende al terminar la prueba y nunca ha pagado un plan, sus productos, pedidos y
+          clientes se conservan 90 días y después se borran; te avisamos dos veces por correo antes.
+          Tu cuenta y la de tus clientes se quedan.</li>
         <li>Lo que mandas a la papelera del panel se borra solo a los 30 días.</li>
         <li>El registro de cambios del panel de tu tienda (quién cambió qué) se guarda 365 días y después
           se borra solo.</li>
@@ -109,7 +116,8 @@ export default function PrivacidadPage() {
         Conforme a la Ley Orgánica de Protección de Datos Personales de {PAIS_DEL_TITULAR}, puedes pedir
         acceder a tus datos, corregirlos, eliminarlos, oponerte a su tratamiento y recibirlos en un
         formato que puedas llevarte a otro servicio. Escríbenos a <Correo /> desde el correo de tu cuenta.
-        El catálogo y los pedidos de tu tienda los puedes descargar tú mismo en CSV desde el panel.
+        El catálogo, los pedidos y los clientes de tu tienda los puedes descargar tú mismo en CSV desde el
+        panel.
       </p>
       <p>
         Si eres comprador de una tienda, dirígete primero a ella: es la responsable de tus datos. Si nos

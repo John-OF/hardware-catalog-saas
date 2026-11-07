@@ -31,7 +31,7 @@ class StockNotificationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = StockNotification::with([
-            'product:id,name,stock,price,sale_price,thumbnail_url',
+            'product:id,name,stock,track_stock,price,sale_price,thumbnail_url',
             // MOD-5: la variante que espera, con su propio stock.
             'variant:id,product_id,options,stock,price,sale_price',
         ])
@@ -76,7 +76,7 @@ class StockNotificationController extends Controller
             'notified_at' => $data['notified'] ? now() : null,
         ]);
 
-        $stockNotification->load('product:id,name,stock,price,sale_price,thumbnail_url');
+        $stockNotification->load('product:id,name,stock,track_stock,price,sale_price,thumbnail_url');
 
         if ($estabaAvisado !== (bool) $data['notified']) {
             Bitacora::anotar(

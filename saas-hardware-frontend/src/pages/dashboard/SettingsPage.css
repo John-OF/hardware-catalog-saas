@@ -191,22 +191,9 @@
   word-break: break-all;
 }
 
-/* Pago y envío (MOD-3, MOD-1). Una tarjeta por método, con el toggle siempre
-   visible y los campos solo cuando está encendido: es lo que hace que cuatro
-   métodos con dos o cinco campos cada uno no se vean como un formulario de
-   veinte campos de golpe. */
-:where(.page-settings) .payment-methods-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-:where(.page-settings) .payment-method-card {
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
+/* Pago y envío (MOD-3, MOD-1). Los métodos de pago tienen su propio editor
+   desde MOD-23 (`EditorDeMetodosDePago.css`); el interruptor de aquí lo usan
+   el envío y el impuesto. */
 :where(.page-settings) .payment-method-toggle {
   display: flex;
   align-items: center;
@@ -227,12 +214,6 @@
 :where(.page-settings) .payment-method-toggle svg {
   color: var(--primary);
   flex-shrink: 0;
-}
-
-:where(.page-settings) .payment-method-fields {
-  margin-top: 0.85rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
 }
 
 :where(.page-settings) .settings-divider {

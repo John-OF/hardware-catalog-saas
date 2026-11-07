@@ -39,6 +39,11 @@ class BackInStockNotification extends Notification implements ShouldQueue
 
     public function __construct(Product $product, string $nombreCliente, ?ProductVariant $variante = null)
     {
+        // FUN-29: el aviso sale cuando la reposición se guarda de verdad. Si se
+        // encola dentro de una transacción que luego se deshace —la vista previa
+        // de un import que repone stock—, no sale, sea cual sea la cola.
+        $this->afterCommit();
+
         $tenant = $product->tenant;
 
         // El precio que se anuncia es el que veria en el catalogo: el de oferta
@@ -53,7 +58,9 @@ class BackInStockNotification extends Notification implements ShouldQueue
             'producto' => $variante ? "{$product->name} ({$variante->nombre})" : $product->name,
             'tienda'   => $tenant?->name ?? 'la tienda',
             'precio'   => Money::format($precio, $tenant?->currency),
-            'stock'    => (int) ($variante ? $variante->stock : $product->stock),
+            // MOD-22: sin control de stock no hay unidades que contar (el aviso
+            // sale al apagarlo), y el numero que quedo guardado no dice nada.
+            'stock'    => $product->controlaStock() ? (int) ($variante ? $variante->stock : $product->stock) : null,
             'whatsapp' => $tenant?->whatsapp_number,
             'url'      => StoreUrl::forProduct($tenant, $product->id),
         ];
@@ -75,13 +82,13 @@ class BackInStockNotification extends Notification implements ShouldQueue
         $tienda = TextoDeCorreo::enLinea($this->aviso['tienda']);
 
         $mail = (new MailMessage)
-            ->subject("Ya llego: {$this->aviso['producto']}")
+            ->subject("Ya llegó: {$this->aviso['producto']}")
             ->greeting('Hola '.TextoDeCorreo::enLinea($this->aviso['cliente']).',')
-            ->line("**{$producto}** volvio a estar disponible en {$tienda}, a {$this->aviso['precio']}.");
+            ->line("**{$producto}** volvió a estar disponible en {$tienda}, a {$this->aviso['precio']}.");
 
         // Decir cuantas quedan no es un adorno: quien espera una pieza agotada
         // necesita saber si tiene que correr o puede pensarselo.
-        if ($this->aviso['stock'] <= 3) {
+        if ($this->aviso['stock'] !== null && $this->aviso['stock'] <= 3) {
             $mail->line("Quedan pocas unidades ({$this->aviso['stock']}).");
         }
 
@@ -90,9 +97,9 @@ class BackInStockNotification extends Notification implements ShouldQueue
         }
 
         if ($this->aviso['whatsapp']) {
-            $mail->line('Si prefieres, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->aviso['whatsapp']).'.');
+            $mail->line('Si prefieres, escríbenos por WhatsApp al '.TextoDeCorreo::enLinea($this->aviso['whatsapp']).'.');
         }
 
-        return $mail->line('Recibes este correo porque pediste que te avisaramos de este producto. No te escribiremos por nada mas.');
+        return $mail->line('Recibes este correo porque pediste que te avisáramos de este producto. No te escribiremos por nada más.');
     }
 }

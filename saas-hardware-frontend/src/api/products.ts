@@ -53,8 +53,21 @@ export interface CambioDeImport {
   detalle: string | null;
 }
 
+/** Una fila del archivo que no entró, con sus celdas como llegaron (FUN-29). */
+export interface FilaRechazada {
+  fila: number;
+  error: string;
+  celdas: (string | null)[];
+}
+
 export interface ImportReport {
   message: string;
+  /** FUN-29: true si fue una vista previa y no se guardó nada. */
+  preview?: boolean;
+  /** FUN-29: la cabecera del archivo tal cual, para las filas rechazadas. */
+  header?: string[];
+  /** FUN-29: las filas con aviso, para descargarlas, corregirlas y volver a subirlas. */
+  rejected_rows?: FilaRechazada[];
   /** Lo que se escribió: creados más actualizados. */
   success_count: number;
   created_count: number;
@@ -73,10 +86,15 @@ export interface ImportReport {
  */
 export type ModoDeImport = 'omitir' | 'actualizar' | 'duplicar';
 
-export const importProductsCsv = async (file: File, modo: ModoDeImport = 'omitir'): Promise<ImportReport> => {
+/**
+ * Sube el CSV. Con `vistaPrevia` (FUN-29) el servidor hace el import entero y
+ * lo deshace: el informe dice lo que pasaría y no se guarda nada.
+ */
+export const importProductsCsv = async (file: File, modo: ModoDeImport = 'omitir', vistaPrevia = false): Promise<ImportReport> => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('modo', modo);
+  if (vistaPrevia) formData.append('vista_previa', '1');
   const response = await api.post<ImportReport>('/products/import', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

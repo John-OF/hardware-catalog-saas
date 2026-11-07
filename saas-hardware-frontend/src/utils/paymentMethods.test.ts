@@ -1,51 +1,54 @@
 import { describe, expect, it } from 'vitest';
 import { metodosDePagoActivos } from './paymentMethods';
+import { unMetodo } from '../test/fixtures';
+import type { PaymentMethod } from '../types';
 
-describe('metodosDePagoActivos (MOD-3)', () => {
+describe('metodosDePagoActivos (MOD-3, MOD-23)', () => {
   it('sin nada guardado, ninguno', () => {
     expect(metodosDePagoActivos(null)).toEqual([]);
     expect(metodosDePagoActivos(undefined)).toEqual([]);
-    expect(metodosDePagoActivos({})).toEqual([]);
+    expect(metodosDePagoActivos([])).toEqual([]);
+  });
+
+  it('lo de antes de MOD-23 (un objeto, no una lista) cuenta como ninguno en vez de romper', () => {
+    const antiguo = { yape: { enabled: true, phone: '987654321' } } as unknown as PaymentMethod[];
+    expect(metodosDePagoActivos(antiguo)).toEqual([]);
   });
 
   it('un método apagado no sale, aunque tenga datos', () => {
-    expect(metodosDePagoActivos({ yape: { enabled: false, phone: '987654321' } })).toEqual([]);
+    expect(metodosDePagoActivos([unMetodo({ enabled: false, details: '987654321' })])).toEqual([]);
   });
 
-  it('yape y plin muestran teléfono y titular', () => {
-    const [info] = metodosDePagoActivos({ yape: { enabled: true, phone: '987654321', holder_name: 'Ana' } });
-    expect(info).toEqual({ clave: 'yape', etiqueta: 'Yape', detalle: '987654321 · Ana' });
+  it('uno sin nombre tampoco', () => {
+    expect(metodosDePagoActivos([unMetodo({ name: '  ' })])).toEqual([]);
   });
 
-  it('sin titular, el detalle es solo el teléfono', () => {
-    const [info] = metodosDePagoActivos({ plin: { enabled: true, phone: '987654321' } });
-    expect(info.detalle).toBe('987654321');
-  });
+  it('da nombre, datos, instrucciones y QR de cada uno, sin espacios de los bordes', () => {
+    const [info] = metodosDePagoActivos([
+      unMetodo({ id: 'k3', name: ' Deuna ', details: '0991234567 · Ana ', instructions: 'Manda la captura', qr_url: 'https://cdn.test/qr.png' }),
+    ]);
 
-  it('transferencia junta banco, cuenta y titular', () => {
-    const [info] = metodosDePagoActivos({
-      transferencia: { enabled: true, bank: 'BCP', account_number: '1937482910', holder_name: 'Ana Dueña' },
-    });
     expect(info).toEqual({
-      clave: 'transferencia',
-      etiqueta: 'Transferencia bancaria',
-      detalle: 'BCP 1937482910 · Ana Dueña',
+      clave: 'k3',
+      etiqueta: 'Deuna',
+      detalle: '0991234567 · Ana',
+      instrucciones: 'Manda la captura',
+      qr: 'https://cdn.test/qr.png',
     });
   });
 
-  it('efectivo no tiene detalle', () => {
-    const [info] = metodosDePagoActivos({ efectivo: { enabled: true } });
-    expect(info).toEqual({ clave: 'efectivo', etiqueta: 'Efectivo contra entrega', detalle: '' });
+  it('sin datos ni instrucciones, textos vacíos y sin QR', () => {
+    const [info] = metodosDePagoActivos([unMetodo({ name: 'Efectivo contra entrega' })]);
+    expect(info).toMatchObject({ detalle: '', instrucciones: '', qr: null });
   });
 
-  it('devuelve solo los encendidos, en el orden fijo: yape, plin, transferencia, efectivo', () => {
-    const activos = metodosDePagoActivos({
-      efectivo: { enabled: true },
-      yape: { enabled: true, phone: '1' },
-      transferencia: { enabled: false, bank: 'BCP' },
-      plin: { enabled: true, phone: '2' },
-    });
+  it('respeta el orden que eligió la tienda', () => {
+    const activos = metodosDePagoActivos([
+      unMetodo({ id: 'a', name: 'Efectivo' }),
+      unMetodo({ id: 'b', name: 'Nequi', enabled: false }),
+      unMetodo({ id: 'c', name: 'Transferencia' }),
+    ]);
 
-    expect(activos.map((m) => m.clave)).toEqual(['yape', 'plin', 'efectivo']);
+    expect(activos.map((m) => m.etiqueta)).toEqual(['Efectivo', 'Transferencia']);
   });
 });

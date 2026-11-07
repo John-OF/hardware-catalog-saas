@@ -1,5 +1,6 @@
 import type { Product, ProductVariant } from '../types';
 import { precioPorCantidad } from './preciosPorCantidad';
+import { controlaStock, hayParaPedir } from './stock';
 
 /**
  * Variantes de producto (MOD-5): lo que comparten catálogo, ficha, carrito,
@@ -23,6 +24,9 @@ export const precioVisible = (item: { price: number | string; sale_price: number
  * `cantidad` solo cambia `precio`, que es lo que se cobra por unidad: con ella
  * entra el precio por mayor (MOD-15). `price` y `sale_price` siguen siendo los
  * de una unidad, que es lo que se tacha y se enseña en la tarjeta.
+ *
+ * `disponible` es si se puede pedir y `controlaStock` si hay unidades que
+ * contar (MOD-22): sin control de stock, `stock` no se enseña ni se compara.
  */
 export const datosDeVenta = (product: Product, variant?: ProductVariant | null, cantidad = 1) => {
   const fuente = variant ?? product;
@@ -31,6 +35,8 @@ export const datosDeVenta = (product: Product, variant?: ProductVariant | null, 
     price: Number(fuente.price),
     sale_price: fuente.sale_price !== null && fuente.sale_price !== undefined ? Number(fuente.sale_price) : null,
     stock: fuente.stock,
+    controlaStock: controlaStock(product),
+    disponible: hayParaPedir(product, variant),
     precio: precioPorCantidad(precioVisible(fuente), fuente.price_tiers, cantidad),
   };
 };

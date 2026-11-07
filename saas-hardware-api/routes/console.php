@@ -39,6 +39,10 @@ Vigilancia::tarea(Schedule::command('papelera:purgar')->daily(), 'papelera');
 // crece con cada import, que guarda el detalle de hasta 100 productos.
 Vigilancia::tarea(Schedule::command('bitacora:purgar')->daily(), 'bitacora');
 
+// MOD-26: los comprobantes de pago caducan. Llevan datos bancarios de quien
+// compró, y guardarlos más de lo necesario es un riesgo sin ninguna ventaja.
+Vigilancia::tarea(Schedule::command('comprobantes:purgar')->daily(), 'comprobantes');
+
 // INF-7: la copia de seguridad de la base, a diario. Se programa de madrugada
 // porque `mysqldump` con `--single-transaction` no bloquea la tienda, pero sí
 // compite por disco y red con quien esté comprando.
@@ -47,6 +51,11 @@ Vigilancia::tarea(Schedule::command('bitacora:purgar')->daily(), 'bitacora');
 // arrancar la siguiente encima: dos `mysqldump` a la vez es la forma de tumbar
 // justo la base que se quería proteger.
 Vigilancia::tarea(Schedule::command('copias:crear')->dailyAt('03:30')->withoutOverlapping(), 'copias');
+
+// INF-24: avisa a las pruebas que se cerraron sin pagar y, a los 90 días y tras
+// dos avisos, borra sus datos. Después de la copia, porque sin una copia de las
+// últimas horas no borra nada: es la única vuelta atrás.
+Vigilancia::tarea(Schedule::command('pruebas:purgar')->dailyAt('05:00')->withoutOverlapping(), 'purga');
 
 // INF-19: el repaso de todo lo que falla en silencio, cada hora. En segundo
 // plano porque puede esperar hasta 90 s a que un worker atienda su trabajo de

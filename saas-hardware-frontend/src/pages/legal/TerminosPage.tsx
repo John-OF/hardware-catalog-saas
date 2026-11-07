@@ -49,8 +49,14 @@ export default function TerminosPage() {
       <p>
         Toda tienda nueva empieza con <strong>7 días de prueba gratis</strong>, sin tarjeta, con los
         límites del plan Pro. Si al terminar la prueba no has elegido un plan de pago, la tienda se
-        suspende: deja de estar disponible, pero <strong>no se borra nada</strong> de lo que creaste, y
-        se puede reactivar al contratar un plan.
+        suspende: deja de estar disponible, y se puede reactivar al contratar un plan, tal como estaba.
+      </p>
+      <p>
+        Lo que creaste en ella se conserva <strong>90 días</strong> desde que se suspende. Si para
+        entonces no has elegido un plan, borramos sus productos con sus fotos, sus pedidos y sus
+        clientes; antes te avisamos dos veces por correo, con la fecha. Tu cuenta y la tienda se quedan:
+        si contratas un plan después, vuelve a abrirse, vacía. Esto no le pasa nunca a una tienda que
+        haya pagado un plan alguna vez.
       </p>
 
       <h2>5. Planes, precios e impuestos</h2>

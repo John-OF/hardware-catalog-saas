@@ -14,6 +14,7 @@ import {
 import Imagen from '../../components/ui/Imagen';
 import { Link } from 'react-router-dom';
 import { getDashboardStats } from '../../api/dashboard';
+import { controlaStock, hayParaPedir } from '../../utils/stock';
 import type { DashboardStats } from '../../api/dashboard';
 import { useTenantStore } from '../../stores/tenantStore';
 import { useAuthStore, usePuede } from '../../stores/authStore';
@@ -217,8 +218,9 @@ export default function OverviewPage() {
                     <span className="views-pill">
                       <Eye size={12} /> {product.views_count}
                     </span>
-                    <span className={`stock-pill ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
-                      {product.stock > 0 ? `${product.stock} u.` : 'Agotado'}
+                    {/* MOD-22: sin control de stock no hay unidades que contar. */}
+                    <span className={`stock-pill ${hayParaPedir(product) ? 'in-stock' : 'out-of-stock'}`}>
+                      {!controlaStock(product) ? 'Sin control' : product.stock > 0 ? `${product.stock} u.` : 'Agotado'}
                     </span>
                   </div>
                 </div>

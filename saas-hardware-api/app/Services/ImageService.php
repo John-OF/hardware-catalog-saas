@@ -73,6 +73,47 @@ class ImageService
     }
 
     /**
+     * Sube la imagen del QR de un método de pago (MOD-23) y devuelve su URL.
+     *
+     * En PNG y no en WebP con pérdida como las fotos: un QR es blanco y negro
+     * con bordes duros, y la compresión con pérdida los emborrona justo donde
+     * el lector del celular los necesita nítidos. En PNG además pesa poco.
+     * Se reduce a 800 px, que sobra para escanearlo desde la pantalla.
+     */
+    public function subirImagenDePago(UploadedFile $file, string $tenantSlug): string
+    {
+        $imagen = Image::decodePath($file->getRealPath())
+            ->scaleDown(width: 800, height: 800)
+            ->encode(new PngEncoder);
+
+        $path = "pagos/{$tenantSlug}/".Str::uuid()->toString().'.png';
+        $disk = $this->disco();
+        $this->guardar($disk, $path, $imagen->toString());
+
+        return Storage::disk($disk)->url($path);
+    }
+
+    /**
+     * Borra la imagen de un QR que ya no usa ningún método de pago (MOD-23).
+     *
+     * Solo si está en la carpeta de pagos de ESA tienda: la URL llega de lo que
+     * había guardado, y si algún día alguien escribiera ahí otra cosa, esto no
+     * puede borrar una foto de producto ni la imagen de otra tienda. Cada QR
+     * tiene su propio archivo (no se comparten como las fotos de un producto
+     * duplicado), así que no hace falta buscar quién más lo usa.
+     */
+    public function borrarImagenDePago(?string $url, string $tenantSlug): void
+    {
+        $ruta = ImagenesDelDisco::ruta($url);
+
+        if ($ruta === null || ! str_starts_with($ruta, "pagos/{$tenantSlug}/") || str_contains($ruta, '..')) {
+            return;
+        }
+
+        Storage::disk($this->disco())->delete($ruta);
+    }
+
+    /**
      * Borra del almacenamiento las fotos de producto que ya no use nadie (TEC-14).
      *
      * **Hay que llamarlo DESPUÉS de haber cambiado la base**, con las URL que

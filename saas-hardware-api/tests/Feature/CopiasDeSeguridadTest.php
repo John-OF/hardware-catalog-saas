@@ -102,7 +102,7 @@ class CopiasDeSeguridadTest extends TestCase
         Storage::fake('public');
 
         $this->artisan('copias:crear', ['--disco' => 'public'])
-            ->expectsOutputToContain('publico')
+            ->expectsOutputToContain('público')
             ->assertExitCode(1);
 
         $this->assertSame([], Storage::disk('public')->allFiles());

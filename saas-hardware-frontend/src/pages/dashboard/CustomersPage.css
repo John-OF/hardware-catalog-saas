@@ -256,3 +256,164 @@
   font-size: 0.88rem;
   margin: 0;
 }
+
+/* MOD-24: el directorio. Botones de la cabecera, la marca de cuenta, las
+   etiquetas, el WhatsApp de cada fila, las notas de la ficha y el import. */
+
+:where(.page-customers) .customers-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-customers) .customers-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+:where(.page-customers) .customers-header-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.page-customers) .customer-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+:where(.page-customers) .customer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+:where(.page-customers) .customer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-customers) .customer-tag button {
+  display: flex;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+:where(.page-customers) .customer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.page-customers) .customer-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  color: var(--success);
+}
+
+:where(.page-customers) .customer-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+:where(.page-customers) .customer-notes label,
+:where(.page-customers) .customer-notes-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+:where(.page-customers) .customer-notes-hint {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+:where(.page-customers) .customer-notes textarea {
+  resize: vertical;
+}
+
+:where(.page-customers) .customer-tags.editables {
+  align-items: center;
+}
+
+:where(.page-customers) .customer-tag-input {
+  width: 170px;
+  padding-block: 0.3rem;
+  font-size: 0.8rem;
+}
+
+:where(.page-customers) .customer-notes-save {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+:where(.page-customers) .customers-import-help {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+:where(.page-customers) .customers-import-help p {
+  margin: 0 0 0.4rem;
+}
+
+:where(.page-customers) .customers-import-help ul {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+:where(.page-customers) .customers-import-columns {
+  display: block;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--overlay-mix), 0.03);
+  color: var(--primary);
+  word-break: break-all;
+}
+
+:where(.page-customers) .customers-import-result p {
+  margin: 0 0 0.6rem;
+}
+
+:where(.page-customers) .customers-import-errors {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+  color: var(--danger);
+  max-height: 12rem;
+  overflow-y: auto;
+}

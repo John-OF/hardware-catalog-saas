@@ -24,6 +24,9 @@ const ACCIONES: Record<string, string> = {
   'tenant.pago': 'Pagos registrados',
   'tenant.plan_vencido': 'Planes vencidos',
   'tenant.fecha_plan': 'Fechas de pago corregidas',
+  // INF-24: la purga de las pruebas que nunca pagaron.
+  'tenant.aviso_purga': 'Avisos de borrado de datos',
+  'tenant.datos_borrados': 'Datos de pruebas borrados',
   // SEC-9: lo que pasa con la cuenta del propio operador.
   'operador.dos_pasos_activada': 'Verificación en dos pasos activada',
   'operador.codigo_de_recuperacion': 'Entradas con código de recuperación',

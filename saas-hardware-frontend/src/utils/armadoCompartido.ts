@@ -1,5 +1,6 @@
 import type { Product, ProductVariant } from '../types';
 import { tieneVariantes } from './variants';
+import { hayParaPedir } from './stock';
 
 /**
  * El armado de PC en la URL, para poder compartirlo (MOD-20).
@@ -87,7 +88,7 @@ export function armadoDesdeElEnlace(
     selecciones[paso] = producto;
     variantes[paso] = tieneVariantes(producto)
       ? producto.variants!.find((v) => v.id === pieza.variante)
-        ?? producto.variants!.find((v) => v.stock > 0)
+        ?? producto.variants!.find((v) => hayParaPedir(producto, v))
         ?? producto.variants![0]
       : null;
   }

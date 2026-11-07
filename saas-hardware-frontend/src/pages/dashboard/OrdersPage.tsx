@@ -25,6 +25,7 @@ import {
 import { getOrders, updateOrderStatus, deleteOrder } from '../../api/orders';
 import { descargarCotizacion, exportarPedidos } from '../../api/exportaciones';
 import NewOrderModal from '../../components/dashboard/NewOrderModal';
+import PagoDelPedido, { etiquetaDePago } from '../../components/dashboard/PagoDelPedido';
 import type { Order, PaginatedResponse } from '../../types';
 import { useTenantStore } from '../../stores/tenantStore';
 import { formatearFecha, formatearFechaHora } from '../../utils/fechas';
@@ -94,7 +95,9 @@ export default function OrdersPage() {
     queryKey: ['orders', search, status, page],
     queryFn: () => getOrders({
       search: search || undefined,
-      status: status || undefined,
+      // MOD-26: «con pago en revisión» es un filtro del pago, no del estado.
+      status: status && status !== 'pago_en_revision' ? status : undefined,
+      payment_status: status === 'pago_en_revision' ? 'en_revision' : undefined,
       page,
       per_page: 10
     }),
@@ -253,6 +256,7 @@ export default function OrdersPage() {
           <option value="processing">En Proceso</option>
           <option value="attended">Atendidos</option>
           <option value="cancelled">Cancelados</option>
+          <option value="pago_en_revision">Con pago en revisión</option>
         </select>
       </div>
 
@@ -303,6 +307,10 @@ export default function OrdersPage() {
                     <span className={`badge ${getStatusBadgeClass(order.status)}`}>
                       {getStatusText(order.status)}
                     </span>
+                    {/* MOD-26: el pago va aparte del estado. */}
+                    {order.payment_status && (
+                      <span className={`pago-badge ${order.payment_status}`}>{etiquetaDePago(order.payment_status)}</span>
+                    )}
                   </td>
                   <td className="actions-cell">
                     <div className="action-buttons">
@@ -452,6 +460,17 @@ export default function OrdersPage() {
                     </div>
                   )}
                 </div>
+
+                {/* MOD-26: el comprobante y la revisión del pago. */}
+                <PagoDelPedido
+                  pedido={selectedOrder}
+                  tienda={tenant}
+                  puedeGestionar={puedeGestionar === true}
+                  onActualizado={(actualizado) => {
+                    setSelectedOrder(actualizado);
+                    queryClient.invalidateQueries({ queryKey: ['orders'] });
+                  }}
+                />
 
                 {/* MOD-25. Sin número no hay a quién escribir: no sale. */}
                 {selectedOrder.customer_phone && mensajeElegido && (

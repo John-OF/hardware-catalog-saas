@@ -1,7 +1,8 @@
 import './InformeDeImport.css';
 
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Eye } from 'lucide-react';
 import type { AccionDeImport, ImportReport } from '../../api/products';
+import { csvDeFilasRechazadas, descargarTexto } from '../../utils/filasRechazadas';
 
 /**
  * Los grupos del informe, en el orden en que importan. Los dos primeros son lo
@@ -9,11 +10,11 @@ import type { AccionDeImport, ImportReport } from '../../api/products';
  * tocó, y en un catálogo reimportado pueden ser cientos: van plegados, con la
  * cuenta a la vista.
  */
-const GRUPOS: { accion: AccionDeImport; titulo: string; abierto: boolean }[] = [
-  { accion: 'actualizado', titulo: 'Actualizados', abierto: true },
-  { accion: 'creado', titulo: 'Creados', abierto: true },
-  { accion: 'sin_cambios', titulo: 'Sin cambios (ya estaban al día)', abierto: false },
-  { accion: 'omitido', titulo: 'Omitidos porque ya existían', abierto: false },
+const GRUPOS: { accion: AccionDeImport; titulo: string; enPrevia: string; abierto: boolean }[] = [
+  { accion: 'actualizado', titulo: 'Actualizados', enPrevia: 'Se actualizarían', abierto: true },
+  { accion: 'creado', titulo: 'Creados', enPrevia: 'Se crearían', abierto: true },
+  { accion: 'sin_cambios', titulo: 'Sin cambios (ya estaban al día)', enPrevia: 'Sin cambios (ya están al día)', abierto: false },
+  { accion: 'omitido', titulo: 'Omitidos porque ya existían', enPrevia: 'Se omitirían porque ya existen', abierto: false },
 ];
 
 /**
@@ -26,18 +27,31 @@ const GRUPOS: { accion: AccionDeImport; titulo: string; abierto: boolean }[] = [
  */
 export default function InformeDeImport({ informe }: { informe: ImportReport }) {
   const hayAvisos = informe.errors.length > 0;
+  const previa = informe.preview === true;
+  const rechazadas = informe.rejected_rows ?? [];
+
+  // FUN-29: las filas que no entraron, como un CSV para corregir y volver a subir.
+  const descargarRechazadas = () =>
+    descargarTexto('filas-con-error.csv', csvDeFilasRechazadas(informe.header ?? [], rechazadas));
 
   return (
-    <div className="informe-import" role="status">
+    <div className={`informe-import ${previa ? 'previa' : ''}`} role="status">
       <h4 className={`informe-import-titulo ${hayAvisos ? 'con-avisos' : ''}`}>
-        {hayAvisos ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
-        {hayAvisos ? 'Importación con avisos' : 'Importación terminada'}
+        {previa ? <Eye size={16} /> : hayAvisos ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+        {previa
+          ? 'Vista previa: todavía no se guardó nada'
+          : hayAvisos ? 'Importación con avisos' : 'Importación terminada'}
       </h4>
       <p className="informe-import-resumen">{informe.message}</p>
 
       {hayAvisos && (
         <section className="informe-import-grupo informe-import-errores">
-          <h5>Filas que no entraron o con avisos ({informe.errors.length})</h5>
+          <h5>{previa ? 'Filas que no entrarían o con avisos' : 'Filas que no entraron o con avisos'} ({informe.errors.length})</h5>
+          {rechazadas.length > 0 && (
+            <button type="button" className="btn-secondary btn-small informe-import-descargar" onClick={descargarRechazadas}>
+              <Download size={14} /> Descargar las filas con error para corregirlas
+            </button>
+          )}
           <ul>
             {informe.errors.map((error, i) => (
               <li key={i}>{error}</li>
@@ -56,7 +70,7 @@ export default function InformeDeImport({ informe }: { informe: ImportReport }) 
         return (
           <details key={grupo.accion} className="informe-import-grupo" open={grupo.abierto}>
             <summary>
-              {grupo.titulo} ({entradas.length})
+              {previa ? grupo.enPrevia : grupo.titulo} ({entradas.length})
             </summary>
             <ul>
               {entradas.map((entrada) => (

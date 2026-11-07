@@ -5,8 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\ImageService;
-use App\Support\Money;
-use App\Support\StoreUrl;
+use App\Support\Cotizacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -39,46 +38,9 @@ class QuoteController extends Controller
     {
         $tenant = app('currentTenant');
 
-        $order->load('items');
-
-        $moneda = $tenant->currency;
-
-        // Los importes se formatean aquí y no en la vista: la moneda de la tienda
-        // se escribe con las mismas reglas que en el panel (`App\Support\Money`),
-        // y una plantilla llena de llamadas a helpers es donde se cuela el `$`
-        // fijo que OWN-1 ya tuvo que quitar una vez.
-        $importes = [
-            'lineas' => $order->items->map(fn ($linea) => [
-                'unitario' => Money::format($linea->unit_price, $moneda),
-                'subtotal' => Money::format($linea->subtotal, $moneda),
-            ])->all(),
-            'envio'    => Money::format($order->delivery_cost ?? 0, $moneda),
-            // MOD-4: el subtotal de los productos antes de descontar, y lo
-            // descontado. `items_subtotal` es null en los pedidos de antes.
-            'subtotal'  => Money::format($order->items_subtotal ?? $order->total, $moneda),
-            'descuento' => Money::format($order->discount_amount ?? 0, $moneda),
-            'base'     => Money::format($order->base_imponible, $moneda),
-            'impuesto' => Money::format($order->tax_amount ?? 0, $moneda),
-            'total'    => Money::format($order->total, $moneda),
-        ];
-
-        $pdf = Pdf::loadView('cotizacion', [
-            'pedido'    => $order,
-            'tienda'    => $tenant,
-            // FUN-20: empotrado, no una URL que dompdf no va a descargar.
-            'logo'      => $imagenes->logoEmpotrable($tenant),
-            'titulo'    => 'Cotización',
-            // El correlativo de la tienda (FUN-3), que es el número que el dueño
-            // y el cliente se dicen por teléfono. No se inventa una serie aparte:
-            // sería un segundo número para la misma operación.
-            'numero'    => 'N.° '.str_pad((string) $order->number, 6, '0', STR_PAD_LEFT),
-            // En la zona de la tienda (MOD-13): la fecha de un documento suyo no
-            // puede depender de dónde esté el servidor.
-            'fecha'     => $order->created_at->timezone($tenant->zonaHoraria())->format('d/m/Y H:i'),
-            'color'     => $tenant->primary_color ?: '#111827',
-            'urlTienda' => StoreUrl::forTenant($tenant),
-            'importes'  => $importes,
-        ])
+        // FUN-26: los datos los arma `App\Support\Cotizacion`, también quién la
+        // emite (la persona del equipo que la descarga) y hasta cuándo vale.
+        $pdf = Pdf::loadView('cotizacion', Cotizacion::datos($order, $tenant, $request->user(), $imagenes))
             // TEC-17: solo los glifos que se usan. El paquete trae el recorte
             // apagado y empotraba DejaVu Sans y su negrita enteras (unos 730 KB
             // de los 860 que pesaba el PDF), y esto es lo que el dueño manda por

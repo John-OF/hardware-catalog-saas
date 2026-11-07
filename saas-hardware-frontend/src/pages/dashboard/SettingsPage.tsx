@@ -26,12 +26,11 @@ import {
   ShieldAlert,
   RefreshCw,
   Wallet,
-  Smartphone,
-  Landmark,
-  Banknote,
   Truck,
   // Impuesto (MOD-2).
   Receipt,
+  // FUN-26: la cotización.
+  FileText,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { avisarErrorEnSesion } from '../../api/erroresDeFormulario';
@@ -72,8 +71,14 @@ import {
 import type { SocialKey } from '../../utils/branding';
 import { THEME_PRESETS, matchingPreset } from '../../utils/themePresets';
 import type { ThemePreset } from '../../utils/themePresets';
+import EditorDeMetodosDePago from '../../components/dashboard/EditorDeMetodosDePago';
+import {
+  metodosDesdeTienda,
+  problemaDeMetodos,
+  type MetodoEnFormulario,
+} from '../../utils/metodosDePagoEnFormulario';
+import { deriveCountryCode, FALLBACK_COUNTRY_CODE } from '../../utils/phone';
 import type {
-  PaymentMethods,
   TenantAnnouncementStyle,
   TenantCardStyle,
   TenantColorMode,
@@ -91,19 +96,6 @@ const LAYOUT_LABELS: Record<TenantLayout, string> = {
   grid: 'Tarjetas',
   compact: 'Compacta',
   list: 'Lista',
-};
-
-/**
- * Los cuatro métodos con todos sus campos en '' (MOD-3), para que el
- * formulario los tenga siempre controlados: sin esto, un input pasaría de
- * no-controlado (sin `tenant` todavía) a controlado en cuanto llegara la
- * respuesta de `GET /tenant`, que React avisa por consola como error.
- */
-const PAYMENT_METHODS_VACIOS: Required<PaymentMethods> = {
-  yape: { enabled: false, phone: '', holder_name: '' },
-  plin: { enabled: false, phone: '', holder_name: '' },
-  transferencia: { enabled: false, bank: '', account_number: '', account_type: 'ahorros', holder_name: '', cci: '' },
-  efectivo: { enabled: false },
 };
 
 /**
@@ -158,11 +150,10 @@ export default function SettingsPage() {
   // Fase 4: Nuevos Estados
   const [customDomain, setCustomDomain] = useState('');
 
-  // Pago y envío (MOD-3, MOD-1). Los cuatro métodos siempre presentes en el
-  // estado —aunque el tenant no haya guardado ninguno— para que los campos
-  // sean controlados desde el primer render y no salten de no-controlado a
-  // controlado en cuanto llega `tenant`.
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethods>(PAYMENT_METHODS_VACIOS);
+  // Pago y envío (MOD-3, MOD-1). Desde MOD-23 los métodos son una lista que
+  // arma la tienda, con sugerencias del país de su WhatsApp.
+  const [metodosDePago, setMetodosDePago] = useState<MetodoEnFormulario[]>([]);
+  const [paisDeSugerencias, setPaisDeSugerencias] = useState(FALLBACK_COUNTRY_CODE);
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
   const [deliveryCost, setDeliveryCost] = useState('0');
   // MOD-2. Apagado por defecto: encenderlo cambia lo que se cobra o cómo se
@@ -171,18 +162,10 @@ export default function SettingsPage() {
   const [taxName, setTaxName] = useState('IVA');
   const [taxRate, setTaxRate] = useState('15');
   const [taxIncluded, setTaxIncluded] = useState(true);
+  // FUN-26: la cotización en PDF.
+  const [validezCotizacion, setValidezCotizacion] = useState('');
+  const [condicionesCotizacion, setCondicionesCotizacion] = useState('');
 
-  /** Cambia un campo de un método sin tocar los otros tres. */
-  const setMetodo = <M extends keyof PaymentMethods>(
-    metodo: M,
-    campo: keyof NonNullable<PaymentMethods[M]>,
-    valor: string | boolean,
-  ) => {
-    setPaymentMethods((prev) => ({
-      ...prev,
-      [metodo]: { ...prev[metodo], [campo]: valor },
-    }));
-  };
   // FUN-6: aparte de isSaving, porque comprobar el TXT es una accion propia,
   // no parte de "Guardar cambios" -no manda nada nuevo, solo pregunta si lo
   // que ya se guardo se puede demostrar.
@@ -225,22 +208,18 @@ export default function SettingsPage() {
     setCurrency(tenant.currency ?? DEFAULT_CURRENCY);
     setTimezone(tenant.timezone ?? DEFAULT_TIMEZONE);
 
-    // MOD-3: se completa cada método por separado y no de un tirón, porque
-    // `GET /tenant` sólo trae las claves que alguna vez se guardaron —una
-    // tienda que nunca tocó "efectivo" no lo trae, y sin esto el checkbox
-    // saldría sin marcar Y sin controlar a la vez.
-    setPaymentMethods({
-      yape: { ...PAYMENT_METHODS_VACIOS.yape, ...tenant.payment_methods?.yape },
-      plin: { ...PAYMENT_METHODS_VACIOS.plin, ...tenant.payment_methods?.plin },
-      transferencia: { ...PAYMENT_METHODS_VACIOS.transferencia, ...tenant.payment_methods?.transferencia },
-      efectivo: { ...PAYMENT_METHODS_VACIOS.efectivo, ...tenant.payment_methods?.efectivo },
-    });
+    // MOD-23: la lista guardada como filas del formulario, y las sugerencias
+    // del país de su WhatsApp (el mismo que se usa para el prefijo del checkout).
+    setMetodosDePago(metodosDesdeTienda(tenant.payment_methods));
+    setPaisDeSugerencias(deriveCountryCode(tenant.whatsapp_number));
     setDeliveryEnabled(tenant.delivery_enabled ?? false);
     setDeliveryCost(tenant.delivery_cost != null ? String(tenant.delivery_cost) : '0');
     setTaxEnabled(tenant.tax_enabled ?? false);
     setTaxName(tenant.tax_name || 'IVA');
     setTaxRate(tenant.tax_rate != null ? String(tenant.tax_rate) : '15');
     setTaxIncluded(tenant.tax_included ?? true);
+    setValidezCotizacion(tenant.quote_validity_days ? String(tenant.quote_validity_days) : '');
+    setCondicionesCotizacion(tenant.quote_terms ?? '');
 
     const th = tenant.theme ?? {};
     setAccentColor(th.accent_color ?? '#06b6d4');
@@ -370,6 +349,14 @@ export default function SettingsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // MOD-23: lo mismo que valida el backend, para poder decir cuál.
+    const problemaDePagos = problemaDeMetodos(metodosDePago);
+    if (problemaDePagos) {
+      toast.error(problemaDePagos);
+      return;
+    }
+
     setIsSaving(true);
 
     const payload: UpdateTenantPayload = {
@@ -380,13 +367,15 @@ export default function SettingsPage() {
       custom_domain: customDomain || null,
       currency,
       timezone,
-      payment_methods: paymentMethods,
+      payment_methods: metodosDePago,
       delivery_enabled: deliveryEnabled,
       delivery_cost: deliveryCost || '0',
       tax_enabled: taxEnabled,
       tax_name: taxName || 'IVA',
       tax_rate: taxRate || '0',
       tax_included: taxIncluded,
+      quote_validity_days: validezCotizacion.trim() || null,
+      quote_terms: condicionesCotizacion.trim() || null,
       theme: {
         hero_style: heroStyle,
         hero_title: heroTitle || null,
@@ -628,152 +617,12 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="payment-methods-list">
-          <div className="payment-method-card">
-            <label className="payment-method-toggle">
-              <input
-                type="checkbox"
-                checked={paymentMethods.yape?.enabled ?? false}
-                onChange={(e) => setMetodo('yape', 'enabled', e.target.checked)}
-              />
-              <Smartphone size={16} />
-              <span>Yape</span>
-            </label>
-            {paymentMethods.yape?.enabled && (
-              <div className="settings-grid payment-method-fields">
-                <div className="form-group">
-                  <label>Número de Yape</label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.yape?.phone ?? ''}
-                    onChange={(e) => setMetodo('yape', 'phone', e.target.value)}
-                    maxLength={20}
-                    placeholder="987654321"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>A nombre de <span className="optional">(opcional)</span></label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.yape?.holder_name ?? ''}
-                    onChange={(e) => setMetodo('yape', 'holder_name', e.target.value)}
-                    maxLength={150}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="payment-method-card">
-            <label className="payment-method-toggle">
-              <input
-                type="checkbox"
-                checked={paymentMethods.plin?.enabled ?? false}
-                onChange={(e) => setMetodo('plin', 'enabled', e.target.checked)}
-              />
-              <Smartphone size={16} />
-              <span>Plin</span>
-            </label>
-            {paymentMethods.plin?.enabled && (
-              <div className="settings-grid payment-method-fields">
-                <div className="form-group">
-                  <label>Número de Plin</label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.plin?.phone ?? ''}
-                    onChange={(e) => setMetodo('plin', 'phone', e.target.value)}
-                    maxLength={20}
-                    placeholder="987654321"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>A nombre de <span className="optional">(opcional)</span></label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.plin?.holder_name ?? ''}
-                    onChange={(e) => setMetodo('plin', 'holder_name', e.target.value)}
-                    maxLength={150}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="payment-method-card">
-            <label className="payment-method-toggle">
-              <input
-                type="checkbox"
-                checked={paymentMethods.transferencia?.enabled ?? false}
-                onChange={(e) => setMetodo('transferencia', 'enabled', e.target.checked)}
-              />
-              <Landmark size={16} />
-              <span>Transferencia bancaria</span>
-            </label>
-            {paymentMethods.transferencia?.enabled && (
-              <div className="settings-grid payment-method-fields">
-                <div className="form-group">
-                  <label>Banco</label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.transferencia?.bank ?? ''}
-                    onChange={(e) => setMetodo('transferencia', 'bank', e.target.value)}
-                    maxLength={100}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Tipo de cuenta</label>
-                  <select
-                    className="premium-input"
-                    value={paymentMethods.transferencia?.account_type ?? 'ahorros'}
-                    onChange={(e) => setMetodo('transferencia', 'account_type', e.target.value)}
-                  >
-                    <option value="ahorros">Ahorros</option>
-                    <option value="corriente">Corriente</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Número de cuenta</label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.transferencia?.account_number ?? ''}
-                    onChange={(e) => setMetodo('transferencia', 'account_number', e.target.value)}
-                    maxLength={40}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>CCI <span className="optional">(opcional)</span></label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.transferencia?.cci ?? ''}
-                    onChange={(e) => setMetodo('transferencia', 'cci', e.target.value)}
-                    maxLength={40}
-                  />
-                </div>
-                <div className="form-group full">
-                  <label>A nombre de <span className="optional">(opcional)</span></label>
-                  <input
-                    className="premium-input"
-                    value={paymentMethods.transferencia?.holder_name ?? ''}
-                    onChange={(e) => setMetodo('transferencia', 'holder_name', e.target.value)}
-                    maxLength={150}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="payment-method-card">
-            <label className="payment-method-toggle">
-              <input
-                type="checkbox"
-                checked={paymentMethods.efectivo?.enabled ?? false}
-                onChange={(e) => setMetodo('efectivo', 'enabled', e.target.checked)}
-              />
-              <Banknote size={16} />
-              <span>Efectivo contra entrega</span>
-            </label>
-          </div>
-        </div>
+        <EditorDeMetodosDePago
+          filas={metodosDePago}
+          pais={paisDeSugerencias}
+          onPais={setPaisDeSugerencias}
+          onChange={setMetodosDePago}
+        />
 
         <hr className="settings-divider" />
 
@@ -907,6 +756,49 @@ export default function SettingsPage() {
               </div>
             </>
           )}
+        </div>
+      </section>
+
+      {/* La cotización en PDF (FUN-26) */}
+      <section className="settings-card glass-card">
+        <div className="settings-card-head">
+          <FileText size={18} />
+          <div>
+            <h3>Cotización en PDF</h3>
+            <p>
+              Lo que se imprime en la cotización que descargas desde cada pedido, además de los productos y
+              tus formas de pago. Tu identificación fiscal y tu dirección salen de «Marca y contacto», más
+              abajo. Sigue sin ser un comprobante fiscal, y lo dice.
+            </p>
+          </div>
+        </div>
+        <div className="settings-grid">
+          <div className="form-group">
+            <label htmlFor="cotizacion-validez">Días de validez <span className="optional">(opcional)</span></label>
+            <input
+              id="cotizacion-validez"
+              type="number"
+              min={1}
+              max={365}
+              className="premium-input"
+              placeholder="Sin fecha"
+              value={validezCotizacion}
+              onChange={(e) => setValidezCotizacion(e.target.value)}
+            />
+            <span className="helper-text">Se imprime como fecha: «Válida hasta el …», contando desde el día en que la descargas.</span>
+          </div>
+          <div className="form-group full">
+            <label htmlFor="cotizacion-condiciones">Condiciones <span className="optional">(opcional)</span></label>
+            <textarea
+              id="cotizacion-condiciones"
+              className="premium-input"
+              rows={3}
+              maxLength={1000}
+              placeholder="Ej.: 50% de anticipo. Entrega en 3 días hábiles. Garantía de 12 meses."
+              value={condicionesCotizacion}
+              onChange={(e) => setCondicionesCotizacion(e.target.value)}
+            />
+          </div>
         </div>
       </section>
 

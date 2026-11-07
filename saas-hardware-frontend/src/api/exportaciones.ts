@@ -40,6 +40,10 @@ export const exportarPedidos = (filtros: FiltrosDePedidos = {}): Promise<void> =
 export const exportarReporte = (filtros: FiltrosDeReporte = {}): Promise<void> =>
   descargar('/reports/export', filtros);
 
+/** El directorio de clientes (MOD-24), con la etiqueta del filtro si la hay. */
+export const exportarClientes = (filtros: { etiqueta?: string } = {}): Promise<void> =>
+  descargar('/customers/export', filtros);
+
 /** La cotización de un pedido en PDF (MOD-2). Mismo camino que los CSV. */
 export const descargarCotizacion = (pedidoId: string): Promise<void> =>
   descargar(`/orders/${pedidoId}/pdf`, {});
@@ -87,6 +91,7 @@ export function nombreDeArchivo(cabecera: unknown, ruta: string): string {
 
   if (ruta.endsWith('/pdf')) return 'cotizacion.pdf';
   if (ruta.includes('reports')) return 'reporte.csv';
+  if (ruta.includes('customers')) return 'clientes.csv';
 
   return ruta.includes('orders') ? 'pedidos.csv' : 'catalogo.csv';
 }

@@ -302,8 +302,9 @@ class Seo
                 'priceCurrency' => strtoupper($tenant->currency ?: 'USD'),
                 // Los dos valores que Google entiende. Con variantes (MOD-5),
                 // `stock` es la suma, que es justo lo que hay que responder aquí:
-                // si queda alguna, el producto se puede comprar.
-                'availability' => (int) $producto->stock > 0
+                // si queda alguna, el producto se puede comprar. MOD-22: sin
+                // control de stock se puede comprar siempre.
+                'availability' => $producto->hayParaPedir()
                     ? 'https://schema.org/InStock'
                     : 'https://schema.org/OutOfStock',
                 'seller' => ['@type' => 'Organization', 'name' => $tenant->name],

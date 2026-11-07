@@ -322,7 +322,10 @@ class PlanLimitsTest extends TestCase
         $this->importar("nombre;precio;stock\nGPU;100;5\n")
             ->assertStatus(422)
             ->assertJsonPath('code', 'plan_limit')
-            ->assertJsonPath('limit_key', 'csv_import');
+            ->assertJsonPath('limit_key', 'csv_import')
+            // Antes: «La importación por CSV no está incluido»; la frase no concuerda con el nombre.
+            ->assertJsonPath('message', fn (string $m) => str_starts_with($m, 'Tu plan ')
+                && str_ends_with($m, ' no incluye la importación por CSV. Para usar esta función, mejora de plan.'));
 
         $this->assertSame(0, Product::withoutTenant()->where('tenant_id', $this->tenant->id)->count());
     }
@@ -397,7 +400,8 @@ class PlanLimitsTest extends TestCase
         $this->comoAdmin()->putJson('/api/tenant', ['custom_domain' => 'mitienda.com'])
             ->assertStatus(422)
             ->assertJsonPath('code', 'plan_limit')
-            ->assertJsonPath('limit_key', 'custom_domain');
+            ->assertJsonPath('limit_key', 'custom_domain')
+            ->assertJsonPath('message', fn (string $m) => str_ends_with($m, ' no incluye el dominio propio. Para usar esta función, mejora de plan.'));
 
         $this->assertNull($this->tenant->fresh()->custom_domain);
     }

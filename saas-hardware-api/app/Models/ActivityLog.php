@@ -64,6 +64,9 @@ class ActivityLog extends Model
     public const TIENDA_PAGO = 'tenant.pago';
     public const TIENDA_PLAN_VENCIDO = 'tenant.plan_vencido';
     public const TIENDA_FECHA_PLAN = 'tenant.fecha_plan';
+    // INF-24: la purga de las pruebas abandonadas, sus dos avisos y el borrado.
+    public const TIENDA_AVISO_DE_PURGA = 'tenant.aviso_purga';
+    public const TIENDA_DATOS_BORRADOS = 'tenant.datos_borrados';
 
     /** Lo que pasa con la propia cuenta del operador (SEC-9). */
     public const OPERADOR_DOS_PASOS_ACTIVADA = 'operador.dos_pasos_activada';
@@ -87,6 +90,8 @@ class ActivityLog extends Model
     public const PEDIDO_MOSTRADOR = 'pedido.mostrador';
     public const PEDIDO_ESTADO = 'pedido.estado';
     public const PEDIDO_BORRADO = 'pedido.borrado';
+    // MOD-26: confirmar o rechazar el pago, aparte del estado del pedido.
+    public const PEDIDO_PAGO = 'pedido.pago';
     public const CATEGORIA_CREADA = 'categoria.creada';
     public const CATEGORIA_EDITADA = 'categoria.editada';
     public const CATEGORIA_BORRADA = 'categoria.borrada';
@@ -118,6 +123,9 @@ class ActivityLog extends Model
     public const PAPELERA_PURGADO = 'papelera.purgado';
     public const PAPELERA_VACIADA = 'papelera.vaciada';
     public const CONFIGURACION_EDITADA = 'configuracion.editada';
+    // MOD-24: lo que la tienda escribe de su directorio de clientes.
+    public const CLIENTE_EDITADO = 'cliente.editado';
+    public const CLIENTES_IMPORTADOS = 'cliente.importados';
     public const CONFIGURACION_DOMINIO = 'configuracion.dominio_verificado';
 
     /** Las áreas de la bitácora de tienda, en el orden en que las ofrece el filtro. */
@@ -136,7 +144,7 @@ class ActivityLog extends Model
      */
     public const DIAS_EN_TIENDA = 365;
 
-    public const AREAS_DE_TIENDA = ['producto', 'pedido', 'categoria', 'pagina', 'resena', 'espera', 'cupon', 'papelera', 'equipo', 'configuracion'];
+    public const AREAS_DE_TIENDA = ['producto', 'pedido', 'cliente', 'categoria', 'pagina', 'resena', 'espera', 'cupon', 'papelera', 'equipo', 'configuracion'];
 
     protected $fillable = [
         'origen', 'tenant_id', 'actor_id', 'actor_email', 'actor_role',

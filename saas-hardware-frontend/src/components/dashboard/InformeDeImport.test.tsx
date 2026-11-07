@@ -81,4 +81,23 @@ describe('InformeDeImport', () => {
     expect(screen.getByText(/«Processors» no existe/)).toBeInTheDocument();
     expect(screen.getByText('Creados (1)')).toBeInTheDocument();
   });
+
+  it('FUN-29: en la vista previa lo dice en condicional y deja descargar las filas con error', () => {
+    render(
+      <InformeDeImport
+        informe={informe({
+          preview: true,
+          message: 'Vista previa: se crearía 1 producto. Todavía no se guardó nada.',
+          changes: [{ fila: 2, accion: 'creado', producto: 'Mouse', detalle: null }],
+          errors: ["Fila 3: El precio 'caro' no es válido."],
+          header: ['nombre', 'precio'],
+          rejected_rows: [{ fila: 3, error: "El precio 'caro' no es válido.", celdas: ['Teclado', 'caro'] }],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Vista previa: todavía no se guardó nada')).toBeInTheDocument();
+    expect(screen.getByText('Se crearían (1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Descargar las filas con error/ })).toBeInTheDocument();
+  });
 });

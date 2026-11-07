@@ -11,6 +11,7 @@ import { createOrder } from '../../api/orders';
 import type { Order, PaginatedResponse, Product, ProductVariant } from '../../types';
 import { formatMoney } from '../../utils/money';
 import { claveDeLinea, datosDeVenta } from '../../utils/variants';
+import { controlaStock } from '../../utils/stock';
 
 /**
  * El padre lo monta solo cuando esta abierto, asi no hace falta un efecto que
@@ -118,8 +119,12 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
   });
 
   // Vender más unidades de las que hay deja el stock en negativo. No se bloquea
-  // (el dueño puede tener mercadería sin registrar) pero se avisa.
-  const linesOverStock = lines.filter((line) => line.quantity > datosDeVenta(line.product, line.variant).stock);
+  // (el dueño puede tener mercadería sin registrar) pero se avisa. MOD-22: lo
+  // que no lleva la cuenta de sus unidades no se pasa nunca.
+  const linesOverStock = lines.filter((line) => {
+    const venta = datosDeVenta(line.product, line.variant);
+    return venta.controlaStock && line.quantity > venta.stock;
+  });
 
   const canSubmit = customerName.trim().length > 0 && lines.length > 0 && !createMutation.isPending;
 
@@ -166,7 +171,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                         >
                           <span className="result-name">{variant.nombre}</span>
                           <span className="result-meta">
-                            {money(priceOf({ product, variant }))} · {variant.stock} u.
+                            {money(priceOf({ product, variant }))} · {controlaStock(product) ? `${variant.stock} u.` : 'sin control de stock'}
                           </span>
                         </button>
                       ))}
@@ -183,7 +188,7 @@ export default function NewOrderModal({ onClose, onCreated, currency }: NewOrder
                       {!product.is_active && <em className="result-flag">no publicado</em>}
                     </span>
                     <span className="result-meta">
-                      {money(priceOf({ product, variant: null }))} · {product.stock} u.
+                      {money(priceOf({ product, variant: null }))} · {controlaStock(product) ? `${product.stock} u.` : 'sin control de stock'}
                     </span>
                   </button>
                   ),

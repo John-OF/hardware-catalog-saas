@@ -39,6 +39,12 @@ describe('problemaDeVariantes', () => {
     expect(problemaDeVariantes(['Capacidad'], [fila({}), fila({ valores: ['32 GB'], stock: '' })])).toBe('A la variante 2 le falta el stock.');
   });
 
+  it('MOD-22: sin control de stock no pide el stock de cada variante', () => {
+    expect(problemaDeVariantes(['Capacidad'], [fila({ stock: '' })], false)).toBeNull();
+    // El precio sigue haciendo falta.
+    expect(problemaDeVariantes(['Capacidad'], [fila({ stock: '', price: '' })], false)).toBe('A la variante 1 le falta el precio.');
+  });
+
   it('acepta precio y stock a 0', () => {
     expect(problemaDeVariantes(['Capacidad'], [fila({ price: '0', stock: '0' })])).toBeNull();
   });
@@ -89,6 +95,13 @@ describe('agregarVariantesAlFormulario', () => {
     ]);
     expect(formData.get('variant_images[0]')).toBeNull();
     expect((formData.get('variant_images[1]') as File).name).toBe('rojo.png');
+  });
+
+  it('MOD-22: sin control de stock el stock viaja vacío, para que el backend deje el que había', () => {
+    const formData = new FormData();
+    agregarVariantesAlFormulario(formData, ['Capacidad'], [fila({ id: 'v-16', stock: '7' })], false, false);
+
+    expect(JSON.parse(formData.get('variants') as string)[0].stock).toBeNull();
   });
 
   it('manda la lista vacía: es lo que le dice al backend que quite las variantes', () => {

@@ -75,10 +75,10 @@ class ResetPasswordNotification extends Notification implements ShouldQueue, Not
         return (new MailMessage)
             ->subject('Recupera el acceso a tu tienda')
             ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
-            ->line('Recibimos una solicitud para restablecer la contrasenia de tu panel de administracion.')
-            ->action('Elegir nueva contrasenia', $url)
+            ->line('Recibimos una solicitud para restablecer la contraseña de tu panel de administración.')
+            ->action('Elegir nueva contraseña', $url)
             ->line("Este enlace caduca en {$minutos} minutos y solo puede usarse una vez.")
-            ->line('Si no fuiste tu, puedes ignorar este correo: tu contrasenia actual sigue funcionando.')
+            ->line('Si no fuiste tú, puedes ignorar este correo: tu contraseña actual sigue funcionando.')
             ->salutation('Un saludo, el equipo de '.config('app.name'));
     }
 }

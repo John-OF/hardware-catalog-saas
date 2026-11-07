@@ -60,6 +60,23 @@ describe('TiendaCerrada (FUN-28)', () => {
     expect(screen.queryByText('Tu plan')).not.toBeInTheDocument();
   });
 
+  it('a una prueba que nunca pagó le dice hasta cuándo se guardan sus datos (INF-24)', () => {
+    abrir({ motivo: 'prueba', desde: '2026-11-08T12:00:00+00:00', plan: 'Básico', borrado_desde: '2027-02-06T12:00:00+00:00', datos_borrados: null });
+
+    const texto = screen.getByText(/se guardan hasta el/);
+    expect(texto).toHaveTextContent('6 feb 2027');
+    expect(texto).toHaveTextContent('se borran, con sus fotos');
+    expect(screen.queryByText(/siguen guardados/)).not.toBeInTheDocument();
+  });
+
+  it('si ya se borraron, lo dice y avisa de que vuelve a abrir vacía (INF-24)', () => {
+    abrir({ motivo: 'prueba', desde: '2026-11-08T12:00:00+00:00', plan: 'Básico', borrado_desde: null, datos_borrados: '2027-02-06T05:00:00+00:00' });
+
+    const texto = screen.getByText(/se borraron sus productos/);
+    expect(texto).toHaveTextContent('6 feb 2027');
+    expect(texto).toHaveTextContent('vuelve a abrir, vacía');
+  });
+
   it('con el plan vencido lo nombra y marca el que tenía', async () => {
     abrir({ motivo: 'plan', desde: '2026-11-08T15:00:00+00:00', plan: 'Pro' });
 

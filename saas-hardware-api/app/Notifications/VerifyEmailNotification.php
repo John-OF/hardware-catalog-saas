@@ -63,7 +63,7 @@ class VerifyEmailNotification extends Notification implements ShouldQueue, NotTe
             ->subject('Confirma tu correo y publica tu tienda')
             ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
             ->line('Gracias por crear tu tienda. Solo falta confirmar que este correo es tuyo.')
-            ->line('**Hasta que lo confirmes tu catalogo no es visible para el publico.** Puedes entrar al panel y dejarlo todo listo mientras tanto: productos, categorias y personalizacion se guardan igual.')
+            ->line('**Hasta que lo confirmes, tu catálogo no es visible para el público.** Puedes entrar al panel y dejarlo todo listo mientras tanto: productos, categorías y personalización se guardan igual.')
             ->action('Confirmar mi correo', $url)
             ->line("Este enlace caduca en {$minutos} minutos. Si caduca, puedes pedir otro desde el panel.")
             ->line('Si no creaste ninguna tienda, ignora este correo.')

@@ -41,7 +41,7 @@ class CreateBackup extends Command
         // Lo primero, antes de volcar nada: una copia en un disco publico es un
         // volcado de la base entera descargable por HTTP.
         if (Copias::discoEsPublico($disco)) {
-            $this->error("El disco «{$disco}» es publico: una copia ahi quedaria descargable por cualquiera. Usa 'local', 'r2' o 's3'.");
+            $this->error("El disco «{$disco}» es público: una copia ahí quedaría descargable por cualquiera. Usa 'local', 'r2' o 's3'.");
 
             return self::FAILURE;
         }
@@ -68,7 +68,7 @@ class CreateBackup extends Command
 
         $borradas = $this->purgar($disco, $dias);
 
-        $this->info("Copias caducadas borradas: {$borradas} (se guardan {$dias} dias).");
+        $this->info("Copias caducadas borradas: {$borradas} (se guardan {$dias} días).");
 
         return self::SUCCESS;
     }

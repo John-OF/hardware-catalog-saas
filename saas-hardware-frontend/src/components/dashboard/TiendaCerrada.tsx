@@ -62,10 +62,7 @@ export default function TiendaCerrada({ onSalir }: { onSalir: () => void }) {
 
         <h1>{titulo}</h1>
         <p className="tienda-cerrada-texto">{texto}</p>
-        <p className="tienda-cerrada-texto">
-          Tus productos, pedidos y clientes siguen guardados.
-          {motivo !== 'suspendida' && ' En cuanto se confirme el pago, la tienda vuelve a abrir tal como estaba.'}
-        </p>
+        <LoQueSeGuarda cierre={cierre} tenant={tenant} motivo={motivo} />
 
         {esAdmin === false && (
           <p className="tienda-cerrada-aviso">
@@ -149,6 +146,42 @@ export default function TiendaCerrada({ onSalir }: { onSalir: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Qué pasa con sus datos (INF-24). A una prueba que nunca pagó se le borran a
+ * los 90 días de cerrarse, y aquí se le dice la fecha —la misma de los dos
+ * correos—; a quien pagó alguna vez, o a una tienda suspendida a mano, no se le
+ * borra nada.
+ */
+function LoQueSeGuarda({ cierre, tenant, motivo }: { cierre: CierreDeTienda | null; tenant: Tenant | null; motivo: string }) {
+  const zona = tenant?.timezone;
+
+  if (cierre?.datos_borrados) {
+    return (
+      <p className="tienda-cerrada-texto">
+        Pasado el plazo sin elegir un plan, el {formatearFecha(cierre.datos_borrados, zona)} se borraron sus productos,
+        pedidos y clientes. Tu cuenta y la tienda siguen: si eliges un plan, vuelve a abrir, vacía.
+      </p>
+    );
+  }
+
+  if (cierre?.borrado_desde) {
+    return (
+      <p className="tienda-cerrada-texto">
+        Tus productos, pedidos y clientes se guardan hasta el <strong>{formatearFecha(cierre.borrado_desde, zona)}</strong>:
+        si para entonces no has elegido un plan, se borran, con sus fotos. Si lo eliges antes, la tienda vuelve a
+        abrir tal como estaba.
+      </p>
+    );
+  }
+
+  return (
+    <p className="tienda-cerrada-texto">
+      Tus productos, pedidos y clientes siguen guardados.
+      {motivo !== 'suspendida' && ' En cuanto se confirme el pago, la tienda vuelve a abrir tal como estaba.'}
+    </p>
   );
 }
 

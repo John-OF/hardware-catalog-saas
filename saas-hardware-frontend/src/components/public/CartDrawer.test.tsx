@@ -8,7 +8,7 @@ import { createPublicOrder } from '../../api/public';
 import { comprobarCupon } from '../../api/coupons';
 import { useCartStore } from '../../stores/cartStore';
 import { useCustomerAuthStore } from '../../stores/customerAuthStore';
-import { unaRamConVariantes, unaTienda, unProducto } from '../../test/fixtures';
+import { unaRamConVariantes, unMetodo, unaTienda, unProducto } from '../../test/fixtures';
 import type { Order } from '../../types';
 
 /**
@@ -488,6 +488,23 @@ describe('CartDrawer (checkout)', () => {
     expect(url.searchParams.get('text')).not.toContain('Formas de pago');
   });
 
+  it('MOD-26: el mensaje lleva el enlace del pedido y la página se entera del pedido creado', async () => {
+    const user = userEvent.setup();
+    const token = 'K'.repeat(40);
+    const onPedidoCreado = vi.fn();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.mocked(createPublicOrder).mockResolvedValue({ ...pedidoCreado(12, 200), tracking_token: token });
+    useCartStore.getState().addItem('tienda-demo', unProducto({ price: 200 }));
+    render(<CartDrawer open onClose={vi.fn()} slug="tienda-demo" tenant={unaTienda()} onPedidoCreado={onPedidoCreado} />);
+
+    await rellenarDatos(user);
+    await user.click(screen.getByRole('button', { name: /Enviar pedido/ }));
+
+    await waitFor(() => expect(onPedidoCreado).toHaveBeenCalledWith(expect.objectContaining({ tracking_token: token })));
+    const mensaje = new URL(vi.mocked(window.open).mock.calls[0][0] as string).searchParams.get('text');
+    expect(mensaje).toContain(`/tienda-demo/pedido/${token}`);
+  });
+
   it('enseña solo los métodos activos y los suma al mensaje de WhatsApp', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'open').mockReturnValue(null);
@@ -499,18 +516,21 @@ describe('CartDrawer (checkout)', () => {
         onClose={vi.fn()}
         slug="tienda-demo"
         tenant={unaTienda({
-          payment_methods: {
-            yape: { enabled: true, phone: '987654321', holder_name: 'Ana' },
-            plin: { enabled: false, phone: '999888777' },
-            efectivo: { enabled: true },
-          },
+          payment_methods: [
+            unMetodo({ id: 'y', name: 'Yape', details: '987654321 · Ana', instructions: 'Manda la captura por WhatsApp', qr_url: 'https://cdn.test/qr.png' }),
+            unMetodo({ id: 'p', name: 'Plin', details: '999888777', enabled: false }),
+            unMetodo({ id: 'e', name: 'Efectivo contra entrega' }),
+          ],
         })}
       />,
     );
 
     expect(screen.getByText('Formas de pago')).toBeInTheDocument();
     expect(screen.getByText('Yape')).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === 'Yape · 987654321 · Ana')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'Yape · 987654321 · Ana')).toBeInTheDocument();
+    // MOD-23: las instrucciones y el QR, que se abre a tamaño completo.
+    expect(screen.getByText('Manda la captura por WhatsApp')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /QR de Yape/ })).toHaveAttribute('href', 'https://cdn.test/qr.png');
     expect(screen.getByText('Efectivo contra entrega')).toBeInTheDocument();
     expect(screen.queryByText('Plin')).not.toBeInTheDocument();
 

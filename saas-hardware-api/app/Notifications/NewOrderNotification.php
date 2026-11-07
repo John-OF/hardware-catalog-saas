@@ -97,7 +97,7 @@ class NewOrderNotification extends Notification implements ShouldQueue
             ->subject("Pedido nuevo {$this->pedido['referencia']} por {$this->pedido['total']}")
             ->greeting('Hola '.TextoDeCorreo::enLinea($notifiable->name).',')
             ->line("**{$cliente}** acaba de hacer un pedido en tu tienda.")
-            ->line('Telefono: '.TextoDeCorreo::enLinea($this->pedido['telefono']));
+            ->line('Teléfono: '.TextoDeCorreo::enLinea($this->pedido['telefono']));
 
         if ($this->pedido['nota']) {
             // `enParrafo` y no `enLinea`: una nota si puede traer varias lineas de

@@ -5,6 +5,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /* Dentro de la ventana, que es una columna flexible con scroll, un hijo con
+     su propio scroll se encoge hasta casi nada (FUN-29 lo vio: solo asomaba el
+     título). Que no se encoja: la ventana ya se desplaza. */
+  flex-shrink: 0;
   /* Un catalogo de cientos de filas no puede empujar los botones del dialogo
      fuera de la pantalla: el informe se desplaza por dentro. */
   max-height: 340px;
@@ -69,4 +73,17 @@
 
 .informe-import-detalle {
   color: var(--text-secondary);
+}
+
+/* FUN-29: la vista previa se distingue de un import hecho, y las filas con
+   error se pueden descargar desde su grupo. */
+.informe-import.previa {
+  border-style: dashed;
+}
+
+.informe-import-descargar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.5rem;
 }

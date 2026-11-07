@@ -3,6 +3,8 @@ import type { Order, PaginatedResponse } from '../types';
 
 export interface GetOrdersParams {
   status?: string;
+  /** MOD-26: solo los que tienen un comprobante esperando revisión. */
+  payment_status?: 'en_revision';
   search?: string;
   page?: number;
   per_page?: number;
@@ -40,4 +42,19 @@ export const updateOrderStatus = async (id: string, status: 'pending' | 'process
 
 export const deleteOrder = async (id: string): Promise<void> => {
   await api.delete(`/orders/${id}`);
+};
+
+/** MOD-26: confirmar el pago o rechazar el comprobante (con el motivo que verá el comprador). */
+export const revisarPago = async (id: string, decision: 'confirmar' | 'rechazar', motivo?: string): Promise<Order> => {
+  const response = await api.post<Order>(`/orders/${id}/pago`, { decision, motivo });
+  return response.data;
+};
+
+/**
+ * MOD-26: el comprobante que mandó el comprador, como blob. Va por axios porque
+ * la ruta pide el token y la tienda, que un `<img src>` no manda.
+ */
+export const getComprobante = async (id: string): Promise<Blob> => {
+  const response = await api.get(`/orders/${id}/comprobante`, { responseType: 'blob' });
+  return response.data as Blob;
 };

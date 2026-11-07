@@ -27,7 +27,7 @@ type Env = Record<string, unknown>;
 
 /** Primeros segmentos de la URL que son de la aplicación y no una tienda. */
 const RUTAS_DE_LA_APLICACION = new Set([
-  'login', 'register', 'dashboard', 'platform', 'terminos', 'privacidad', 'reembolsos',
+  'login', 'register', 'dashboard', 'platform', 'terminos', 'privacidad', 'reembolsos', 'pedido',
   'forgot-password', 'reset-password', 'accept-invitation',
 ]);
 

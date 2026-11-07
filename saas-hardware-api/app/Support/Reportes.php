@@ -408,6 +408,10 @@ class Reportes
      *
      * No depende del rango de fechas: es una foto de ahora.
      *
+     * MOD-22: lo que no lleva la cuenta de sus unidades no se acaba, así que
+     * no sale, ni la ficha ni sus variantes. Su número de stock se quedó como
+     * estaba al apagarlo y no dice nada.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function stockBajo(): array
@@ -415,6 +419,7 @@ class Reportes
         $fichas = Product::withoutTenant()
             ->where('tenant_id', $this->tenantId)
             ->where('is_active', true)
+            ->where('track_stock', true)
             ->whereDoesntHave('variants', fn ($q) => $q->withoutTenant())
             ->whereColumn('stock', '<=', 'low_stock_threshold')
             ->orderBy('stock')
@@ -431,7 +436,7 @@ class Reportes
         $variantes = ProductVariant::withoutTenant()
             ->where('tenant_id', $this->tenantId)
             ->whereColumn('stock', '<=', 'low_stock_threshold')
-            ->whereHas('product', fn ($q) => $q->withoutTenant()->where('is_active', true))
+            ->whereHas('product', fn ($q) => $q->withoutTenant()->where('is_active', true)->where('track_stock', true))
             ->with(['product' => fn ($q) => $q->withoutTenant()->select('id', 'name')])
             ->orderBy('stock')
             ->limit(self::TOPE_STOCK_BAJO)

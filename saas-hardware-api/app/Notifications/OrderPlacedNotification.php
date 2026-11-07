@@ -50,6 +50,8 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
             'tienda' => $tenant?->name ?? 'la tienda',
             'whatsapp' => $tenant?->whatsapp_number,
             'url' => StoreUrl::forTenant($tenant),
+            // MOD-26: el enlace para ver el pedido y mandar el comprobante.
+            'seguimiento' => StoreUrl::forOrderTracking($tenant, $order->tracking_token),
             'entrega' => match ($order->delivery_method) {
                 'delivery' => 'Delivery ('.Money::format($order->delivery_cost, $moneda).')',
                 'pickup' => 'Recojo en tienda',
@@ -82,7 +84,7 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
         $mail = (new MailMessage)
             ->subject("Recibimos tu pedido {$this->pedido['referencia']} en {$this->pedido['tienda']}")
             ->greeting('Hola '.TextoDeCorreo::enLinea($this->pedido['cliente']).',')
-            ->line("Recibimos tu pedido **{$this->pedido['referencia']}** en {$tienda}. Te avisaremos cuando este listo.")
+            ->line("Recibimos tu pedido **{$this->pedido['referencia']}** en {$tienda}. Te avisaremos cuando esté listo.")
             ->line('---');
 
         foreach ($this->pedido['lineas'] as $linea) {
@@ -96,17 +98,21 @@ class OrderPlacedNotification extends Notification implements ShouldQueue
 
         $mail->line("**Total: {$this->pedido['total']}**");
 
-        if ($this->pedido['url']) {
+        // MOD-26: el botón lleva a su pedido, donde ve cómo pagar y manda el
+        // comprobante; sin enlace de seguimiento, a la tienda como antes.
+        if ($this->pedido['seguimiento'] ?? null) {
+            $mail->action('Ver mi pedido', $this->pedido['seguimiento']);
+        } elseif ($this->pedido['url']) {
             $mail->action('Ver la tienda', $this->pedido['url']);
         }
 
         // El numero va tambien en el cuerpo y no solo en el asunto: es lo que el
         // comprador tiene que decir si escribe por WhatsApp, y el asunto se pierde
         // en cuanto reenvia el correo o lo lee en el movil.
-        $mail->line("Guarda el numero **{$this->pedido['referencia']}**: es el que necesitas para preguntar por tu pedido.");
+        $mail->line("Guarda el número **{$this->pedido['referencia']}**: es el que necesitas para preguntar por tu pedido.");
 
         if ($this->pedido['whatsapp']) {
-            $mail->line('Cualquier duda, escribenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
+            $mail->line('Cualquier duda, escríbenos por WhatsApp al '.TextoDeCorreo::enLinea($this->pedido['whatsapp']).'.');
         }
 
         return $mail;

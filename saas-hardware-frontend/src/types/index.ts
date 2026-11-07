@@ -139,7 +139,8 @@ export interface Tenant {
    * desde el panel (`GET /tenant`) llegan los cuatro, encendidos o no, para
    * poder editarlos. `null` es "nunca configuró ninguno".
    */
-  payment_methods: PaymentMethods | null;
+  /** MOD-23: la lista que arma la tienda. El catálogo público solo recibe las encendidas. */
+  payment_methods: PaymentMethod[] | null;
   /**
    * Los mensajes de WhatsApp que escribe el comprador (MOD-25), ya resueltos:
    * el de la tienda si lo cambió y si no el de fábrica. **Solo llega por el
@@ -164,21 +165,28 @@ export interface Tenant {
   tax_name: string;
   tax_rate: number | string;
   tax_included: boolean;
+  /** FUN-26: días que vale una cotización desde que se emite; null, sin fecha. */
+  quote_validity_days?: number | null;
+  /** FUN-26: las condiciones que se imprimen en la cotización. */
+  quote_terms?: string | null;
 }
 
-/** Los cuatro métodos fijos de `Tenant::METODOS_DE_PAGO`. Ninguno es obligatorio. */
-export interface PaymentMethods {
-  yape?: { enabled: boolean; phone?: string | null; holder_name?: string | null };
-  plin?: { enabled: boolean; phone?: string | null; holder_name?: string | null };
-  transferencia?: {
-    enabled: boolean;
-    bank?: string | null;
-    account_number?: string | null;
-    account_type?: 'ahorros' | 'corriente' | null;
-    holder_name?: string | null;
-    cci?: string | null;
-  };
-  efectivo?: { enabled: boolean };
+/**
+ * Un método de pago que escribió la tienda (MOD-23): "Yape", "Deuna",
+ * "Transferencia Banco Pichincha"… con lo que el comprador necesita para pagar.
+ * La forma la decide `App\Support\MetodosDePago` en el backend. No cobra nada.
+ */
+export interface PaymentMethod {
+  /** Lo pone el backend; sigue al mismo método entre guardados (y a su QR). */
+  id: string;
+  name: string;
+  /** "987654321 · Ana Dueña", la cuenta, el alias… Texto libre. */
+  details: string | null;
+  /** "Manda la captura por WhatsApp". */
+  instructions: string | null;
+  /** La imagen del QR, como URL completa. */
+  qr_url: string | null;
+  enabled: boolean;
 }
 
 /**
@@ -341,6 +349,12 @@ export interface Product {
    */
   price_tiers?: PriceTier[] | null;
   stock: number;
+  /**
+   * Si la tienda lleva la cuenta de las unidades (MOD-22). `false`: se pide
+   * siempre y `stock` no dice nada. Ausente cuenta como `true`. Se lee con
+   * `utils/stock.ts`, nunca comparando `stock` a mano.
+   */
+  track_stock?: boolean;
   low_stock_threshold: number;
   sku: string | null;
   is_available: boolean;
@@ -421,6 +435,36 @@ export interface OrderItem {
   subtotal: number;
 }
 
+/** El estado del pago de un pedido (MOD-26). */
+export type EstadoDePago = 'en_revision' | 'confirmado' | 'rechazado';
+
+/**
+ * Un pedido visto por quien lo hizo, desde su enlace (MOD-26). Lo mínimo para
+ * seguirlo: sin teléfono, correo ni nota, por si el enlace se reenvía.
+ */
+export interface SeguimientoDePedido {
+  number: number;
+  status: Order['status'];
+  created_at: string;
+  customer_name: string;
+  items: Array<{ product_name: string; variant_name: string | null; quantity: number; unit_price: number | string; subtotal: number | string }>;
+  items_subtotal: number | string | null;
+  discount_amount: number | string | null;
+  coupon_code: string | null;
+  delivery_method: 'pickup' | 'delivery' | null;
+  delivery_cost: number | string | null;
+  tax_name: string | null;
+  tax_rate: number | string | null;
+  tax_amount: number | string | null;
+  total: number | string;
+  payment: {
+    status: EstadoDePago | null;
+    proof_sent_at: string | null;
+    rejection_reason: string | null;
+    can_upload: boolean;
+  };
+}
+
 export interface Order {
   id: string;
   /**
@@ -466,6 +510,22 @@ export interface Order {
   items_subtotal?: number | string | null;
   coupon_code?: string | null;
   discount_amount?: number | string | null;
+  /**
+   * MOD-26: la llave del enlace con el que el comprador ve su pedido y manda su
+   * comprobante (`/{slug}/pedido/{token}`).
+   */
+  tracking_token?: string;
+  /**
+   * El pago, aparte de `status` (que es lo que mueve el stock): `null` si nadie
+   * dijo nada, `en_revision` si el comprador mandó su comprobante, y
+   * `confirmado` o `rechazado` cuando la tienda lo revisó.
+   */
+  payment_status?: EstadoDePago | null;
+  payment_proof_uploaded_at?: string | null;
+  payment_reviewed_at?: string | null;
+  payment_rejection_reason?: string | null;
+  /** Si hay un comprobante guardado que el panel puede abrir. */
+  tiene_comprobante?: boolean;
   total: number;
   /**
    * Utilidad del pedido (MOD-6). Los tres solo llegan para admin.
@@ -491,12 +551,23 @@ export interface Order {
  * pedidos cancelados, y `ultima_compra`/`total_gastado` valen `null`/`0` para
  * quien se registró pero todavía no ha comprado.
  */
+/**
+ * Una persona del directorio de clientes de la tienda (MOD-10, MOD-24): quien
+ * le compró —con cuenta o sin ella— y quien abrió cuenta aunque no haya
+ * comprado. Se llena sola con los pedidos; la tienda escribe sus notas y
+ * etiquetas, que el cliente no ve nunca.
+ */
 export interface Cliente {
   id: string;
+  /** La cuenta del catálogo, si la tiene. */
+  user_id: string | null;
+  tiene_cuenta: boolean;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
-  is_active: boolean;
+  notes: string | null;
+  tags: string[];
+  /** Lo primero que se supo de esta persona: su cuenta o su primer pedido. */
   created_at: string;
   pedidos_count: number;
   total_gastado: number;
@@ -526,7 +597,7 @@ export interface StockNotification {
   /** null mientras siga esperando. */
   notified_at: string | null;
   created_at: string;
-  product?: Pick<Product, 'id' | 'name' | 'stock' | 'price' | 'sale_price' | 'thumbnail_url'>;
+  product?: Pick<Product, 'id' | 'name' | 'stock' | 'track_stock' | 'price' | 'sale_price' | 'thumbnail_url'>;
   /** La variante que espera (MOD-5); null si espera el producto entero. */
   variant_id?: string | null;
   variant?: Pick<ProductVariant, 'id' | 'options' | 'nombre' | 'stock' | 'price' | 'sale_price'> | null;
@@ -536,6 +607,7 @@ export interface StockNotification {
 export type AreaDeActividad =
   | 'producto'
   | 'pedido'
+  | 'cliente'
   | 'categoria'
   | 'pagina'
   | 'resena'
@@ -622,6 +694,13 @@ export interface CierreDeTienda {
   desde: string | null;
   /** Nombre comercial del plan que tenía: «Pro». */
   plan: string;
+  /**
+   * INF-24: si nunca pagó, desde cuándo se borran sus productos, pedidos y
+   * clientes; `null` si no le toca (pagó alguna vez, o la cerró el operador).
+   */
+  borrado_desde?: string | null;
+  /** INF-24: cuándo se borraron, si ya pasó. */
+  datos_borrados?: string | null;
 }
 
 export interface AuthResponse {

@@ -64,7 +64,7 @@ class ProductController extends Controller
     private const CAMPOS_EN_INFORME = [
         'brand' => 'marca', 'sku' => 'SKU', 'price' => 'precio', 'sale_price' => 'oferta',
         'cost' => 'costo', 'price_tiers' => 'precio por mayor', 'stock' => 'stock',
-        'category' => 'categoría', 'status' => 'estado',
+        'category' => 'categoría', 'status' => 'estado', 'track_stock' => 'control de stock',
     ];
 
     private const CAMPOS_DE_VARIANTE_EN_INFORME = [
@@ -279,9 +279,12 @@ class ProductController extends Controller
             // UI-15: tipo y tope de `config/subidas.php`.
             'file' => ['required', 'file', ...Subidas::reglas('csv')],
             'modo' => 'nullable|in:'.implode(',', self::MODOS_DE_IMPORT),
+            // FUN-29: correrlo entero y deshacerlo, para enseñar qué pasaría.
+            'vista_previa' => 'nullable|boolean',
         ]);
 
         $modo = $validado['modo'] ?? 'omitir';
+        $vistaPrevia = $request->boolean('vista_previa');
 
         $file = $request->file('file');
         $path = $file->getRealPath();
@@ -315,10 +318,17 @@ class ProductController extends Controller
         // El str_replace quita el BOM de UTF-8: Excel lo escribe al guardar y sin
         // esto la primera columna no casa con 'nombre' y el mapeo cae a los
         // fallbacks por posición (OWN-5).
+        // FUN-29: la cabecera tal cual, para devolver las filas rechazadas en un
+        // archivo que se pueda corregir y volver a subir.
+        $cabeceraOriginal = array_map(fn ($col) => str_replace("\xEF\xBB\xBF", '', (string) $col), $header);
+
         $header = array_map(
             fn ($col) => trim(strtolower(str_replace("\xEF\xBB\xBF", '', $col))),
             $header
         );
+
+        // FUN-29: cada fila como llegó, por su número, para las rechazadas.
+        $filasLeidas = [];
 
         $creados = 0;
         $actualizados = 0;
@@ -378,6 +388,9 @@ class ProductController extends Controller
             // columna `status` de la base vale `published` por defecto-. Era la
             // unica columna que rompia la promesa de MOD-12 sobre ese viaje.
             'estado'           => array_search('estado', $header),
+            // MOD-22: si se lleva la cuenta de las unidades, `si` o `no`. Es de
+            // la ficha, asi que la lee la primera fila del grupo, como el estado.
+            'controla_stock'   => array_search('controla_stock', $header),
         ];
 
         // Alternativas en inglés
@@ -393,6 +406,7 @@ class ProductController extends Controller
         if ($map['variante'] === false) $map['variante'] = array_search('variant', $header);
         if ($map['tramos'] === false) $map['tramos'] = array_search('price_tiers', $header);
         if ($map['estado'] === false) $map['estado'] = array_search('status', $header);
+        if ($map['controla_stock'] === false) $map['controla_stock'] = array_search('track_stock', $header);
 
         // Fallbacks por posición si fallan cabeceras
         if ($map['nombre'] === false) $map['nombre'] = 0;
@@ -443,6 +457,7 @@ class ProductController extends Controller
 
             while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                 $rowCount++;
+                $filasLeidas[$rowCount] = $row;
 
                 // Ignorar filas vacías
                 if (empty($row) || (count($row) === 1 && $row[0] === null)) {
@@ -514,10 +529,29 @@ class ProductController extends Controller
                     }
                 }
 
+                // MOD-22: `null` es "el archivo no lo dice": al crear, que si
+                // lleva la cuenta; al actualizar, que no se toca.
+                $controlaStr = $map['controla_stock'] !== false && isset($row[$map['controla_stock']]) ? trim($row[$map['controla_stock']]) : '';
+                $controla = $this->siONoDeFila($controlaStr);
+
+                if ($controlaStr !== '' && $controla === null) {
+                    $errors[] = "Fila {$rowCount}: El valor de controla_stock '{$controlaStr}' no es válido (usa 'si' o 'no').";
+                    continue;
+                }
+
                 $stockStr = $map['stock'] !== false && isset($row[$map['stock']]) ? trim($row[$map['stock']]) : '';
                 $stock = is_numeric($stockStr) ? (int) $stockStr : null;
 
-                if ($stock === null || $stock < 0) {
+                // Sin control de stock el numero puede ir vacio. Lo dice la fila,
+                // o —en las variantes que siguen a la primera, que no repiten la
+                // columna— la ficha que ya abrio el grupo.
+                $textoDeLaFila = $map['variante'] !== false && isset($row[$map['variante']]) ? trim($row[$map['variante']]) : '';
+                $fichaDelGrupo = $textoDeLaFila === '' ? null : ($fichas['grupo:'.$this->claveDeNombre($name)] ?? null);
+                $sinControl = $controla === false || ($fichaDelGrupo['atributos']['track_stock'] ?? null) === false;
+
+                if ($stockStr === '' && $sinControl) {
+                    $stock = null;
+                } elseif ($stock === null || $stock < 0) {
                     $errors[] = "Fila {$rowCount}: El stock '{$stockStr}' no es válido (debe ser un entero >= 0).";
                     continue;
                 }
@@ -715,6 +749,9 @@ class ProductController extends Controller
                         // con los de la mas barata, igual que el precio y el costo.
                         'price_tiers' => $tramos,
                         'stock'       => $stock,
+                        // MOD-22: null es "el archivo no lo dice"; al crear lo
+                        // rellena el bucle de abajo, como el estado.
+                        'track_stock' => $controla,
                         'category_id' => $categoryId,
                         'description' => $description,
                         'specs'       => $specs,
@@ -772,6 +809,10 @@ class ProductController extends Controller
                 // del lote, asi que una fila con menos claves que otra
                 // desalinearia el insert entero.
                 $atributos['status'] ??= 'published';
+                // MOD-22: lo mismo con el control de stock y su numero, que sin
+                // control puede venir vacio.
+                $atributos['track_stock'] ??= true;
+                $atributos['stock'] ??= 0;
 
                 $fila   = $this->filaAAtributos($atributos);
                 $lote[] = $fila;
@@ -841,7 +882,16 @@ class ProductController extends Controller
                 }
             }
 
-            \DB::commit();
+            // FUN-29: la vista previa hace TODO lo de un import —las mismas reglas,
+            // el mismo informe— y al final lo deshace. No es un cálculo aparte
+            // que pudiera separarse del de verdad: es el de verdad sin guardar.
+            // Los avisos de «ya llegó» que dispararía esperan al commit
+            // (`BackInStockNotification`), así que tampoco sale ninguno.
+            if ($vistaPrevia) {
+                \DB::rollBack();
+            } else {
+                \DB::commit();
+            }
         } catch (\Exception $e) {
             \DB::rollBack();
             fclose($handle);
@@ -868,7 +918,7 @@ class ProductController extends Controller
                 .($noCaben === 1 ? '1 producto nuevo del archivo no se importó.' : "{$noCaben} productos nuevos del archivo no se importaron.");
         }
 
-        $resumen = $this->resumenDelImport($creados, $actualizados, $sinCambios, $omitidos);
+        $resumen = $this->resumenDelImport($creados, $actualizados, $sinCambios, $omitidos, $vistaPrevia);
 
         // En el orden del archivo: se crean en lote y se actualizan despues, asi
         // que sin esto el informe no se leeria de arriba abajo como el CSV.
@@ -878,11 +928,11 @@ class ProductController extends Controller
         // sube la version de cache (AUD-6). Se sube una sola vez al terminar, lo
         // que ademas ahorra las N escrituras en cache que hacia el import cuando
         // guardaba fila a fila.
-        if ($creados > 0) {
+        if ($creados > 0 && ! $vistaPrevia) {
             $this->invalidarCachePublica();
         }
 
-        if ($creados + $actualizados > 0) {
+        if ($creados + $actualizados > 0 && ! $vistaPrevia) {
             Bitacora::anotar(
                 ActivityLog::PRODUCTO_IMPORTADOS,
                 "Importó un CSV: {$resumen}.",
@@ -908,9 +958,11 @@ class ProductController extends Controller
         }
 
         return response()->json([
-            'message'         => $cambios !== []
-                ? 'Proceso completado: '.$resumen.'.'
-                : 'No se importó ningún producto.',
+            'message'         => $vistaPrevia
+                ? ($cambios !== [] ? 'Vista previa: '.$resumen.'. Todavía no se guardó nada.' : 'Vista previa: no se importaría ningún producto.')
+                : ($cambios !== [] ? 'Proceso completado: '.$resumen.'.' : 'No se importó ningún producto.'),
+            // FUN-29: si esto fue una vista previa (nada guardado).
+            'preview'         => $vistaPrevia,
             // Lo que se escribio: creados mas actualizados. Los omitidos no, que
             // es justo lo que el dueño pidio que no se tocara.
             'success_count'   => $creados + $actualizados,
@@ -920,7 +972,43 @@ class ProductController extends Controller
             'skipped_count'   => $omitidos,
             'changes'         => $cambios,
             'errors'          => $errors,
+            // FUN-29: las filas que no entraron, con sus celdas como llegaron y
+            // el motivo, para descargarlas, corregirlas y volver a subirlas.
+            'header'          => $cabeceraOriginal,
+            'rejected_rows'   => $this->filasRechazadas($errors, $filasLeidas),
         ]);
+    }
+
+    /**
+     * Las filas del archivo que tienen un aviso, con sus celdas y el motivo
+     * (FUN-29). Los avisos dicen «Fila N: …» —la misma numeración del informe,
+     * contando la cabecera como la 1—; los que no son de una fila (el tope del
+     * plan) no van aquí.
+     *
+     * @param  array<int, string>  $errores
+     * @param  array<int, array<int, string|null>>  $filas
+     * @return array<int, array{fila: int, error: string, celdas: array<int, string|null>}>
+     */
+    private function filasRechazadas(array $errores, array $filas): array
+    {
+        $porFila = [];
+
+        foreach ($errores as $error) {
+            if (preg_match('/^Fila (\d+): (.+)$/su', $error, $m) && isset($filas[(int) $m[1]])) {
+                $fila = (int) $m[1];
+                $porFila[$fila]['fila'] = $fila;
+                $porFila[$fila]['errores'][] = $m[2];
+                $porFila[$fila]['celdas'] = $filas[$fila];
+            }
+        }
+
+        ksort($porFila);
+
+        return array_values(array_map(fn (array $f) => [
+            'fila'   => $f['fila'],
+            'error'  => implode(' ', $f['errores']),
+            'celdas' => $f['celdas'],
+        ], $porFila));
     }
 
     /**
@@ -943,30 +1031,37 @@ class ProductController extends Controller
      * "se crearon 3 productos, se actualizaron 2, 20 ya estaban al día y se
      * omitieron 5 que ya existían".
      */
-    private function resumenDelImport(int $creados, int $actualizados, int $sinCambios, int $omitidos): string
+    private function resumenDelImport(int $creados, int $actualizados, int $sinCambios, int $omitidos, bool $condicional = false): string
     {
         $partes = [];
 
+        // FUN-29: en la vista previa, lo que pasaría.
         if ($creados > 0) {
-            $partes[] = $creados === 1 ? 'se creó 1 producto' : "se crearon {$creados} productos";
+            $partes[] = $condicional
+                ? ($creados === 1 ? 'se crearía 1 producto' : "se crearían {$creados} productos")
+                : ($creados === 1 ? 'se creó 1 producto' : "se crearon {$creados} productos");
         }
 
         if ($actualizados > 0) {
-            $partes[] = $actualizados === 1 ? 'se actualizó 1' : "se actualizaron {$actualizados}";
+            $partes[] = $condicional
+                ? ($actualizados === 1 ? 'se actualizaría 1' : "se actualizarían {$actualizados}")
+                : ($actualizados === 1 ? 'se actualizó 1' : "se actualizaron {$actualizados}");
         }
 
         if ($sinCambios > 0) {
-            $partes[] = $sinCambios === 1 ? '1 ya estaba al día' : "{$sinCambios} ya estaban al día";
+            $partes[] = $condicional
+                ? ($sinCambios === 1 ? '1 ya está al día' : "{$sinCambios} ya están al día")
+                : ($sinCambios === 1 ? '1 ya estaba al día' : "{$sinCambios} ya estaban al día");
         }
 
         if ($omitidos > 0) {
-            $partes[] = $omitidos === 1
-                ? 'se omitió 1 que ya existía'
-                : "se omitieron {$omitidos} que ya existían";
+            $partes[] = $condicional
+                ? ($omitidos === 1 ? 'se omitiría 1 que ya existe' : "se omitirían {$omitidos} que ya existen")
+                : ($omitidos === 1 ? 'se omitió 1 que ya existía' : "se omitieron {$omitidos} que ya existían");
         }
 
         if ($partes === []) {
-            return 'no se importó ningún producto';
+            return $condicional ? 'no se importaría ningún producto' : 'no se importó ningún producto';
         }
 
         $ultima = array_pop($partes);
@@ -1170,6 +1265,8 @@ class ProductController extends Controller
             // FUN-21: con las palabras del CSV y no con las de la base, que es
             // lo que el dueño acaba de escribir en el archivo.
             'status'      => $producto->status === 'draft' ? 'borrador' : 'publicado',
+            // MOD-22: con las palabras del CSV, como el estado.
+            'track_stock' => $producto->controlaStock() ? 'si' : 'no',
             'category'    => $nombresDeCategoria[$producto->category_id] ?? null,
             // Crudos: la descripción que devuelve el modelo ya pasó por su cast.
             'description' => (string) ($producto->getAttributes()['description'] ?? ''),
@@ -1522,6 +1619,22 @@ class ProductController extends Controller
             unset($validado['cost']);
         }
 
+        // MOD-22: llega de un FormData como '1'/'0' (README). Vacio es "como
+        // estaba", y la columna no admite null.
+        if (array_key_exists('track_stock', $validado)) {
+            if ($validado['track_stock'] === null || $validado['track_stock'] === '') {
+                unset($validado['track_stock']);
+            } else {
+                $validado['track_stock'] = filter_var($validado['track_stock'], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        // Y sin control de stock el numero puede no venir: vacio no lo toca, y
+        // un producto nuevo nace con 0 (el valor por defecto de la columna).
+        if (array_key_exists('stock', $validado) && $validado['stock'] === null) {
+            unset($validado['stock']);
+        }
+
         return [$validado, $variantes];
     }
 
@@ -1564,6 +1677,8 @@ class ProductController extends Controller
             // formato que el dueño ya ve al exportar.
             'price_tiers' => PreciosPorCantidad::aTexto($product->price_tiers),
             'stock'       => $product->stock,
+            // MOD-22: apagarlo cambia lo que se puede pedir, asi que queda escrito.
+            'track_stock' => $product->controlaStock(),
             'is_active'   => (bool) $product->is_active,
             'status'      => $product->status === 'draft' ? 'borrador' : 'publicado',
             'category'    => $product->category?->name,
@@ -1599,7 +1714,7 @@ class ProductController extends Controller
 
         $campos = [
             'name' => 'nombre', 'brand' => 'marca', 'sku' => 'SKU', 'category' => 'categoría',
-            'is_active' => 'visible', 'status' => 'estado',
+            'is_active' => 'visible', 'status' => 'estado', 'track_stock' => 'control de stock',
         ];
 
         if (! $conVariantes) {
@@ -1696,7 +1811,9 @@ class ProductController extends Controller
                 // MOD-15: normalizados aqui como los de la ficha. La lista manda,
                 // igual que con las variantes: lo que no viene se queda sin tramos.
                 'price_tiers'         => PreciosPorCantidad::paraGuardar($datos['price_tiers'] ?? null),
-                'stock'               => $datos['stock'],
+                // MOD-22: sin control de stock puede llegar vacio, y entonces se
+                // queda el que tenia (0 si es nueva).
+                'stock'               => $datos['stock'] ?? ($variante->exists ? $variante->stock : 0),
                 'low_stock_threshold' => $datos['low_stock_threshold'] ?? 5,
                 'sort_order'          => $posicion,
             ]);
@@ -1796,6 +1913,20 @@ class ProductController extends Controller
      * `ExportController` es `publicado`/`borrador`, y quien arma el CSV a mano
      * mirando la API escribe `published`/`draft`.
      */
+    /**
+     * `si` o `no` de una celda del CSV, o `null` si no se entiende o va vacia
+     * (MOD-22). Acepta lo que escribe la exportacion y lo que escribiria a mano
+     * cualquiera: con tilde, en ingles o como 1/0.
+     */
+    private function siONoDeFila(string $texto): ?bool
+    {
+        return match (mb_strtolower(trim($texto))) {
+            'si', 'sí', 'yes', 'true', '1' => true,
+            'no', 'false', '0' => false,
+            default => null,
+        };
+    }
+
     private function estadoDeFila(string $texto): ?string
     {
         return match (mb_strtolower(trim($texto))) {
@@ -1871,7 +2002,7 @@ class ProductController extends Controller
      * @param  array<int, array{name: string, value: string}>  $opciones
      * @return array<string, mixed>
      */
-    private function varianteDeFila(array $opciones, ?string $sku, float $price, ?float $salePrice, ?float $costo, int $stock, ?array $tramos = null): array
+    private function varianteDeFila(array $opciones, ?string $sku, float $price, ?float $salePrice, ?float $costo, ?int $stock, ?array $tramos = null): array
     {
         return [
             'options'     => $opciones,
@@ -1894,6 +2025,10 @@ class ProductController extends Controller
      */
     private function varianteAAtributos(string $productId, array $variante, int $orden): array
     {
+        // MOD-22: sin control de stock la fila puede no traer el numero, y la
+        // columna no admite null; todas las filas del lote, ademas, con las
+        // mismas claves.
+        $variante['stock'] ??= 0;
         $modelo = new ProductVariant($variante + ['product_id' => $productId, 'sort_order' => $orden]);
         $ahora  = now();
 

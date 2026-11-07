@@ -37,6 +37,17 @@ class StoreUrl
     }
 
     /**
+     * El seguimiento de un pedido para quien lo hizo (MOD-26): `/pedido/{token}`
+     * en el router del frontend, con y sin slug como la ficha de un producto.
+     */
+    public static function forOrderTracking(?Tenant $tenant, ?string $token): ?string
+    {
+        $base = self::forTenant($tenant);
+
+        return $base && $token ? $base.'/pedido/'.$token : null;
+    }
+
+    /**
      * Ficha de un producto.
      *
      * El path es el que enlaza el frontend (`/product/{id}`, ver el router). Si se

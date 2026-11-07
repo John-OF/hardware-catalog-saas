@@ -1,0 +1,136 @@
+/* El pago de un pedido en su detalle (MOD-26). CSS de componente: global, con
+   prefijo propio. */
+
+.pago-del-pedido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.pago-del-pedido h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.pago-estado {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pago-estado svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.pago-estado.revision {
+  color: var(--warning);
+}
+
+.pago-estado.confirmado {
+  color: var(--success);
+}
+
+.pago-estado.rechazado {
+  color: var(--danger);
+}
+
+.pago-del-pedido .btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+}
+
+.pago-comprobante {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pago-comprobante img,
+.pago-comprobante iframe {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.pago-comprobante iframe {
+  height: 420px;
+}
+
+.pago-descargar {
+  align-self: flex-start;
+  font-size: 0.8rem;
+}
+
+.pago-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pago-rechazo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pago-rechazo label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.pago-enlace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pago-enlace > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.pago-enlace code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+
+.pago-badge {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.pago-badge.en_revision {
+  color: var(--warning);
+}
+
+.pago-badge.confirmado {
+  color: var(--success);
+}
+
+.pago-badge.rechazado {
+  color: var(--danger);
+}

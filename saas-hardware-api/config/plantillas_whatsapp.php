@@ -59,6 +59,10 @@ return [
         'enlace'    => 'El enlace a la ficha del producto o al armado',
         'piezas'    => 'Las piezas del armado, una por línea, con su precio',
         'consumo'   => 'El consumo estimado del armado y la fuente recomendada',
+        // MOD-26: el enlace del pedido para quien lo hizo, y por qué no se
+        // confirmó su pago.
+        'seguimiento' => 'El enlace para que el cliente vea su pedido y mande su comprobante de pago',
+        'motivo'      => 'Por qué no se pudo confirmar el pago',
     ],
 
     'plantillas' => [
@@ -69,8 +73,8 @@ return [
             'grupo'     => 'comprador',
             'etiqueta'  => 'Pedido desde el carrito',
             'cuando'    => 'Lo envía el comprador al confirmar su pedido en el carrito, y te llega a ti.',
-            'variables' => ['tienda', 'pedido', 'productos', 'total', 'cliente', 'entrega', 'nota', 'pagos'],
-            'texto'     => "Hola {tienda}, quiero hacer este pedido:\n\n{productos}\n\n*Total: {total}*\n\nNombre: {cliente}\nEntrega: {entrega}\nNota: {nota}\n\nFormas de pago: {pagos}\n\n(Pedido {pedido})",
+            'variables' => ['tienda', 'pedido', 'productos', 'total', 'cliente', 'entrega', 'nota', 'pagos', 'seguimiento'],
+            'texto'     => "Hola {tienda}, quiero hacer este pedido:\n\n{productos}\n\n*Total: {total}*\n\nNombre: {cliente}\nEntrega: {entrega}\nNota: {nota}\n\nFormas de pago: {pagos}\n\n(Pedido {pedido})\nMi pedido: {seguimiento}",
         ],
 
         'consulta_producto' => [
@@ -97,15 +101,17 @@ return [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Pedido recibido',
             'cuando'    => 'Lo mandas tú desde un pedido en estado «Pendiente».',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
-            'texto'     => "Hola {cliente}, recibimos tu pedido {pedido} en {tienda}:\n\n{productos}\n\nTotal: {total}\n\nPronto empezamos a prepararlo.",
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
+            'texto'     => "Hola {cliente}, recibimos tu pedido {pedido} en {tienda}:\n\n{productos}\n\nTotal: {total}\n\nPronto empezamos a prepararlo.
+
+Aquí puedes verlo y mandarnos tu comprobante de pago: {seguimiento}",
         ],
 
         'pedido_en_proceso' => [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Pedido en preparación',
             'cuando'    => 'Lo mandas tú desde un pedido en estado «En proceso».',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
             'texto'     => "Hola {cliente}, tu pedido {pedido} ya se está preparando en {tienda}. Te avisamos apenas esté listo.",
         ],
 
@@ -113,7 +119,7 @@ return [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Pedido listo',
             'cuando'    => 'Lo mandas tú desde un pedido en estado «Atendido».',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
             'texto'     => "¡Hola {cliente}! Tu pedido {pedido} ya está listo en {tienda}.\n\n{productos}\n\nTotal: {total}\nEntrega: {entrega}\n\n¡Gracias por tu compra!",
         ],
 
@@ -121,7 +127,7 @@ return [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Pedido cancelado',
             'cuando'    => 'Lo mandas tú desde un pedido en estado «Cancelado».',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
             'texto'     => "Hola {cliente}, tu pedido {pedido} en {tienda} fue cancelado. Si tienes alguna duda, escríbenos por aquí.",
         ],
 
@@ -129,16 +135,34 @@ return [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Recordatorio de pago',
             'cuando'    => 'Lo eliges tú desde cualquier pedido, para recordarle al cliente que falta su pago.',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
-            'texto'     => "Hola {cliente}, te escribimos de {tienda} por tu pedido {pedido} de {total}. Todavía no vemos tu pago.\n\nPuedes pagarnos por: {pagos}\n\nSi ya pagaste, mándanos el comprobante por aquí. ¡Gracias!",
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
+            'texto'     => "Hola {cliente}, te escribimos de {tienda} por tu pedido {pedido} de {total}. Todavía no vemos tu pago.\n\nPuedes pagarnos por: {pagos}\n\nSi ya pagaste, súbenos el comprobante aquí: {seguimiento}\n\n¡Gracias!",
         ],
 
         'contacto_pedido' => [
             'grupo'     => 'tienda',
             'etiqueta'  => 'Contacto sobre un pedido',
             'cuando'    => 'Lo eliges tú desde cualquier pedido, para escribirle al cliente sin un motivo fijo.',
-            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos'],
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
             'texto'     => 'Hola {cliente}, te escribo de {tienda} por tu pedido {pedido}.',
+        ],
+
+        // MOD-26: lo que la tienda contesta al revisar el comprobante. Aparte
+        // del estado del pedido, como el pago.
+        'pago_confirmado' => [
+            'grupo'     => 'tienda',
+            'etiqueta'  => 'Pago confirmado',
+            'cuando'    => 'Lo eliges tú desde un pedido cuyo pago confirmaste.',
+            'variables' => ['cliente', 'tienda', 'pedido', 'productos', 'total', 'entrega', 'pagos', 'seguimiento'],
+            'texto'     => "Hola {cliente}, confirmamos el pago de tu pedido {pedido} en {tienda}. ¡Gracias! Puedes seguirlo aquí: {seguimiento}",
+        ],
+
+        'pago_rechazado' => [
+            'grupo'     => 'tienda',
+            'etiqueta'  => 'Pago no confirmado',
+            'cuando'    => 'Lo eliges tú desde un pedido cuyo comprobante rechazaste.',
+            'variables' => ['cliente', 'tienda', 'pedido', 'total', 'pagos', 'seguimiento', 'motivo'],
+            'texto'     => "Hola {cliente}, no pudimos confirmar el pago de tu pedido {pedido} en {tienda}.\nMotivo: {motivo}\n\nPuedes mandarnos otro comprobante aquí: {seguimiento}",
         ],
 
         'stock_disponible' => [

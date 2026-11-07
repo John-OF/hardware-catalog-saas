@@ -52,6 +52,7 @@ import {
   type TramoEnFormulario,
 } from '../../utils/tramosEnFormulario';
 import { precioEsDesde, tieneVariantes } from '../../utils/variants';
+import { controlaStock } from '../../utils/stock';
 import { margenDe, precioQueSeCobra } from '../../utils/margen';
 import { exportarCatalogo } from '../../api/exportaciones';
 import type { Product, Category, PaginatedResponse } from '../../types';
@@ -149,6 +150,8 @@ export default function ProductsPage() {
   const [cost, setCost] = useState('');
   const [stock, setStock] = useState('');
   const [lowStockThreshold, setLowStockThreshold] = useState('5');
+  // MOD-22: apagado, el producto se pide siempre y los campos de stock se esconden.
+  const [controlarStock, setControlarStock] = useState(true);
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -364,6 +367,7 @@ export default function ProductsPage() {
     setPrice('');
     setSalePrice('');
     setStock('');
+    setControlarStock(true);
     setLowStockThreshold('5');
     setCategoryId('');
     setDescription('');
@@ -394,6 +398,7 @@ export default function ProductsPage() {
     // `cost` no llega si quien mira es staff; entonces se queda vacío y no se manda.
     setCost(product.cost !== null && product.cost !== undefined ? String(product.cost) : '');
     setStock(product.stock.toString());
+    setControlarStock(controlaStock(product));
     setLowStockThreshold(product.low_stock_threshold ? product.low_stock_threshold.toString() : '5');
     setCategoryId(product.category_id || '');
     setDescription(product.description || '');
@@ -466,14 +471,14 @@ export default function ProductsPage() {
     }
 
     if (conVariantesEnFormulario) {
-      const problema = problemaDeVariantes(ejesVariantes, filasVariantes);
+      const problema = problemaDeVariantes(ejesVariantes, filasVariantes, controlarStock);
       if (problema) {
         toast.error(problema);
         return;
       }
     } else {
-      if (!price || !stock) {
-        toast.error('Nombre, precio y stock son obligatorios.');
+      if (!price || (controlarStock && !stock)) {
+        toast.error(controlarStock ? 'Nombre, precio y stock son obligatorios.' : 'Nombre y precio son obligatorios.');
         return;
       }
 
@@ -498,11 +503,16 @@ export default function ProductsPage() {
     formData.append('sku', sku || '');
     // Con variantes, precio y stock de la ficha los calcula el backend: mandarlos
     // vacíos solo daría un error de validación.
+    // MOD-22: '1'/'0', nunca vacío (README, booleanos en FormData).
+    formData.append('track_stock', controlarStock ? '1' : '0');
     if (!conVariantesEnFormulario) {
       formData.append('price', price);
       formData.append('sale_price', salePrice || '');
-      formData.append('stock', stock);
-      formData.append('low_stock_threshold', lowStockThreshold || '5');
+      // Sin control de stock el número no viaja: el backend deja el que había.
+      if (controlarStock) {
+        formData.append('stock', stock);
+        formData.append('low_stock_threshold', lowStockThreshold || '5');
+      }
 
       // MOD-6: si no se ve el campo, la clave NO viaja. Mandarla vacía borraría
       // el costo cada vez que un vendedor edita el producto.
@@ -539,7 +549,7 @@ export default function ProductsPage() {
 
     // Siempre, también vacía: una lista vacía es lo que le dice al backend que
     // quite las variantes de un producto que las tenía.
-    agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes, puedeVerCostos);
+    agregarVariantesAlFormulario(formData, ejesVariantes, filasVariantes, puedeVerCostos, controlarStock);
 
     // INF-12: lo último, cuando ya están todas las fotos. Si PHP descarta alguna
     // por `max_file_uploads`, el servidor lo ve y rechaza el guardado.
@@ -552,8 +562,14 @@ export default function ProductsPage() {
     }
   };
 
+  // FUN-29: el formulario primero revisa (vista previa, nada se guarda) y
+  // después, con el informe a la vista, «Importar ahora» hace lo mismo de verdad.
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    await importar(true);
+  };
+
+  const importar = async (vistaPrevia: boolean) => {
     if (!importFile) {
       toast.error('Por favor, selecciona un archivo CSV.');
       return;
@@ -563,8 +579,14 @@ export default function ProductsPage() {
     setImportReport(null);
 
     try {
-      const report = await importProductsCsv(importFile, importMode);
+      const report = await importProductsCsv(importFile, importMode, vistaPrevia);
       setImportReport(report);
+
+      // La vista previa no cambió nada: el archivo se queda para importarlo.
+      if (vistaPrevia) {
+        return;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['plan'] });
 
@@ -886,12 +908,16 @@ export default function ProductsPage() {
                   // MOD-5: con variantes, "stock bajo" es que ALGUNA esté en su umbral:
                   // el total puede ser alto con la de 32 GB a punto de agotarse.
                   const conVariantes = tieneVariantes(product);
-                  const variantesBajas = conVariantes
+                  // MOD-22: lo que no lleva la cuenta de sus unidades no se acaba.
+                  const conStock = controlaStock(product);
+                  const variantesBajas = conVariantes && conStock
                     ? product.variants!.filter((v) => v.stock <= (v.low_stock_threshold ?? 5))
                     : [];
-                  const isLowStock = conVariantes
-                    ? variantesBajas.length > 0
-                    : product.stock <= (product.low_stock_threshold ?? 5);
+                  const isLowStock = !conStock
+                    ? false
+                    : conVariantes
+                      ? variantesBajas.length > 0
+                      : product.stock <= (product.low_stock_threshold ?? 5);
                   return (
                     <tr
                       key={product.id}
@@ -971,11 +997,13 @@ export default function ProductsPage() {
                       </td>
                       <td>
                         <div className="stock-cell">
-                          <span className={`stock-number ${product.stock === 0 ? 'out' : isLowStock ? 'low' : ''}`}>
-                            {product.stock}
+                          <span className={`stock-number ${conStock && product.stock === 0 ? 'out' : isLowStock ? 'low' : ''}`}>
+                            {conStock ? product.stock : '—'}
                           </span>
                           <span className="stock-label">
-                            {product.stock === 0 ? (
+                            {!conStock ? (
+                              'Sin control de stock'
+                            ) : product.stock === 0 ? (
                               'Sin Stock'
                             ) : isLowStock && conVariantes ? (
                               <span style={{ color: '#f87171', fontWeight: 600 }} title={variantesBajas.map((v) => `${v.nombre}: ${v.stock}`).join(', ')}>
@@ -988,7 +1016,7 @@ export default function ProductsPage() {
                             )}
                           </span>
                           {/* Con variantes puede haber quien espere una agotada aunque el total tenga stock. */}
-                          {(product.stock === 0 || conVariantes) && (product.waitlist_count ?? 0) > 0 && (
+                          {((conStock && product.stock === 0) || conVariantes) && (product.waitlist_count ?? 0) > 0 && (
                             /* FUN-1b: la insignia ya existia pero era un numero muerto.
                                Ahora lleva a la lista de espera filtrada por este
                                producto, que es lo que el dueno quiere ver al leerla:
@@ -1229,11 +1257,34 @@ export default function ProductsPage() {
                 </select>
               </div>
 
+              {/* MOD-22: va antes de las variantes porque vale para todas. */}
+              <div className="form-group">
+                <label htmlFor="prod-track-stock">Control de stock</label>
+                <div className="toggle-switch-wrapper">
+                  <input
+                    id="prod-track-stock"
+                    type="checkbox"
+                    checked={controlarStock}
+                    onChange={(e) => setControlarStock(e.target.checked)}
+                    className="toggle-checkbox"
+                  />
+                  <label htmlFor="prod-track-stock" className="toggle-label"></label>
+                  <span className="toggle-text">
+                    {controlarStock ? 'Llevo la cuenta de las unidades' : 'Se puede pedir siempre'}
+                  </span>
+                </div>
+                <small className="form-hint">
+                  Apágalo para servicios, encargos o productos digitales: no se enseñan las unidades,
+                  nunca sale agotado y vender no descuenta nada.
+                </small>
+              </div>
+
               <EditorDeVariantes
                 ejes={ejesVariantes}
                 filas={filasVariantes}
                 moneda={currencyCode}
                 conCostos={puedeVerCostos}
+                conStock={controlarStock}
                 onChange={(ejes, filas) => {
                   setEjesVariantes(ejes);
                   setFilasVariantes(filas);
@@ -1242,8 +1293,9 @@ export default function ProductsPage() {
 
               {conVariantesEnFormulario ? (
                 <p className="variants-price-note">
-                  El precio y el stock se definen en cada variante. En el catálogo, el producto se
-                  muestra con el precio de la más barata y la suma del stock.
+                  {controlarStock
+                    ? 'El precio y el stock se definen en cada variante. En el catálogo, el producto se muestra con el precio de la más barata y la suma del stock.'
+                    : 'El precio se define en cada variante. En el catálogo, el producto se muestra con el precio de la más barata.'}
                   {editingProduct && tieneVariantes(editingProduct) === false && (
                     <> El precio y el stock que tenía el producto dejarán de usarse.</>
                   )}
@@ -1309,6 +1361,7 @@ export default function ProductsPage() {
                 </div>
               )}
 
+              {controlarStock && (
               <div className="form-row">
                 <div className="form-group half">
                   <label htmlFor="prod-stock">Stock disponible</label>
@@ -1336,6 +1389,7 @@ export default function ProductsPage() {
                   />
                 </div>
               </div>
+              )}
 
               {/* MOD-15: el precio por mayor de la ficha, debajo del precio y
                   del stock porque se decide mirando los dos. Solo sin variantes:
@@ -1516,10 +1570,10 @@ export default function ProductsPage() {
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>Formato y Columnas Permitidas</h4>
                 <p>El archivo debe estar codificado en UTF-8 y tener como cabecera (primera fila):</p>
                 <code style={{ background: 'rgba(var(--overlay-mix),0.03)', padding: '0.4rem 0.6rem', borderRadius: '4px', fontFamily: 'monospace', color: 'var(--primary)', display: 'block', wordBreak: 'break-all' }}>
-                  nombre;marca;variante;sku;precio;precio_oferta;costo;stock;categoria;descripcion;especificaciones
+                  nombre;marca;variante;sku;precio;precio_oferta;costo;stock;categoria;descripcion;especificaciones;controla_stock
                 </code>
                 <ul style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
-                  <li><strong>nombre</strong>, <strong>precio</strong> y <strong>stock</strong> son obligatorios. El resto son opcionales y puedes quitar sus columnas.</li>
+                  <li><strong>nombre</strong>, <strong>precio</strong> y <strong>stock</strong> son obligatorios (el stock no, si <strong>controla_stock</strong> es <code>no</code>). El resto son opcionales y puedes quitar sus columnas.</li>
                   <li>
                     <strong>categoria</strong>: tiene que ser una de las que ya tienes (da igual mayúsculas o tildes). Si no existe, esa fila no se importa: créala antes en Categorías.
                     {' '}
@@ -1531,6 +1585,7 @@ export default function ProductsPage() {
                   </li>
                   <li><strong>especificaciones</strong>: formato de clave:valor separados por punto y coma (ej: <code>Frecuencia:3.2 GHz;Núcleos:16</code>).</li>
                   <li><strong>variante</strong>: déjala vacía si el producto no tiene variantes. Si la rellenas (ej: <code>Capacidad: 1 TB</code>, hasta tres opciones separadas por <code>|</code>), esa fila es una variante y el <strong>precio</strong>, el <strong>stock</strong> y el <strong>sku</strong> son suyos: pon una fila por variante repitiendo el mismo <strong>nombre</strong>.</li>
+                  <li><strong>controla_stock</strong>: <code>si</code> o <code>no</code>. Con <code>no</code> el producto se puede pedir siempre (servicios, encargos, productos digitales). Vacía, al crear es <code>si</code> y al actualizar no cambia nada.</li>
                   <li>Un producto <strong>ya existe</strong> si en tu tienda hay otro con el mismo <strong>nombre</strong> (sin mirar mayúsculas ni tildes). Qué hacer con él lo eliges abajo.</li>
                 </ul>
                 
@@ -1579,7 +1634,8 @@ export default function ProductsPage() {
                       name="modo-import"
                       value={modo.valor}
                       checked={importMode === modo.valor}
-                      onChange={() => setImportMode(modo.valor)}
+                      // FUN-29: la vista previa era con el otro modo; hay que repetirla.
+                      onChange={() => { setImportMode(modo.valor); setImportReport(null); }}
                     />
                     <span>
                       <strong>{modo.titulo}</strong>
@@ -1599,14 +1655,26 @@ export default function ProductsPage() {
                 >
                   {importReport ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button
-                  type="submit"
-                  disabled={isImporting}
-                  className="btn-primary"
-                >
-                  {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Importando...' : 'Iniciar Importación'}</span>
-                </button>
+                {importReport?.preview ? (
+                  <button
+                    type="button"
+                    disabled={isImporting || importReport.changes.every((c) => c.accion === 'omitido' || c.accion === 'sin_cambios')}
+                    className="btn-primary"
+                    onClick={() => importar(false)}
+                  >
+                    {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
+                    <span>{isImporting ? 'Importando...' : 'Importar ahora'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isImporting || !importFile}
+                    className="btn-primary"
+                  >
+                    {isImporting ? <Loader2 className="spinner" size={16} /> : <Upload size={16} />}
+                    <span>{isImporting ? 'Revisando...' : 'Revisar el archivo'}</span>
+                  </button>
+                )}
               </div>
             </form>
         </Dialogo>
